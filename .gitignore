@@ -1,0 +1,33 @@
+# --- Go ---
+backend/bin/
+backend/tmp/          # air hot-reload build dir
+*.exe
+*.test
+*.out
+coverage.txt
+
+# --- Node / frontend ---
+node_modules/
+frontend/dist/
+frontend/coverage/
+*.tsbuildinfo
+
+# --- Playwright ---
+test-results/
+playwright-report/
+
+# --- Environment & secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Docker ---
+deploy/**/data/       # local DB volumes if bind-mounted
+
+# --- Editors / OS ---
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+Thumbs.db
+.DS_Store
