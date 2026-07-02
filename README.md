@@ -21,7 +21,7 @@ Docker Compose · GitHub Actions · Playwright
 
 ## Status
 
-**Current phase:** 0 — Environment Setup (see the roadmap in the project plan).
+**Current phase:** 1 — Go Fundamentals & First HTTP API (Phase 0 completed 2026-07-02; see the roadmap in the project plan).
 
 ```
 Mountain_Breath/

@@ -74,14 +74,14 @@ that is part of learning.
 **You will learn:** the toolchain of a full-stack developer; Git basics if any gaps.
 
 **Tasks:**
-- [ ] Install Go (latest stable), verify with `go version`
-- [ ] Install Node.js LTS (via `nvm-windows` or installer), verify `node -v`, `npm -v`
-- [ ] Install Docker Desktop, verify `docker run hello-world`
-- [ ] Configure Git (`user.name`, `user.email`), create GitHub account/repo, push the initial commit
-- [ ] Install VS Code extensions: Go, ESLint, Prettier, Tailwind CSS IntelliSense
-- [ ] Install `golangci-lint` and `air`
+- [x] Install Go (latest stable), verify with `go version` — Go 1.26.4 via winget
+- [x] Install Node.js LTS, verify `node -v`, `npm -v` — Node 24.18.0 / npm 11.16 via winget
+- [x] Install Docker Desktop, verify — Docker 29.6.1, engine running
+- [x] Configure Git (`user.name`, `user.email`), create GitHub repo, push the initial commit — https://github.com/Nerses01/Mountain_Breath (private)
+- [x] Install VS Code extensions: Go, ESLint, Prettier, Tailwind CSS IntelliSense
+- [x] Install `golangci-lint` (2.12.2 via winget) and `air` (1.65.3 via `go install`)
 
-**Done when:** `go version`, `node -v`, `docker ps` all work; the repo is on GitHub.
+**Done when:** `go version`, `node -v`, `docker ps` all work; the repo is on GitHub. ✅ **Completed 2026-07-02**
 
 ---
 

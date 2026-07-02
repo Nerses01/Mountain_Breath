@@ -4,7 +4,7 @@
 
 ```
                         ┌──────────────────────────────────────────┐
-                        │              Docker Compose               │
+                        │              Docker Compose              │
                         │                                          │
   Browser ──HTTPS──►  Nginx (reverse proxy)                        │
                         │   ├── /            → frontend (static React build)
