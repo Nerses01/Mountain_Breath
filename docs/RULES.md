@@ -35,6 +35,11 @@ How we (developer + Claude) collaborate on this project. Read at the start of ea
 13. **Document decisions.** Significant technical choices go into the Decisions Log
     in [ARCHITECTURE.md](ARCHITECTURE.md).
 14. **English** for code, comments, commits, and docs (job-market practice).
+15. **The Postman collection is the living API contract.** Every commit that adds,
+    changes, or removes a route updates
+    `docs/api/mountain-breath.postman_collection.json` in the same commit —
+    request, variables (`{{baseUrl}}`, `{{apiV1}}`), and test scripts. If the
+    collection and the code disagree, that's a bug.
 
 ## Developer's Own Rules
 

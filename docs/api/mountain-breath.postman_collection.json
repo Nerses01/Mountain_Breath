@@ -1,0 +1,113 @@
+{
+	"info": {
+		"_postman_id": "a7c3e8d0-5b2f-4e9a-9c41-3f8b2d6e1a05",
+		"name": "Mountain Breath API",
+		"description": "Living API contract for the Mountain Breath backend.\n\n**Rule (docs/RULES.md):** every commit that adds, changes, or removes a route must update this collection in the same commit — request, variables, and tests.\n\n**Usage:** start the API (`air` or `go run ./cmd/api` in `backend/`), then send requests here, or use the Collection Runner to execute the whole suite with its tests as a smoke test.\n\nFolders mirror the roadmap phases from docs/PROJECT_PLAN.md.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "apiV1",
+			"value": "{{baseUrl}}/api/v1",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "System",
+			"description": "Operational endpoints — not part of the business API.",
+			"item": [
+				{
+					"name": "Health check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						},
+						"description": "Liveness probe. Returns 200 with `{\"status\":\"ok\"}` while the server is up. Later used by Docker healthchecks (Phase 8) and the load balancer (Phase 9)."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"content-type is application/json\", () => {",
+									"    pm.response.to.have.header(\"Content-Type\", \"application/json\");",
+									"});",
+									"",
+									"pm.test(\"body is {status: ok}\", () => {",
+									"    pm.expect(pm.response.json().status).to.eql(\"ok\");",
+									"});",
+									"",
+									"pm.test(\"responds fast (< 200 ms)\", () => {",
+									"    pm.expect(pm.response.responseTime).to.be.below(200);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Slow endpoint (dev only)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/debug/slow",
+							"host": ["{{baseUrl}}"],
+							"path": ["debug", "slow"]
+						},
+						"description": "Sleeps 5 seconds, then responds. Registered only when `MB_ENV=dev`.\n\nPurpose: observing graceful shutdown (Ctrl+C while this is in flight) and client-cancellation (abort the request and watch the server log `slow request abandoned by client`)."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"actually took ~5 seconds\", () => {",
+									"    pm.expect(pm.response.responseTime).to.be.at.least(4500);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Catalog (Phase 2)",
+			"description": "Coming in Phase 2: CRUD for categories, products, and variants under {{apiV1}} — /categories, /products, /products/:slug, admin endpoints.",
+			"item": []
+		},
+		{
+			"name": "Auth (Phase 4)",
+			"description": "Coming in Phase 4: /auth/register, /auth/login, /auth/logout with session cookies.",
+			"item": []
+		},
+		{
+			"name": "Cart & Orders (Phase 5)",
+			"description": "Coming in Phase 5: /cart, /cart/items, /orders.",
+			"item": []
+		}
+	]
+}
