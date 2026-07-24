@@ -8,9 +8,10 @@ How we (developer + Claude) collaborate on this project. Read at the start of ea
    approach that teaches the most, even if it takes longer.
 2. **Explain before code.** When introducing a new concept, tool, or pattern,
    Claude explains *what it is and why it's used* before writing code with it.
-3. **The developer writes code too.** Where practical, Claude guides and reviews
-   while the developer writes the code — especially for core learning topics
-   (Go idioms, SQL, React hooks). Claude writes boilerplate/scaffolding.
+3. **Claude writes, developer studies.** Claude writes the code with detailed
+   explanations (concepts, line-by-line reasoning, C++ analogies); the developer
+   reads, asks questions, and must understand every line before moving on.
+   *(Changed from "developer writes with guidance" at developer's request, 2026-07-07.)*
 4. **Compare with C++.** When a Go/TypeScript concept has a C++ analogue
    (or a deliberate difference — error values vs exceptions, GC vs RAII,
    interfaces vs virtual functions), point it out.

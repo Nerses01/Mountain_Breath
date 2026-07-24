@@ -94,15 +94,16 @@ that is part of learning.
 JSON marshalling, project layout conventions.
 
 **Tasks:**
-- [ ] Complete the [Tour of Go](https://go.dev/tour/) (1–2 evenings)
-- [ ] Read [Effective Go](https://go.dev/doc/effective_go) sections as needed
-- [ ] Create `backend/` with `go mod init`
-- [ ] Build a minimal API: `GET /health` returning JSON, structured logging with `log/slog`
-- [ ] Add `chi` router, middleware (request logging, panic recovery)
-- [ ] Set up `air` for hot reload and `golangci-lint` with a config file
-- [ ] Understand and document the chosen project layout (`cmd/`, `internal/`)
+- [x] Complete the [Tour of Go](https://go.dev/tour/) (1–2 evenings)
+- [x] Read [Effective Go](https://go.dev/doc/effective_go) sections as needed
+- [x] Create `backend/` with `go mod init`
+- [x] Build a minimal API: `GET /health` returning JSON, structured logging with `log/slog`
+- [x] Add `chi` router, middleware (request logging, panic recovery)
+- [x] Set up `air` for hot reload and `golangci-lint` with a config file
+- [x] Understand and document the chosen project layout (`cmd/`, `internal/`)
+- [x] Graceful shutdown (signal → drain in-flight requests → exit) + Delve debugging set up in VS Code
 
-**Done when:** `go run ./cmd/api` serves `/health`; linter passes; layout documented.
+**Done when:** `go run ./cmd/api` serves `/health`; linter passes; layout documented. ✅ **Completed 2026-07-24**
 
 ---
 

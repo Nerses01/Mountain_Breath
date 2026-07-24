@@ -1,0 +1,12 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/api.exe ./cmd/api"
+bin = "tmp/api.exe"
+include_ext = ["go"]
+exclude_dir = ["tmp", "bin"]
+delay = 1000 # ms to wait after a change before rebuilding
+
+[log]
+time = true

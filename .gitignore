@@ -28,6 +28,7 @@ deploy/**/data/       # local DB volumes if bind-mounted
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+!.vscode/launch.json
 .idea/
 Thumbs.db
 .DS_Store

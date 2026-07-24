@@ -17,6 +17,19 @@ Template for an entry:
 
 ---
 
+## 2026-07-24 — Phase 1 complete: structured API, middleware, graceful shutdown
+
+**Worked on:** split `main.go` into `internal/api` + `internal/config`; chi router; request-logging and panic-recovery middleware; JSON respond helpers with the standard error envelope; env-based config; `http.Server` timeouts; graceful shutdown with `signal.NotifyContext` + `srv.Shutdown`; dev-only `/debug/slow` endpoint; Delve + VS Code F5 debugging; `.air.toml` and `.golangci.yml`.
+**Learned:**
+- Middleware = decorator pattern over `http.Handler`; chain order matters; closures capture dependencies.
+- `defer` + `recover` only work together during panic unwinding — same mechanism as destructors during C++ exception unwinding.
+- Every request runs in its own goroutine → handlers must be concurrency-safe.
+- `select` waits on multiple channels at once (like `WaitForMultipleObjects`); `r.Context()` is cancelled when the client disconnects.
+- Graceful shutdown: `signal.NotifyContext` → `<-ctx.Done()` → `srv.Shutdown(ctxWithTimeout)`; `ListenAndServe` returns `http.ErrServerClosed` on purpose then.
+- `errcheck` forces every error to be handled or explicitly discarded (`_ =`) — `[[nodiscard]]` everywhere.
+**Questions / to revisit:**
+- Test graceful shutdown manually (Ctrl+C during `/debug/slow`).
+
 ## 2026-07-02 — Phase 0: Environment Setup ✅
 
 **Worked on:** full dev environment on Windows — installed Go 1.26.4, Node.js 24.18 LTS, golangci-lint, air, VS Code extensions (Go, ESLint, Prettier, Tailwind); verified Docker; created private GitHub repo and pushed (`gh repo create ... --push`).
