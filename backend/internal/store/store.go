@@ -1,0 +1,69 @@
+package store
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
+)
+
+// Postgres error code for a UNIQUE constraint violation.
+// Full list: https://www.postgresql.org/docs/current/errcodes-appendix.html
+const uniqueViolation = "23505"
+
+// Store gives the rest of the app access to the database. All SQL lives here.
+type Store struct {
+	pool *pgxpool.Pool
+}
+
+func New(pool *pgxpool.Pool) *Store {
+	return &Store{pool: pool}
+}
+
+func (s *Store) ListCategories(ctx context.Context) ([]domain.Category, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, slug, name, sort_order, created_at
+		FROM categories
+		ORDER BY sort_order, name`)
+	if err != nil {
+		return nil, fmt.Errorf("querying categories: %w", err)
+	}
+	defer rows.Close()
+
+	// Start with an empty (non-nil) slice: a nil slice marshals to JSON
+	// null, an empty one to [] — and the API must return [].
+	cats := make([]domain.Category, 0)
+	for rows.Next() {
+		var c domain.Category
+		if err := rows.Scan(&c.ID, &c.Slug, &c.Name, &c.SortOrder, &c.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scanning category row: %w", err)
+		}
+		cats = append(cats, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating category rows: %w", err)
+	}
+	return cats, nil
+}
+
+// CreateCategory inserts c and fills in its DB-generated fields (ID, CreatedAt).
+func (s *Store) CreateCategory(ctx context.Context, c *domain.Category) error {
+	err := s.pool.QueryRow(ctx, `
+		INSERT INTO categories (slug, name, sort_order)
+		VALUES ($1, $2, $3)
+		RETURNING id, created_at`,
+		c.Slug, c.Name, c.SortOrder,
+	).Scan(&c.ID, &c.CreatedAt)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+			return domain.ErrSlugTaken
+		}
+		return fmt.Errorf("inserting category: %w", err)
+	}
+	return nil
+}

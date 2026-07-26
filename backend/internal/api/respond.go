@@ -29,3 +29,11 @@ func (s *Server) respondJSON(w http.ResponseWriter, status int, v any) {
 func (s *Server) respondError(w http.ResponseWriter, status int, code, message string) {
 	s.respondJSON(w, status, errorEnvelope{Error: errorBody{Code: code, Message: message}})
 }
+
+func (s *Server) respondValidationError(w http.ResponseWriter, fields map[string]string) {
+	s.respondJSON(w, http.StatusBadRequest, errorEnvelope{Error: errorBody{
+		Code:    "validation_failed",
+		Message: "one or more fields are invalid",
+		Fields:  fields,
+	}})
+}

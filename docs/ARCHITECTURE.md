@@ -79,7 +79,8 @@ concurrent checkouts (row locking `SELECT ... FOR UPDATE`).
   ```json
   { "error": { "code": "validation_failed", "message": "...", "fields": { "name": "required" } } }
   ```
-- List endpoints support `?page=` / `?per_page=` (offset pagination first; cursor later if needed)
+- List endpoints support `?page=` / `?per_page=` (offset pagination first; cursor later if needed);
+  paginated responses use the envelope `{"items": [...], "page": N, "per_page": N, "total": N}`
 - Auth: session cookie (`HttpOnly`, `Secure`, `SameSite=Lax`); admin endpoints under `/api/v1/admin/*`
 - Versioning in the path so a future v2 can coexist
 
@@ -106,5 +107,7 @@ frontend/
 | 3 | Money as integer minor units | float money is a classic bug class | 2026-07-02 |
 | 4 | Server-side cart | teaches state management on the backend; works logged-out via session | 2026-07-02 |
 | 5 | REST before GraphQL/gRPC | foundation first | 2026-07-02 |
+| 6 | Store interfaces defined at the consumer (`api.CategoryStore`), not in `store` | Go idiom; lets tests swap in fakes without touching the store package | 2026-07-26 |
+| 7 | DB errors translated to domain sentinel errors (`ErrSlugTaken`) at the store boundary | API layer maps domain errors to HTTP codes without knowing SQL details | 2026-07-26 |
 
 Add a new row whenever we make a significant technical decision.

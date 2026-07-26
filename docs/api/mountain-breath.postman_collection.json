@@ -96,8 +96,322 @@
 		},
 		{
 			"name": "Catalog (Phase 2)",
-			"description": "Coming in Phase 2: CRUD for categories, products, and variants under {{apiV1}} — /categories, /products, /products/:slug, admin endpoints.",
-			"item": []
+			"description": "Category and product endpoints. Products are read-only until Phase 4 adds the admin panel — data comes from backend/seed/seed.sql. Category POST is unprotected until Phase 4.",
+			"item": [
+				{
+					"name": "List products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/products?category=&page=1&per_page=20",
+							"host": ["{{apiV1}}"],
+							"path": ["products"],
+							"query": [
+								{
+									"key": "category",
+									"value": "",
+									"description": "optional category slug filter, e.g. herbal-tea"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "per_page",
+									"value": "20",
+									"description": "1..100, default 20"
+								}
+							]
+						},
+						"description": "Paginated list of active products with nested variants (sorted by price). Envelope: {items, page, per_page, total}."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"",
+									"pm.test(\"has pagination envelope\", () => {",
+									"    pm.expect(body).to.have.keys(\"items\", \"page\", \"per_page\", \"total\");",
+									"    pm.expect(body.items).to.be.an(\"array\");",
+									"});",
+									"",
+									"pm.test(\"every product has variants array\", () => {",
+									"    body.items.forEach(p => pm.expect(p.variants).to.be.an(\"array\"));",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Get product by slug",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/products/armenian-coffee",
+							"host": ["{{apiV1}}"],
+							"path": ["products", "armenian-coffee"]
+						},
+						"description": "Product detail with variants. Slug comes from seed data."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"",
+									"pm.test(\"slug matches request\", () => {",
+									"    pm.expect(body.slug).to.eql(\"armenian-coffee\");",
+									"});",
+									"",
+									"pm.test(\"variants sorted by price ascending\", () => {",
+									"    const prices = body.variants.map(v => v.price_minor);",
+									"    pm.expect(prices).to.eql([...prices].sort((a, b) => a - b));",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Get product — unknown slug (404)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/products/no-such-product",
+							"host": ["{{apiV1}}"],
+							"path": ["products", "no-such-product"]
+						},
+						"description": "Unknown slug returns 404 with the standard error envelope."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 404\", () => {",
+									"    pm.response.to.have.status(404);",
+									"});",
+									"",
+									"pm.test(\"error code is not_found\", () => {",
+									"    pm.expect(pm.response.json().error.code).to.eql(\"not_found\");",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "List categories",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/categories",
+							"host": ["{{apiV1}}"],
+							"path": ["categories"]
+						},
+						"description": "Returns all categories ordered by sort_order, then name. Always an array — [] when empty, never null."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"body is an array\", () => {",
+									"    pm.expect(pm.response.json()).to.be.an(\"array\");",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Create category",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"slug\": \"{{newCatSlug}}\",\n    \"name\": \"Test Category\",\n    \"sort_order\": 100\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{apiV1}}/categories",
+							"host": ["{{apiV1}}"],
+							"path": ["categories"]
+						},
+						"description": "Creates a category. The pre-request script generates a unique slug each run, so the Collection Runner stays repeatable."
+					},
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"// unique slug per run — keeps the Collection Runner repeatable",
+									"pm.collectionVariables.set(\"newCatSlug\", \"test-cat-\" + Date.now());"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 201\", () => {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"",
+									"pm.test(\"echoes the slug back\", () => {",
+									"    pm.expect(body.slug).to.eql(pm.collectionVariables.get(\"newCatSlug\"));",
+									"});",
+									"",
+									"pm.test(\"has a DB-generated id and created_at\", () => {",
+									"    pm.expect(body.id).to.be.a(\"number\");",
+									"    pm.expect(body.created_at).to.be.a(\"string\");",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Create category — duplicate slug (409)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"slug\": \"{{newCatSlug}}\",\n    \"name\": \"Same Slug Again\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{apiV1}}/categories",
+							"host": ["{{apiV1}}"],
+							"path": ["categories"]
+						},
+						"description": "Reuses {{newCatSlug}} from the previous request — run it after 'Create category'. The UNIQUE constraint surfaces as 409 + code slug_taken."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 409\", () => {",
+									"    pm.response.to.have.status(409);",
+									"});",
+									"",
+									"pm.test(\"error code is slug_taken\", () => {",
+									"    pm.expect(pm.response.json().error.code).to.eql(\"slug_taken\");",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Create category — validation errors (400)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"slug\": \"BAD SLUG\",\n    \"name\": \"\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{apiV1}}/categories",
+							"host": ["{{apiV1}}"],
+							"path": ["categories"]
+						},
+						"description": "Empty name + malformed slug → 400 with the standard error envelope and a per-field breakdown."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 400\", () => {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"const err = pm.response.json().error;",
+									"",
+									"pm.test(\"error code is validation_failed\", () => {",
+									"    pm.expect(err.code).to.eql(\"validation_failed\");",
+									"});",
+									"",
+									"pm.test(\"reports both bad fields\", () => {",
+									"    pm.expect(err.fields).to.have.property(\"name\");",
+									"    pm.expect(err.fields).to.have.property(\"slug\");",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				}
+			]
 		},
 		{
 			"name": "Auth (Phase 4)",

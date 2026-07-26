@@ -17,6 +17,36 @@ Template for an entry:
 
 ---
 
+## 2026-07-26 — Phase 2: products + variants, pagination, seed data
+
+**Worked on:** migration 000002 (products, product_variants: FKs with RESTRICT/CASCADE, CHECK constraints, composite UNIQUE, explicit FK indexes); idempotent seed script (VALUES-join inserts, ON CONFLICT DO NOTHING); `ListProducts` (filter + pagination + total) and `GetProductBySlug`; N+1 avoided via `WHERE product_id = ANY($1)`; generic `paginated[T]` envelope; chi URL params; interface embedding (`Store` = `CategoryStore` + `ProductStore`). All 6 endpoint paths verified.
+**Learned:**
+- FK delete policies say what deletion *means*: RESTRICT (category with products = error) vs CASCADE (variants die with product).
+- Postgres does not auto-index FK columns — create those indexes yourself.
+- The N+1 problem and the batch fix: load children for a whole page in one `= ANY(ids)` query.
+- `($1 = '' OR col = $1)` — optional filters without string-building SQL.
+- Go generics (`paginated[T any]`) — like C++ templates but constraint-based, no header bloat.
+- Query params are untrusted input: parse with defaults, clamp ranges.
+- Smart App Control blocks fresh unsigned `go build` output; `go run` (build cache) passes — needs a permanent decision (see below).
+**Questions / to revisit:**
+- Smart App Control vs local dev: decide whether to turn it off (Windows Security → App & browser control) — it will keep blocking `bin\api.exe` and possibly air's `tmp\api.exe`.
+
+## 2026-07-26 — Phase 2: pgx store layer + first real endpoints
+
+**Worked on:** `internal/domain` (Category + validation + `ErrSlugTaken` sentinel), `internal/store` (pgxpool, ListCategories, CreateCategory), consumer-side `CategoryStore` interface in `api`, DTOs, `GET/POST /api/v1/categories` with 201/400/409 handling, `main` refactored to `run() error` pattern, godotenv for dev, Postman Catalog folder with pre-request scripts and tests. All 6 request paths verified with curl.
+**Learned:**
+- Connection pool: handlers borrow/return connections concurrently; `pgxpool.New` + startup `Ping` = fail fast.
+- Parameterized queries (`$1, $2`) — the only defense against SQL injection; never string-concatenate SQL.
+- Sentinel error flow across layers: pg error 23505 → `errors.As` → `domain.ErrSlugTaken` → `errors.Is` in handler → HTTP 409. Layers stay decoupled.
+- Interfaces belong at the consumer (`api.CategoryStore`), satisfied implicitly — enables fake stores in tests.
+- `INSERT ... RETURNING` fetches DB-generated values in the same round-trip.
+- nil slice marshals to JSON `null`, empty slice to `[]` — APIs must return `[]`.
+- Request hygiene: `http.MaxBytesReader` (body cap) + `DisallowUnknownFields` (typo'd JSON keys fail loudly).
+- `run() error` pattern: `os.Exit` skips `defer`s, so main delegates to a function that returns errors.
+- PowerShell 5.1 mangles embedded quotes for native exes — pass JSON to curl via `-d "@file"`.
+**Questions / to revisit:**
+- Products + variants schema and endpoints; pagination; seed script.
+
 ## 2026-07-24 — Phase 2 started: Postgres in Docker, first migration
 
 **Worked on:** `deploy/docker-compose.dev.yml` (postgres:17-alpine, named volume, healthcheck, env-based secrets with git-ignored `.env` + committed `.env.example`); installed `migrate` CLI; migration 000001 (categories table); tested up → down → up; fixed broken `.gitignore` inline comments and untracked air build logs.

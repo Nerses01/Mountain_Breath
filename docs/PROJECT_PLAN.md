@@ -117,12 +117,12 @@ configuration, Docker Compose for dev dependencies.
 
 **Tasks:**
 - [x] Write `deploy/docker-compose.dev.yml` with PostgreSQL 17 (+ `.env`/`.env.example` secrets pattern)
-- [ ] Design the catalog schema (see ARCHITECTURE.md): categories ✓, products, variants
-- [x] Create migrations with `golang-migrate`; learn up/down migrations (000001_create_categories, full up→down→up cycle tested)
-- [ ] Implement repository layer with `pgx`
-- [ ] REST endpoints: CRUD for categories and products (+ variants), pagination, filtering by category
-- [ ] Input validation and a consistent JSON error format
-- [ ] Seed script with sample Mountain Breath products
+- [x] Design the catalog schema (see ARCHITECTURE.md): categories, products, variants (FKs, CHECK constraints, FK indexes)
+- [x] Create migrations with `golang-migrate`; learn up/down migrations (000001 categories, 000002 products+variants; full up→down→up cycle tested)
+- [x] Implement repository layer with `pgx` (pgxpool, consumer-side `CategoryStore` interface in `api`)
+- [x] REST endpoints: categories (list+create), products (paginated list with category filter + detail by slug); product writes deferred to Phase 4 admin
+- [x] Input validation and a consistent JSON error format (domain validation, 400/404/409 mapping, sentinel errors)
+- [x] Seed script with sample Mountain Breath products (`backend/seed/seed.sql`, idempotent)
 
 **Done when:** full catalog CRUD works via `curl`/Postman against Postgres in Docker.
 
