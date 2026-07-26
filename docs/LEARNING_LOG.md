@@ -17,6 +17,18 @@ Template for an entry:
 
 ---
 
+## 2026-07-24 — Phase 2 started: Postgres in Docker, first migration
+
+**Worked on:** `deploy/docker-compose.dev.yml` (postgres:17-alpine, named volume, healthcheck, env-based secrets with git-ignored `.env` + committed `.env.example`); installed `migrate` CLI; migration 000001 (categories table); tested up → down → up; fixed broken `.gitignore` inline comments and untracked air build logs.
+**Learned:**
+- `.gitignore` does not support inline `#` comments — the comment becomes part of the pattern.
+- Compose: `${VAR:-default}` vs `${VAR:?error}`; named volumes survive `docker compose down`; healthcheck gates dependent services.
+- Migrations are versioned, append-only schema changes; `schema_migrations` table tracks the current version + a dirty flag; every up needs a working down.
+- Postgres: `GENERATED ALWAYS AS IDENTITY` (modern SERIAL), `TEXT` is idiomatic (no VARCHAR(n) needed), `TIMESTAMPTZ` for timestamps, UNIQUE constraint creates an index automatically.
+- Windows: `migrate -path` needs forward-slash/relative paths (it builds a `file://` URL).
+**Questions / to revisit:**
+- (none yet)
+
 ## 2026-07-24 — Phase 1 complete: structured API, middleware, graceful shutdown
 
 **Worked on:** split `main.go` into `internal/api` + `internal/config`; chi router; request-logging and panic-recovery middleware; JSON respond helpers with the standard error envelope; env-based config; `http.Server` timeouts; graceful shutdown with `signal.NotifyContext` + `srv.Shutdown`; dev-only `/debug/slow` endpoint; Delve + VS Code F5 debugging; `.air.toml` and `.golangci.yml`.

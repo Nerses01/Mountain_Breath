@@ -1,0 +1,26 @@
+name: mountain-breath-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: mb-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mb}
+      # :? makes compose fail loudly if the variable is missing,
+      # instead of silently starting with an empty password.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-mountain_breath}
+    ports:
+      # host:container — the API on Windows connects to localhost:5432
+      - "5432:5432"
+    volumes:
+      # named volume: data survives `docker compose down` and container rebuilds
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:

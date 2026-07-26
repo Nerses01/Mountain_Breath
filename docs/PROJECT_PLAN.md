@@ -116,9 +116,9 @@ migrations, the repository pattern, `pgx`, connection pooling, environment-based
 configuration, Docker Compose for dev dependencies.
 
 **Tasks:**
-- [ ] Write `deploy/docker-compose.dev.yml` with PostgreSQL 17
-- [ ] Design the catalog schema (see ARCHITECTURE.md): categories, products, variants
-- [ ] Create migrations with `golang-migrate`; learn up/down migrations
+- [x] Write `deploy/docker-compose.dev.yml` with PostgreSQL 17 (+ `.env`/`.env.example` secrets pattern)
+- [ ] Design the catalog schema (see ARCHITECTURE.md): categories ✓, products, variants
+- [x] Create migrations with `golang-migrate`; learn up/down migrations (000001_create_categories, full up→down→up cycle tested)
 - [ ] Implement repository layer with `pgx`
 - [ ] REST endpoints: CRUD for categories and products (+ variants), pagination, filtering by category
 - [ ] Input validation and a consistent JSON error format
