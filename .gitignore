@@ -1,6 +1,8 @@
 # --- Go ---
 backend/bin/
-backend/tmp/          # air hot-reload build dir
+# air hot-reload build dirs (backend, and repo root if air is started there)
+backend/tmp/
+tmp/
 *.exe
 *.test
 *.out
@@ -22,7 +24,8 @@ playwright-report/
 !.env.example
 
 # --- Docker ---
-deploy/**/data/       # local DB volumes if bind-mounted
+# local DB volumes if bind-mounted
+deploy/**/data/
 
 # --- Editors / OS ---
 .vscode/*
