@@ -17,6 +17,19 @@ Template for an entry:
 
 ---
 
+## 2026-07-26 — Phase 3 started: React + TypeScript catalog page
+
+**Worked on:** Vite react-ts scaffold; Tailwind v4 (`@tailwindcss/vite` plugin); typed API layer (`src/api/types.ts` mirrors Go DTOs, `client.ts` with `ApiError` + generic `request<T>`, `hooks.ts` with TanStack Query); CatalogPage with category filter chips, loading/error states, ProductCard with variant prices; Vite dev proxy `/api → :8080` (no CORS needed). Verified end-to-end: browser → proxy → Go → Postgres.
+**Learned:**
+- Frontend types don't travel over the wire — `types.ts` is a *promise* about JSON shape; the compiler enforces our own consistency, not the backend's (OpenAPI codegen later closes that gap).
+- TanStack Query: `queryKey` identifies the cache entry; params in the key = per-filter caching; `isPending/isError/data` replaces hand-rolled fetch state.
+- React mental model: UI = f(state); `useState` + re-render instead of imperative DOM updates.
+- `erasableSyntaxOnly`: constructor parameter properties are TS syntax that *generates* JS — modern configs forbid non-erasable TS.
+- Vite dev proxy = same-origin in dev, mirroring Nginx in prod — CORS becomes unnecessary in both.
+**Questions / to revisit:**
+- TypeScript handbook + React docs reading still pending (checkbox open).
+- Product detail page + react-router next.
+
 ## 2026-07-26 — Phase 2: products + variants, pagination, seed data
 
 **Worked on:** migration 000002 (products, product_variants: FKs with RESTRICT/CASCADE, CHECK constraints, composite UNIQUE, explicit FK indexes); idempotent seed script (VALUES-join inserts, ON CONFLICT DO NOTHING); `ListProducts` (filter + pagination + total) and `GetProductBySlug`; N+1 avoided via `WHERE product_id = ANY($1)`; generic `paginated[T]` envelope; chi URL params; interface embedding (`Store` = `CategoryStore` + `ProductStore`). All 6 endpoint paths verified.
