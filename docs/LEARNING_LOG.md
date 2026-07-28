@@ -17,6 +17,17 @@ Template for an entry:
 
 ---
 
+## 2026-07-28 — Phase 3 complete: react-router + product detail page
+
+**Worked on:** react-router v7 (`BrowserRouter`, `Routes`, `Link`, `useParams`); `/products/:slug` detail page with variant picker (selected-variant state, out-of-stock disabling, 404 handling via `ApiError.status`); ProductCard wrapped in `Link`; `formatPrice` moved to `src/lib/format.ts`; disabled "Add to cart" placeholder for Phase 5.
+**Learned:**
+- Client-side routing: the URL changes but no server request happens — the router renders a different component; deep links work because the dev server (later Nginx) serves index.html for any non-file path (history fallback).
+- `useParams` reads URL segments; the URL is state too — shareable/bookmarkable, unlike `useState`.
+- Distinguishing 404 from other errors on the frontend via the typed `ApiError`.
+- Vite HMR picked up new files into the running dev server without restart.
+**Questions / to revisit:**
+- (none)
+
 ## 2026-07-26 — Phase 3 started: React + TypeScript catalog page
 
 **Worked on:** Vite react-ts scaffold; Tailwind v4 (`@tailwindcss/vite` plugin); typed API layer (`src/api/types.ts` mirrors Go DTOs, `client.ts` with `ApiError` + generic `request<T>`, `hooks.ts` with TanStack Query); CatalogPage with category filter chips, loading/error states, ProductCard with variant prices; Vite dev proxy `/api → :8080` (no CORS needed). Verified end-to-end: browser → proxy → Go → Postgres.

@@ -19,3 +19,10 @@ export function useProducts(params: ProductListParams) {
     queryFn: () => api.listProducts(params),
   })
 }
+
+export function useProduct(slug: string) {
+  return useQuery({
+    queryKey: ['product', slug],
+    queryFn: () => api.getProduct(slug),
+  })
+}

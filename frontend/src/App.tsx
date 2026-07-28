@@ -1,4 +1,6 @@
+import { Link, Route, Routes } from 'react-router'
 import { CatalogPage } from './pages/CatalogPage'
+import { ProductPage } from './pages/ProductPage'
 
 function App() {
   return (
@@ -6,16 +8,21 @@ function App() {
       <header className="border-b border-stone-200 bg-white">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-4">
           <span className="text-2xl">🏔️</span>
-          <div>
+          <Link to="/">
             <h1 className="text-xl font-bold text-stone-800">Mountain Breath</h1>
             <p className="text-xs text-stone-400">
               tea · coffee · honey from the mountains
             </p>
-          </div>
+          </Link>
         </div>
       </header>
 
-      <CatalogPage />
+      {/* The router swaps the page component based on the URL — no server
+          round-trip, just React rendering a different component. */}
+      <Routes>
+        <Route path="/" element={<CatalogPage />} />
+        <Route path="/products/:slug" element={<ProductPage />} />
+      </Routes>
     </div>
   )
 }

@@ -138,11 +138,11 @@ Tailwind, TanStack Query, CORS (and why it exists), talking to your own API.
 **Tasks:**
 - [ ] TypeScript fundamentals (official handbook) + React quick start
 - [x] Scaffold `frontend/` with Vite (react-ts template), lint + Prettier, Tailwind v4
-- [ ] Pages: product list (grid with categories filter) ✓, product detail with variant picker (needs react-router)
+- [x] Pages: product list (grid with categories filter), product detail with variant picker (react-router v7, URL param routing, SPA deep links)
 - [x] Fetch data with TanStack Query; typed API client mirroring backend JSON (`src/api/`)
 - [x] Handle loading/error states properly; CORS avoided by design — Vite dev proxy keeps one origin (same as Nginx will in prod)
 
-**Done when:** the catalog from Phase 2 renders in the browser from the real API.
+**Done when:** the catalog from Phase 2 renders in the browser from the real API. ✅ **Completed 2026-07-28** (TS handbook / React docs reading continues alongside)
 
 ---
 
