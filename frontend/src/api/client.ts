@@ -1,4 +1,12 @@
-import type { ApiErrorBody, Category, Paginated, Product } from './types'
+import type {
+  ApiErrorBody,
+  Category,
+  Credentials,
+  NewCategory,
+  Paginated,
+  Product,
+  User,
+} from './types'
 
 export class ApiError extends Error {
   readonly status: number
@@ -19,8 +27,17 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string): Promise<T> {
-  const res = await fetch(path)
+interface RequestOptions {
+  method?: string
+  body?: unknown
+}
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const res = await fetch(path, {
+    method: options.method ?? 'GET',
+    headers: options.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  })
   if (!res.ok) {
     // Try to read our standard error envelope; fall back to the HTTP status.
     let code = 'unknown_error'
@@ -35,6 +52,9 @@ async function request<T>(path: string): Promise<T> {
       // response body wasn't our JSON envelope — keep the fallback
     }
     throw new ApiError(res.status, code, message, fields)
+  }
+  if (res.status === 204) {
+    return undefined as T // no content (e.g. logout)
   }
   return res.json() as Promise<T>
 }
@@ -59,4 +79,16 @@ export const api = {
 
   getProduct: (slug: string) =>
     request<Product>(`/api/v1/products/${encodeURIComponent(slug)}`),
+
+  // auth — the browser attaches the session cookie automatically
+  me: () => request<User>('/api/v1/auth/me'),
+  register: (creds: Credentials) =>
+    request<User>('/api/v1/auth/register', { method: 'POST', body: creds }),
+  login: (creds: Credentials) =>
+    request<User>('/api/v1/auth/login', { method: 'POST', body: creds }),
+  logout: () => request<void>('/api/v1/auth/logout', { method: 'POST' }),
+
+  // admin
+  createCategory: (data: NewCategory) =>
+    request<Category>('/api/v1/admin/categories', { method: 'POST', body: data }),
 }

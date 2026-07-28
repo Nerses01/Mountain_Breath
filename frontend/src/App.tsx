@@ -1,5 +1,8 @@
 import { Link, Route, Routes } from 'react-router'
+import { AuthStatus } from './components/AuthStatus'
+import { AdminPage } from './pages/AdminPage'
 import { CatalogPage } from './pages/CatalogPage'
+import { LoginPage } from './pages/LoginPage'
 import { ProductPage } from './pages/ProductPage'
 
 function App() {
@@ -8,12 +11,13 @@ function App() {
       <header className="border-b border-stone-200 bg-white">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-4">
           <span className="text-2xl">🏔️</span>
-          <Link to="/">
+          <Link to="/" className="flex-1">
             <h1 className="text-xl font-bold text-stone-800">Mountain Breath</h1>
             <p className="text-xs text-stone-400">
               tea · coffee · honey from the mountains
             </p>
           </Link>
+          <AuthStatus />
         </div>
       </header>
 
@@ -22,6 +26,8 @@ function App() {
       <Routes>
         <Route path="/" element={<CatalogPage />} />
         <Route path="/products/:slug" element={<ProductPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
     </div>
   )

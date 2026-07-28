@@ -36,6 +36,23 @@ export interface Paginated<T> {
   total: number
 }
 
+export interface User {
+  id: number
+  email: string
+  role: 'customer' | 'admin'
+}
+
+export interface Credentials {
+  email: string
+  password: string
+}
+
+export interface NewCategory {
+  slug: string
+  name: string
+  sort_order: number
+}
+
 // Shape of the backend's error envelope (docs/ARCHITECTURE.md).
 export interface ApiErrorBody {
   error: {

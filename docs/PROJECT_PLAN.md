@@ -158,9 +158,9 @@ auth, role-based access (customer vs admin), CSRF basics.
 - [x] `users` + `sessions` tables + migration (bcrypt hashes, roles, hashed session tokens)
 - [x] Register / login / logout / me endpoints; DB session store; secure cookie (HttpOnly, SameSite=Lax, Secure in prod)
 - [x] Auth middleware (`withUser` + `requireAdmin`); category creation moved under `/api/v1/admin`; admin promotion via SQL for now
-- [ ] Frontend: login/register forms, auth context, admin area for managing products
+- [x] Frontend: login/register page, session-aware header (`useMe`), admin page with category management (product management UI later with Phase 5+)
 
-**Done when:** only a logged-in admin can modify the catalog; sessions survive restart.
+**Done when:** only a logged-in admin can modify the catalog; sessions survive restart. ✅ **Completed 2026-07-28** (sessions live in Postgres → survive server restarts by design)
 
 ---
 

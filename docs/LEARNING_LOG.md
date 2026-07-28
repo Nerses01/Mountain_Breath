@@ -17,6 +17,18 @@ Template for an entry:
 
 ---
 
+## 2026-07-28 — Phase 4 complete: frontend auth UI
+
+**Worked on:** `useMe` (401→null mapping), login/register/logout/createCategory mutations; LoginPage (controlled inputs, mode toggle, per-field API errors); AuthStatus header widget (Sign in ↔ email + Sign out + Admin link); AdminPage with category form + list; routes /login and /admin; generic `request<T>` extended for POST/204.
+**Learned:**
+- `useMutation` for writes vs `useQuery` for reads; after a write either `setQueryData` (we hold the fresh value) or `invalidateQueries` (server knows best).
+- Controlled inputs: React state owns the field value; `e.preventDefault()` stops the browser's own form submission.
+- Anonymous is a state, not an error — mapping 401 to `null` keeps `useMe` clean.
+- Client-side route guards are UX only; the backend middleware is the actual security boundary.
+- The browser attaches HttpOnly cookies automatically — frontend code never sees or touches the session token.
+**Questions / to revisit:**
+- Product management UI for admin (with Phase 5+); logout everywhere; email verification (Phase 10 maybe).
+
 ## 2026-07-28 — Phase 4 (backend): sessions, bcrypt, admin gate
 
 **Worked on:** migration 000003 (users, sessions with hashed tokens); bcrypt registration/login; session cookie (HttpOnly, SameSite=Lax, Secure=!dev, 7d TTL); `withUser` context middleware + `requireAdmin`; `/api/v1/auth/*` endpoints; category POST moved to `/api/v1/admin/categories`; Postman restructured (Auth + Admin folders, cookie-jar flows). Full lifecycle verified with curl cookie jar, including SQL role promotion taking effect on the live session.
