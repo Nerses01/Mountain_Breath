@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -25,10 +26,23 @@ type ProductStore interface {
 	GetProductBySlug(ctx context.Context, slug string) (domain.Product, error)
 }
 
+type UserStore interface {
+	CreateUser(ctx context.Context, u *domain.User) error
+	GetUserByEmail(ctx context.Context, email string) (domain.User, error)
+}
+
+type SessionStore interface {
+	CreateSession(ctx context.Context, token string, userID int64, expiresAt time.Time) error
+	GetUserBySession(ctx context.Context, token string) (domain.User, error)
+	DeleteSession(ctx context.Context, token string) error
+}
+
 // Store embeds the per-entity interfaces into the one the Server depends on.
 type Store interface {
 	CategoryStore
 	ProductStore
+	UserStore
+	SessionStore
 }
 
 // Server holds the dependencies of the HTTP layer. Handlers are methods on it,
@@ -53,11 +67,22 @@ func (s *Server) Routes() chi.Router {
 	r.Get("/health", s.handleHealth)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Get("/categories", s.handleListCategories)
-		r.Post("/categories", s.handleCreateCategory) // TODO Phase 4: admin-only
+		// Resolve the session cookie (if any) for every API request.
+		r.Use(s.withUser)
 
+		r.Post("/auth/register", s.handleRegister)
+		r.Post("/auth/login", s.handleLogin)
+		r.Post("/auth/logout", s.handleLogout)
+		r.Get("/auth/me", s.handleMe)
+
+		r.Get("/categories", s.handleListCategories)
 		r.Get("/products", s.handleListProducts)
 		r.Get("/products/{slug}", s.handleGetProduct)
+
+		r.Route("/admin", func(r chi.Router) {
+			r.Use(s.requireAdmin)
+			r.Post("/categories", s.handleCreateCategory)
+		})
 	})
 
 	if s.devMode {

@@ -17,6 +17,21 @@ Template for an entry:
 
 ---
 
+## 2026-07-28 — Phase 4 (backend): sessions, bcrypt, admin gate
+
+**Worked on:** migration 000003 (users, sessions with hashed tokens); bcrypt registration/login; session cookie (HttpOnly, SameSite=Lax, Secure=!dev, 7d TTL); `withUser` context middleware + `requireAdmin`; `/api/v1/auth/*` endpoints; category POST moved to `/api/v1/admin/categories`; Postman restructured (Auth + Admin folders, cookie-jar flows). Full lifecycle verified with curl cookie jar, including SQL role promotion taking effect on the live session.
+**Learned:**
+- bcrypt: deliberately slow + salted → rainbow tables and brute force become impractical; `CompareHashAndPassword` never exposes the hash comparison.
+- Session tokens: crypto/rand (never math/rand); DB stores SHA-256 of the token so a DB leak can't be replayed; raw token exists only in the cookie.
+- Cookie flags: HttpOnly (XSS can't read), Secure (HTTPS only), SameSite=Lax (CSRF baseline).
+- Same 401 for wrong email and wrong password — user enumeration defense.
+- 401 vs 403: unauthenticated vs authenticated-but-not-allowed.
+- `context.WithValue` with an unexported key type: per-request data flows through the call chain without globals.
+- Server-side sessions mean role changes apply instantly (the JOIN reads current role per request) — a real trade-off vs JWT, where stale claims live until expiry.
+**Questions / to revisit:**
+- Frontend auth UI (forms, auth context, admin area) — next session.
+- Later hardening: login rate limiting, session renewal, expired-session cleanup job.
+
 ## 2026-07-28 — Phase 3 complete: react-router + product detail page
 
 **Worked on:** react-router v7 (`BrowserRouter`, `Routes`, `Link`, `useParams`); `/products/:slug` detail page with variant picker (selected-variant state, out-of-stock disabling, 404 handling via `ApiError.status`); ProductCard wrapped in `Link`; `formatPrice` moved to `src/lib/format.ts`; disabled "Add to cart" placeholder for Phase 5.

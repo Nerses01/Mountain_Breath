@@ -155,9 +155,9 @@ sessions with secure cookies first — understand the trade-offs), middleware-ba
 auth, role-based access (customer vs admin), CSRF basics.
 
 **Tasks:**
-- [ ] `users` table + migration (email, password hash, role)
-- [ ] Register / login / logout endpoints; session store; secure cookie handling
-- [ ] Auth middleware; protect admin-only catalog CRUD
+- [x] `users` + `sessions` tables + migration (bcrypt hashes, roles, hashed session tokens)
+- [x] Register / login / logout / me endpoints; DB session store; secure cookie (HttpOnly, SameSite=Lax, Secure in prod)
+- [x] Auth middleware (`withUser` + `requireAdmin`); category creation moved under `/api/v1/admin`; admin promotion via SQL for now
 - [ ] Frontend: login/register forms, auth context, admin area for managing products
 
 **Done when:** only a logged-in admin can modify the catalog; sessions survive restart.
