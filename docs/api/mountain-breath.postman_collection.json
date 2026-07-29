@@ -605,6 +605,74 @@
 					"response": []
 				},
 				{
+					"name": "List all orders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/admin/orders",
+							"host": ["{{apiV1}}"],
+							"path": ["admin", "orders"]
+						},
+						"description": "Every order (latest 200), newest first, with customer emails. Admin only."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Update order status",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"confirmed\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{apiV1}}/admin/orders/1/status",
+							"host": ["{{apiV1}}"],
+							"path": ["admin", "orders", "1", "status"]
+						},
+						"description": "Drives the state machine: pending → confirmed → shipped → delivered; cancelled reachable from pending/confirmed (and restores stock). Illegal transition → 409 invalid_transition."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"transition accepted (200) or correctly refused (409)\", () => {",
+									"    pm.expect([200, 409]).to.include(pm.response.code);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
 					"name": "Create category — validation errors (400)",
 					"request": {
 						"method": "POST",
@@ -660,8 +728,181 @@
 		},
 		{
 			"name": "Cart & Orders (Phase 5)",
-			"description": "Coming in Phase 5: /cart, /cart/items, /orders.",
-			"item": []
+			"description": "Requires a logged-in session (run Auth → Register first; Postman's cookie jar carries it). PUT /cart/items has SET semantics — sending qty twice leaves one line with that qty.",
+			"item": [
+				{
+					"name": "Get cart",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/cart",
+							"host": ["{{apiV1}}"],
+							"path": ["cart"]
+						},
+						"description": "The logged-in user's cart with live prices/stock and computed totals. 401 anonymous."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"has items and total\", () => {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body.items).to.be.an(\"array\");",
+									"    pm.expect(body.total_minor).to.be.a(\"number\");",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Set cart item",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"variant_id\": 5,\n    \"qty\": 2\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{apiV1}}/cart/items",
+							"host": ["{{apiV1}}"],
+							"path": ["cart", "items"]
+						},
+						"description": "Sets the quantity for a variant (upsert). qty must be 1..99; unknown variant_id → 404. Returns the updated cart."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"cart contains the variant\", () => {",
+									"    const ids = pm.response.json().items.map(i => i.variant_id);",
+									"    pm.expect(ids).to.include(5);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Remove cart item",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/cart/items/5",
+							"host": ["{{apiV1}}"],
+							"path": ["cart", "items", "5"]
+						},
+						"description": "Removes one variant line from the cart. 204 regardless of whether it was present (idempotent delete)."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 204\", () => {",
+									"    pm.response.to.have.status(204);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Checkout (create order)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/orders",
+							"host": ["{{apiV1}}"],
+							"path": ["orders"]
+						},
+						"description": "Turns the cart into an order atomically: stock validated under row locks, decremented, prices snapshotted, cart cleared. 409 empty_cart / insufficient_stock. NOTE: run 'Set cart item' first so the cart is not empty."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 201 or 409 (empty cart)\", () => {",
+									"    pm.expect([201, 409]).to.include(pm.response.code);",
+									"});",
+									"",
+									"if (pm.response.code === 201) {",
+									"    pm.test(\"order is pending with items\", () => {",
+									"        const body = pm.response.json();",
+									"        pm.expect(body.status).to.eql(\"pending\");",
+									"        pm.expect(body.items.length).to.be.above(0);",
+									"    });",
+									"}"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "My orders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/orders",
+							"host": ["{{apiV1}}"],
+							"path": ["orders"]
+						},
+						"description": "The logged-in user's orders, newest first, with item snapshots."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"body is an array\", () => {",
+									"    pm.expect(pm.response.json()).to.be.an(\"array\");",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				}
+			]
 		}
 	]
 }

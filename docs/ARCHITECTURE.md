@@ -110,5 +110,7 @@ frontend/
 | 6 | Store interfaces defined at the consumer (`api.CategoryStore`), not in `store` | Go idiom; lets tests swap in fakes without touching the store package | 2026-07-26 |
 | 7 | DB errors translated to domain sentinel errors (`ErrSlugTaken`) at the store boundary | API layer maps domain errors to HTTP codes without knowing SQL details | 2026-07-26 |
 | 8 | Sessions in Postgres, cookie carries raw token, DB stores its SHA-256 | leak-resistant; server-side revocation and instant role changes | 2026-07-28 |
+| 9 | Cart requires login (amends #4); `PUT /cart/items` with set-semantics | avoids a parallel anonymous-token system for now; idempotent cart writes | 2026-07-29 |
+| 10 | Checkout locks variant rows (`FOR UPDATE`, ordered) inside one transaction | overselling impossible under concurrency; proven with a live race test | 2026-07-29 |
 
 Add a new row whenever we make a significant technical decision.

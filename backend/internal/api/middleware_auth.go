@@ -29,6 +29,17 @@ func userFrom(ctx context.Context) (domain.User, bool) {
 	return u, ok
 }
 
+// requireUser gates a subtree: any logged-in user passes.
+func (s *Server) requireUser(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := userFrom(r.Context()); !ok {
+			s.respondError(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // requireAdmin gates a subtree: 401 for anonymous, 403 for non-admins.
 // (401 = "who are you?", 403 = "I know you, and no.")
 func (s *Server) requireAdmin(next http.Handler) http.Handler {

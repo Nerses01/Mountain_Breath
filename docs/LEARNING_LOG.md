@@ -17,6 +17,20 @@ Template for an entry:
 
 ---
 
+## 2026-07-29 — Phase 5 (backend): cart, transactional checkout, order state machine
+
+**Worked on:** migration 000004 (cart_items with composite PK, orders, order_items with snapshots); cart store (upsert via `ON CONFLICT DO UPDATE`, FK violation → 404); `CreateOrder` transaction (`FOR UPDATE OF v` row locks, deterministic lock order, stock check → decrement → snapshot → clear cart); order state machine with cancel-restores-stock; `requireUser` middleware; endpoints `/cart`, `/cart/items`, `/orders`, admin `/admin/orders(+/{id}/status)`; Postman folders. Live concurrency test: stock=1, two parallel checkouts → exactly one 201.
+**Learned:**
+- A transaction = all-or-nothing; `defer tx.Rollback()` after `Begin` guarantees cleanup on every path (RAII feeling); rollback after commit is a no-op.
+- `SELECT ... FOR UPDATE` locks rows so concurrent transactions queue; `ORDER BY` in the locking query = consistent lock order = no deadlocks.
+- Snapshots (`price_minor_snapshot`, `name_snapshot`) make orders immune to later catalog edits.
+- Composite primary keys model "one row per (user, variant)" naturally; upsert = `INSERT ... ON CONFLICT ... DO UPDATE`.
+- State machines as data (`map[from][]to`) keep transition rules in one testable place.
+- PUT with set-semantics is idempotent — retries are safe (matters on flaky networks).
+**Questions / to revisit:**
+- Frontend cart/checkout/orders UI — next session.
+- Payments stub; expired pending-order cleanup; cart price-change warnings.
+
 ## 2026-07-28 — Phase 4 complete: frontend auth UI
 
 **Worked on:** `useMe` (401→null mapping), login/register/logout/createCategory mutations; LoginPage (controlled inputs, mode toggle, per-field API errors); AuthStatus header widget (Sign in ↔ email + Sign out + Admin link); AdminPage with category form + list; routes /login and /admin; generic `request<T>` extended for POST/204.

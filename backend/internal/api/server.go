@@ -37,12 +37,27 @@ type SessionStore interface {
 	DeleteSession(ctx context.Context, token string) error
 }
 
+type CartStore interface {
+	GetCart(ctx context.Context, userID int64) ([]domain.CartItem, error)
+	SetCartItem(ctx context.Context, userID, variantID int64, qty int) error
+	DeleteCartItem(ctx context.Context, userID, variantID int64) error
+}
+
+type OrderStore interface {
+	CreateOrder(ctx context.Context, userID int64) (domain.Order, error)
+	ListOrdersByUser(ctx context.Context, userID int64) ([]domain.Order, error)
+	ListAllOrders(ctx context.Context) ([]domain.Order, error)
+	UpdateOrderStatus(ctx context.Context, orderID int64, to string) (domain.Order, error)
+}
+
 // Store embeds the per-entity interfaces into the one the Server depends on.
 type Store interface {
 	CategoryStore
 	ProductStore
 	UserStore
 	SessionStore
+	CartStore
+	OrderStore
 }
 
 // Server holds the dependencies of the HTTP layer. Handlers are methods on it,
@@ -79,9 +94,21 @@ func (s *Server) Routes() chi.Router {
 		r.Get("/products", s.handleListProducts)
 		r.Get("/products/{slug}", s.handleGetProduct)
 
+		// Logged-in customers: cart and checkout.
+		r.Group(func(r chi.Router) {
+			r.Use(s.requireUser)
+			r.Get("/cart", s.handleGetCart)
+			r.Put("/cart/items", s.handleSetCartItem)
+			r.Delete("/cart/items/{variantID}", s.handleDeleteCartItem)
+			r.Post("/orders", s.handleCreateOrder)
+			r.Get("/orders", s.handleListMyOrders)
+		})
+
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(s.requireAdmin)
 			r.Post("/categories", s.handleCreateCategory)
+			r.Get("/orders", s.handleAdminListOrders)
+			r.Patch("/orders/{id}/status", s.handleUpdateOrderStatus)
 		})
 	})
 
