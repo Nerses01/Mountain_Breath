@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, type ProductListParams } from './client'
-import type { User } from './types'
+import type { OrderStatus, User } from './types'
 
 // TanStack Query caches by queryKey: two components asking for the same key
 // share one request and one cached result.
@@ -81,5 +81,77 @@ export function useCreateCategory() {
     // We changed the categories list on the server — mark every cached
     // copy stale so visible ones refetch.
     onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
+  })
+}
+
+// enabled: only fetch the cart when someone is logged in — an anonymous
+// visitor would just collect 401s.
+export function useCart(loggedIn: boolean) {
+  return useQuery({
+    queryKey: ['cart'],
+    queryFn: api.getCart,
+    enabled: loggedIn,
+  })
+}
+
+export function useSetCartItem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ variantId, qty }: { variantId: number; qty: number }) =>
+      api.setCartItem(variantId, qty),
+    // The response IS the updated cart — write it straight into the cache.
+    onSuccess: (cart) => qc.setQueryData(['cart'], cart),
+  })
+}
+
+export function useRemoveCartItem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.removeCartItem,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cart'] }),
+  })
+}
+
+export function useCheckout() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.checkout,
+    onSuccess: () => {
+      // Checkout changes a lot of server state: cart emptied, order added,
+      // stock decremented (affects product lists and detail pages).
+      qc.invalidateQueries({ queryKey: ['cart'] })
+      qc.invalidateQueries({ queryKey: ['orders'] })
+      qc.invalidateQueries({ queryKey: ['products'] })
+      qc.invalidateQueries({ queryKey: ['product'] })
+    },
+  })
+}
+
+export function useMyOrders() {
+  return useQuery({
+    queryKey: ['orders'],
+    queryFn: api.myOrders,
+  })
+}
+
+export function useAdminOrders() {
+  return useQuery({
+    queryKey: ['admin-orders'],
+    queryFn: api.adminOrders,
+  })
+}
+
+export function useUpdateOrderStatus() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orderId, status }: { orderId: number; status: OrderStatus }) =>
+      api.updateOrderStatus(orderId, status),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-orders'] })
+      qc.invalidateQueries({ queryKey: ['orders'] })
+      // cancelling restores stock
+      qc.invalidateQueries({ queryKey: ['products'] })
+      qc.invalidateQueries({ queryKey: ['product'] })
+    },
   })
 }

@@ -53,6 +53,40 @@ export interface NewCategory {
   sort_order: number
 }
 
+export interface CartItem {
+  variant_id: number
+  product_name: string
+  product_slug: string
+  label: string
+  price_minor: number
+  stock_qty: number
+  qty: number
+  line_total_minor: number
+}
+
+export interface Cart {
+  items: CartItem[]
+  total_minor: number
+}
+
+export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
+
+export interface OrderItem {
+  name: string
+  label: string
+  price_minor: number
+  qty: number
+}
+
+export interface Order {
+  id: number
+  status: OrderStatus
+  total_minor: number
+  created_at: string
+  user_email?: string // present in admin responses only
+  items: OrderItem[]
+}
+
 // Shape of the backend's error envelope (docs/ARCHITECTURE.md).
 export interface ApiErrorBody {
   error: {

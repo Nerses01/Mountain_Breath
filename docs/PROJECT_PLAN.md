@@ -176,12 +176,12 @@ intuition), designing state machines (order status), handling money correctly
 - [x] Cart: server-side cart tied to the logged-in user; set/remove items (PUT upsert semantics, composite PK)
 - [x] Checkout: order created in one transaction — stock validated under `FOR UPDATE` row locks, decremented, prices snapshotted, cart cleared
 - [x] Order status flow: `pending → confirmed → shipped → delivered / cancelled` (state machine in domain; cancel restores stock; admin endpoints)
-- [ ] Frontend: cart page, checkout flow, "my orders" page; admin order list
-- [ ] Payments: stub/manual confirmation now; real provider integration in Phase 10
+- [x] Frontend: cart page (qty editing), checkout, "my orders", admin order table with status buttons; add-to-cart on product page; header cart badge
+- [x] Payments: stub = manual admin confirmation (pending → confirmed); real provider integration in Phase 10
 - [x] Concurrency proven manually: two simultaneous checkouts of the last item → one 201, one 409, stock 0 (formal test in Phase 6)
 
 **Done when:** a customer can buy a product end-to-end and stock is correctly reduced,
-even with concurrent checkouts (write a test that proves it).
+even with concurrent checkouts (write a test that proves it). ✅ **Completed 2026-07-29** (concurrency proven manually; the automated test is Phase 6's job)
 
 ---
 

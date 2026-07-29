@@ -1,8 +1,11 @@
 import type {
   ApiErrorBody,
+  Cart,
   Category,
   Credentials,
   NewCategory,
+  Order,
+  OrderStatus,
   Paginated,
   Product,
   User,
@@ -88,7 +91,25 @@ export const api = {
     request<User>('/api/v1/auth/login', { method: 'POST', body: creds }),
   logout: () => request<void>('/api/v1/auth/logout', { method: 'POST' }),
 
+  // cart & orders (require login)
+  getCart: () => request<Cart>('/api/v1/cart'),
+  setCartItem: (variantId: number, qty: number) =>
+    request<Cart>('/api/v1/cart/items', {
+      method: 'PUT',
+      body: { variant_id: variantId, qty },
+    }),
+  removeCartItem: (variantId: number) =>
+    request<void>(`/api/v1/cart/items/${variantId}`, { method: 'DELETE' }),
+  checkout: () => request<Order>('/api/v1/orders', { method: 'POST' }),
+  myOrders: () => request<Order[]>('/api/v1/orders'),
+
   // admin
   createCategory: (data: NewCategory) =>
     request<Category>('/api/v1/admin/categories', { method: 'POST', body: data }),
+  adminOrders: () => request<Order[]>('/api/v1/admin/orders'),
+  updateOrderStatus: (orderId: number, status: OrderStatus) =>
+    request<Order>(`/api/v1/admin/orders/${orderId}/status`, {
+      method: 'PATCH',
+      body: { status },
+    }),
 }

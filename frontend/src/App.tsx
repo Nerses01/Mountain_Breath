@@ -1,8 +1,12 @@
 import { Link, Route, Routes } from 'react-router'
 import { AuthStatus } from './components/AuthStatus'
+import { CartLink } from './components/CartLink'
+import { AdminOrdersPage } from './pages/AdminOrdersPage'
 import { AdminPage } from './pages/AdminPage'
+import { CartPage } from './pages/CartPage'
 import { CatalogPage } from './pages/CatalogPage'
 import { LoginPage } from './pages/LoginPage'
+import { OrdersPage } from './pages/OrdersPage'
 import { ProductPage } from './pages/ProductPage'
 
 function App() {
@@ -17,6 +21,7 @@ function App() {
               tea · coffee · honey from the mountains
             </p>
           </Link>
+          <CartLink />
           <AuthStatus />
         </div>
       </header>
@@ -27,7 +32,10 @@ function App() {
         <Route path="/" element={<CatalogPage />} />
         <Route path="/products/:slug" element={<ProductPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/cart" element={<CartPage />} />
+        <Route path="/orders" element={<OrdersPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/orders" element={<AdminOrdersPage />} />
       </Routes>
     </div>
   )

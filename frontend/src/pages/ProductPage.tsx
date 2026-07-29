@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { ApiError } from '../api/client'
-import { useProduct } from '../api/hooks'
+import { useCart, useMe, useProduct, useSetCartItem } from '../api/hooks'
 import { formatPrice } from '../lib/format'
 
 export function ProductPage() {
@@ -11,6 +11,11 @@ export function ProductPage() {
 
   // Which variant the user picked; null = "none yet, default to first".
   const [variantId, setVariantId] = useState<number | null>(null)
+
+  const me = useMe()
+  const cart = useCart(!!me.data)
+  const addToCart = useSetCartItem()
+  const navigate = useNavigate()
 
   if (product.isPending) {
     return <PageShell>Loading…</PageShell>
@@ -81,19 +86,72 @@ export function ProductPage() {
                     : 'out of stock'}
                 </p>
               </div>
-              <button
-                type="button"
-                disabled
-                title="Coming in Phase 5"
-                className="cursor-not-allowed rounded-lg bg-stone-300 px-6 py-3 font-medium text-white"
-              >
-                Add to cart
-              </button>
+              <AddToCartButton
+                inCartQty={
+                  cart.data?.items.find((it) => it.variant_id === selected.id)?.qty ?? 0
+                }
+                outOfStock={selected.stock_qty === 0}
+                loggedIn={!!me.data}
+                isPending={addToCart.isPending}
+                onAdd={() =>
+                  me.data
+                    ? addToCart.mutate({ variantId: selected.id, qty: 1 })
+                    : navigate('/login')
+                }
+              />
             </div>
           </>
         )}
       </div>
     </PageShell>
+  )
+}
+
+function AddToCartButton({
+  inCartQty,
+  outOfStock,
+  loggedIn,
+  isPending,
+  onAdd,
+}: {
+  inCartQty: number
+  outOfStock: boolean
+  loggedIn: boolean
+  isPending: boolean
+  onAdd: () => void
+}) {
+  if (outOfStock) {
+    return (
+      <button
+        type="button"
+        disabled
+        className="cursor-not-allowed rounded-lg bg-stone-300 px-6 py-3 font-medium text-white"
+      >
+        Out of stock
+      </button>
+    )
+  }
+
+  if (inCartQty > 0) {
+    return (
+      <Link
+        to="/cart"
+        className="rounded-lg bg-stone-800 px-6 py-3 font-medium text-white hover:bg-stone-700"
+      >
+        In cart ({inCartQty}) → view
+      </Link>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={isPending}
+      onClick={onAdd}
+      className="rounded-lg bg-emerald-700 px-6 py-3 font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
+    >
+      {loggedIn ? (isPending ? 'Adding…' : 'Add to cart') : 'Sign in to buy'}
+    </button>
   )
 }
 

@@ -17,6 +17,17 @@ Template for an entry:
 
 ---
 
+## 2026-07-29 — Phase 5 complete: shopping UI
+
+**Worked on:** cart/orders/admin-orders API client + hooks; CartPage (qty +/−, remove, checkout with error surface); OrdersPage; AdminOrdersPage (status transition buttons from a client-side mirror of the state machine); real AddToCartButton on ProductPage (out-of-stock / sign-in-to-buy / in-cart states); header cart badge with live count.
+**Learned:**
+- `enabled:` option gates queries on preconditions (no cart fetch while anonymous).
+- Derived UI state: the add-to-cart button's four states all derive from existing queries — no new state needed.
+- Mutation → invalidation fan-out: checkout touches cart+orders+products (stock!), and the UI updates everywhere without a reload.
+- Client-side mirror of a server state machine is fine for UX as long as the server enforces (409 on race).
+**Questions / to revisit:**
+- Product/variant management UI for admin; anonymous carts; payments (Phase 10).
+
 ## 2026-07-29 — Phase 5 (backend): cart, transactional checkout, order state machine
 
 **Worked on:** migration 000004 (cart_items with composite PK, orders, order_items with snapshots); cart store (upsert via `ON CONFLICT DO UPDATE`, FK violation → 404); `CreateOrder` transaction (`FOR UPDATE OF v` row locks, deterministic lock order, stock check → decrement → snapshot → clear cart); order state machine with cancel-restores-stock; `requireUser` middleware; endpoints `/cart`, `/cart/items`, `/orders`, admin `/admin/orders(+/{id}/status)`; Postman folders. Live concurrency test: stock=1, two parallel checkouts → exactly one 201.

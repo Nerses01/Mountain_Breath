@@ -27,7 +27,12 @@ export function AdminPage() {
 
   return (
     <Shell>
-      <h2 className="text-xl font-bold text-stone-800">Admin — Categories</h2>
+      <div className="flex items-center gap-4">
+        <h2 className="text-xl font-bold text-stone-800">Admin — Categories</h2>
+        <Link to="/admin/orders" className="text-sm text-emerald-700 hover:underline">
+          → Orders
+        </Link>
+      </div>
       <CategoryForm />
       <CategoryList />
     </Shell>
