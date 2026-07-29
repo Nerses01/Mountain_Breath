@@ -17,6 +17,21 @@ Template for an entry:
 
 ---
 
+## 2026-07-29 — Phase 6 (backend): the test pyramid
+
+**Worked on:** table-driven domain tests (state machine, cart math, validation); api handler tests with an in-memory `fakeStore` satisfying `api.Store` + `httptest` through the real router/middleware (auth matrix 401/403/201); testcontainers integration tests — one throwaway Postgres per package run (`TestMain`), real migrations via migrate-as-library (iofs source), `resetDB` truncation between tests; checkout tests incl. rollback-on-insufficient-stock and the formalized concurrency race (10 goroutines, stock 3).
+**Learned:**
+- The pyramid in practice: domain tests run in μs, fake-store handler tests in ms, container tests in seconds — write many of the cheap ones, few of the expensive ones.
+- Consumer-side interfaces made the fake store trivial — the design decision from Phase 2 paid off exactly as promised.
+- `TestMain` = per-package setup/teardown; `flag.Parse()` needed before `testing.Short()` there.
+- Test against the real migrations — the test schema can't drift from prod.
+- Verify effects in the DB, not just return values (stock decremented, cart cleared, rollback left everything untouched).
+- `go test -short` as the no-Docker fast path; `-race` needs cgo (absent on Windows) → run it in Linux CI.
+- errcheck caught an unchecked `Close()` in my own test code — linters lint tests too.
+**Questions / to revisit:**
+- Vitest component tests + Playwright e2e (rest of Phase 6).
+- Auth handler tests (register/login) against the fake; coverage reporting.
+
 ## 2026-07-29 — Phase 5 complete: shopping UI
 
 **Worked on:** cart/orders/admin-orders API client + hooks; CartPage (qty +/−, remove, checkout with error surface); OrdersPage; AdminOrdersPage (status transition buttons from a client-side mirror of the state machine); real AddToCartButton on ProductPage (out-of-stock / sign-in-to-buy / in-cart states); header cart badge with live count.

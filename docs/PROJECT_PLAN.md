@@ -195,12 +195,12 @@ integration tests with testcontainers, HTTP handler tests, Vitest component test
 Playwright end-to-end tests, coverage reports.
 
 **Tasks:**
-- [ ] Unit tests for domain logic (cart math, order state transitions)
-- [ ] Integration tests for repositories against real Postgres (testcontainers-go)
-- [ ] HTTP-level tests for API endpoints (auth, error cases)
+- [x] Unit tests for domain logic (cart math, order state transitions, validation) — table-driven
+- [x] Integration tests for repositories against real Postgres (testcontainers-go; migrations applied from the real files; `-short` skips Docker)
+- [x] HTTP-level tests for API endpoints (in-memory fake `Store`, real middleware chain: 401/403/201 auth matrix, validation, 409, 404)
 - [ ] Vitest tests for key React components
 - [ ] Playwright e2e: browse → add to cart → checkout
-- [ ] Concurrent-checkout stock test from Phase 5 formalized
+- [x] Concurrent-checkout stock test from Phase 5 formalized (`TestCreateOrder_ConcurrentCheckoutsDoNotOversell`: 10 goroutines, stock 3 → exactly 3 succeed)
 
 **Done when:** one command runs each test suite; the purchase flow is covered e2e.
 

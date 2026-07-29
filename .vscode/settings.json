@@ -1,0 +1,13 @@
+{
+    // Tests: never serve cached results in the IDE; show verbose output.
+    "go.testFlags": ["-count=1", "-v"],
+    // 10s default is too tight for testcontainers startup.
+    "go.testTimeout": "180s",
+    // Highlight covered/uncovered lines after "Run test with coverage".
+    "go.coverageDecorator": {
+        "type": "gutter"
+    },
+    "gopls": {
+        "ui.semanticTokens": true
+    }
+}
