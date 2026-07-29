@@ -17,6 +17,18 @@ Template for an entry:
 
 ---
 
+## 2026-07-29 — Phase 6 complete: frontend tests (Vitest + Playwright)
+
+**Worked on:** Vitest + Testing Library setup (jsdom, setup file with jest-dom matchers + cleanup); formatPrice unit tests (locale pinned to en-US for determinism); ProductCard component tests (render → assert via accessible queries, MemoryRouter for Link context); Playwright e2e purchase flow with dual webServer config (auto-starts Go + Vite, reuses running ones); trace-on-failure debugging.
+**Learned:**
+- Component tests query the DOM like a user would (`getByRole`, `getByText`) — testing behavior, not implementation details.
+- The e2e failure snapshot exposed a REAL accessibility bug: a Link wrapping a card computed no accessible name; `aria-label` fixed both the screen-reader experience and the test.
+- Vitest and Playwright must not see each other's test files (`test.exclude`).
+- Locale-dependent formatting is a test flakiness source — pin it.
+- The pyramid's economics end-to-end: 7 component tests in ~150ms; 1 browser e2e in ~1.3s covering the whole stack.
+**Questions / to revisit:**
+- More e2e scenarios later (admin flow, insufficient stock); coverage reporting in CI.
+
 ## 2026-07-29 — Phase 6 (backend): the test pyramid
 
 **Worked on:** table-driven domain tests (state machine, cart math, validation); api handler tests with an in-memory `fakeStore` satisfying `api.Store` + `httptest` through the real router/middleware (auth matrix 401/403/201); testcontainers integration tests — one throwaway Postgres per package run (`TestMain`), real migrations via migrate-as-library (iofs source), `resetDB` truncation between tests; checkout tests incl. rollback-on-insufficient-stock and the formalized concurrency race (10 goroutines, stock 3).

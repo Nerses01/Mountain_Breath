@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -12,5 +13,13 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:8080',
     },
+  },
+  test: {
+    // jsdom simulates a browser DOM in Node so component tests need no
+    // real browser (that's Playwright's job).
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
+    // e2e/ belongs to Playwright's runner, not Vitest.
+    exclude: ['e2e/**', 'node_modules/**'],
   },
 })

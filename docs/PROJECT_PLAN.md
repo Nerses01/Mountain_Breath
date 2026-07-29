@@ -198,11 +198,11 @@ Playwright end-to-end tests, coverage reports.
 - [x] Unit tests for domain logic (cart math, order state transitions, validation) — table-driven
 - [x] Integration tests for repositories against real Postgres (testcontainers-go; migrations applied from the real files; `-short` skips Docker)
 - [x] HTTP-level tests for API endpoints (in-memory fake `Store`, real middleware chain: 401/403/201 auth matrix, validation, 409, 404)
-- [ ] Vitest tests for key React components
-- [ ] Playwright e2e: browse → add to cart → checkout
+- [x] Vitest tests for key React components (formatPrice, ProductCard incl. stock states; jsdom + Testing Library)
+- [x] Playwright e2e: register → browse → add to cart → checkout → order visible → cart empty (webServer auto-starts both dev servers; traces on failure)
 - [x] Concurrent-checkout stock test from Phase 5 formalized (`TestCreateOrder_ConcurrentCheckoutsDoNotOversell`: 10 goroutines, stock 3 → exactly 3 succeed)
 
-**Done when:** one command runs each test suite; the purchase flow is covered e2e.
+**Done when:** one command runs each test suite; the purchase flow is covered e2e. ✅ **Completed 2026-07-29** — `go test ./...`, `npm run test`, `npm run e2e`
 
 ---
 
