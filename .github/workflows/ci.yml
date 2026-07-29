@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2 # keep in sync with local install
+          working-directory: backend
+
+      - name: Build
+        run: go build ./...
+
+      # -race works here (Linux has cgo out of the box) and testcontainers
+      # uses the runner's preinstalled Docker for the store tests.
+      - name: Test (with race detector)
+        run: go test -race -count=1 ./...
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # npm ci = clean install exactly from package-lock.json (never updates it)
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Component tests
+        run: npm run test
+
+      - name: Typecheck + build
+        run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    # A throwaway Postgres lives next to the job, like docker-compose in dev.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: mb
+          POSTGRES_PASSWORD: ci-password
+          POSTGRES_DB: mountain_breath
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mb -d mountain_breath"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      # Inherited by Playwright's webServer child processes (go run + vite).
+      MB_DATABASE_URL: postgres://mb:ci-password@localhost:5432/mountain_breath?sslmode=disable
+      MB_ENV: dev
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Apply migrations
+        run: >
+          go run -tags postgres
+          github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
+          -path backend/migrations -database "$MB_DATABASE_URL" up
+
+      - name: Seed catalog
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          psql "$MB_DATABASE_URL" -f backend/seed/seed.sql
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run e2e
+        working-directory: frontend
+        run: npm run e2e
+
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: frontend/test-results/
+          retention-days: 7

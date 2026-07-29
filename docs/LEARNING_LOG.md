@@ -17,6 +17,19 @@ Template for an entry:
 
 ---
 
+## 2026-07-29 — Phase 7: GitHub Actions CI
+
+**Worked on:** `.github/workflows/ci.yml` with three parallel jobs — backend (vet, golangci-lint pinned to local version, build, `go test -race` incl. testcontainers on the runner's Docker), frontend (npm ci, lint, vitest, tsc+build), e2e (Postgres service container with healthcheck, migrations via `go run migrate@version`, seed via psql, Playwright with trace upload on failure). README badge. `reuseExistingServer: !process.env.CI` for Playwright.
+**Learned:**
+- CI = the local quality gate, executed by a robot on every push; jobs run in parallel on clean machines, so "works on my machine" can't hide.
+- `npm ci` vs `npm install`: ci installs exactly the lockfile and never mutates it — the only correct choice for CI.
+- Service containers are CI's docker-compose: Postgres per job, health-gated.
+- Pin tool versions in CI to match local (golangci-lint) or chase phantom differences.
+- `-race` runs on Linux runners for free (cgo present) — the reason it's delegated to CI from Windows.
+- Branch protection is plan-gated for private repos: decided CI-status-without-enforcement (decision #11).
+**Questions / to revisit:**
+- Start the PR habit with the next feature; CI badge stays red/green truth.
+
 ## 2026-07-29 — Phase 6 complete: frontend tests (Vitest + Playwright)
 
 **Worked on:** Vitest + Testing Library setup (jsdom, setup file with jest-dom matchers + cleanup); formatPrice unit tests (locale pinned to en-US for determinism); ProductCard component tests (render → assert via accessible queries, MemoryRouter for Link context); Playwright e2e purchase flow with dual webServer config (auto-starts Go + Vite, reuses running ones); trace-on-failure debugging.

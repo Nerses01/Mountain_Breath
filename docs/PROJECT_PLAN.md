@@ -214,11 +214,11 @@ Playwright end-to-end tests, coverage reports.
 protection, PR-based workflow, status checks, artifacts.
 
 **Tasks:**
-- [ ] Workflow: lint + build + unit/integration tests for backend on every push/PR
-- [ ] Workflow: lint + typecheck + test + build for frontend
-- [ ] Playwright e2e job (against docker-compose services)
-- [ ] Branch protection on `master`: PRs only, checks must pass
-- [ ] Adopt PR workflow even solo — small PRs with self-review
+- [x] Workflow: vet + lint + build + tests (with `-race` and testcontainers) for backend on every push/PR
+- [x] Workflow: lint + component tests + typecheck/build for frontend
+- [x] Playwright e2e job (service-container Postgres, migrations + seed applied, traces uploaded on failure)
+- [x] Branch protection on `master` — **consciously skipped**: requires public repo or GitHub Pro; decided to stay private (decision #11). CI still reports red/green on everything; merging green is discipline.
+- [ ] Adopt PR workflow even solo — small PRs with self-review (start with the next feature)
 
 **Done when:** a broken test blocks a PR; green checks required to merge.
 

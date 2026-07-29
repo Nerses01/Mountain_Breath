@@ -1,5 +1,7 @@
 # Mountain Breath
 
+![CI](https://github.com/Nerses01/Mountain_Breath/actions/workflows/ci.yml/badge.svg)
+
 E-commerce website for the Mountain Breath food & beverages business — and a
 long-term **full-stack learning project** covering the complete lifecycle of a
 modern web application: Go backend, React + TypeScript frontend, PostgreSQL,

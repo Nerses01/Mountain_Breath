@@ -17,13 +17,14 @@ export default defineConfig({
       command: 'go run ./cmd/api',
       cwd: '../backend',
       url: 'http://localhost:8080/health',
-      reuseExistingServer: true,
+      // Locally: reuse your running dev servers. In CI: always start fresh.
+      reuseExistingServer: !process.env.CI,
       timeout: 60_000,
     },
     {
       command: 'npm run dev',
       url: 'http://localhost:5173',
-      reuseExistingServer: true,
+      reuseExistingServer: !process.env.CI,
       timeout: 60_000,
     },
   ],
