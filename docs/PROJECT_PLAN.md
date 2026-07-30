@@ -251,12 +251,12 @@ proxy and static file server, environment/secret handling, health checks.
 HTTPS/TLS with Let's Encrypt, zero-ish-downtime deploys, database backups,
 deploy automation from CI.
 
-**Tasks:**
-- [ ] Choose hosting (recommendation: cheap VPS — Hetzner/DigitalOcean — for maximum learning)
-- [ ] Harden the server: non-root user, SSH keys, firewall, fail2ban
-- [ ] Domain + DNS + TLS certificates (Let's Encrypt via certbot or Caddy/Traefik)
-- [ ] CD: on merge to `master`, CI builds images and deploys to the server
-- [ ] Automated Postgres backups + tested restore procedure
+**Tasks:** *(all artifacts prepared 2026-07-30 — see docs/DEPLOYMENT.md; execution awaits VPS + domain)*
+- [ ] Choose hosting (recommendation: cheap VPS — Hetzner/DigitalOcean — for maximum learning) ← **user decision pending**
+- [ ] Harden the server: non-root user, SSH keys, firewall, fail2ban (runbook §2)
+- [ ] Domain + DNS + TLS — Caddy chosen for auto-Let's Encrypt (`deploy/Caddyfile`, runbook §1/§6)
+- [ ] CD: on merge to `master`, CI deploys over SSH (`deploy` job written, dormant until `DEPLOY_ENABLED=true`)
+- [ ] Automated Postgres backups + tested restore (`deploy/backup.sh` + cron, runbook §7)
 
 **Done when:** merging a PR automatically updates the live site over HTTPS.
 

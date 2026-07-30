@@ -17,6 +17,18 @@ Template for an entry:
 
 ---
 
+## 2026-07-30 — Phase 9 prepared: deploy artifacts + runbook (server pending)
+
+**Worked on:** `deploy/docker-compose.prod.yml` (pulls GHCR images, Caddy TLS edge, MB_ENV=prod); `deploy/Caddyfile` (auto-Let's Encrypt in one line); `deploy/backup.sh` (nightly pg_dump + rotation); CD `deploy` job in CI (SSH pull-and-restart, dormant behind `DEPLOY_ENABLED` variable); `docs/DEPLOYMENT.md` — the full runbook from empty Ubuntu VPS to live HTTPS shop with CD.
+**Learned:**
+- CI vs CD as separate concerns: certify artifacts vs move them; connected by the registry.
+- Caddy's value proposition: TLS issuance/renewal/redirects as defaults, not configuration.
+- The server pulls (git + registry) with read-only credentials: deploy key + read:packages PAT — never push credentials on the server.
+- Gate not-yet-usable pipeline stages behind repository variables so CI stays green.
+- A backup that was never restored is a hope, not a backup.
+**Questions / to revisit:**
+- Execute the runbook once VPS + domain exist; flip MB_ENV story ends (Secure cookies live).
+
 ## 2026-07-29 — Phase 8 complete: the stack containerized
 
 **Worked on:** multi-stage Dockerfiles (Go: deps-layer caching, CGO_ENABLED=0 static build, distroless nonroot final 22.5MB; frontend: npm ci → vite build → nginx 93MB); `api healthcheck` self-probe subcommand (distroless has no curl); nginx.conf (SPA try_files fallback, immutable asset caching, /api proxy via Docker DNS); production compose with health-gated startup chain (postgres healthy → migrate completes → api healthy → web); `.dockerignore` keeping `.env` out of images; GHCR publish job in CI (green master only).

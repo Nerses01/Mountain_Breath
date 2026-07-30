@@ -1,0 +1,84 @@
+# PRODUCTION stack — runs on the server from a clone at /opt/mountain-breath.
+#   docker compose -f deploy/docker-compose.prod.yml up -d
+# Differences vs docker-compose.yml (local): images are PULLED from GHCR
+# (never built on the server), Caddy terminates HTTPS, MB_ENV=prod.
+# Secrets come from deploy/.env on the server (see docs/DEPLOYMENT.md).
+name: mountain-breath
+
+services:
+  # The only service exposed to the internet. Caddy obtains and renews
+  # Let's Encrypt certificates for ${DOMAIN} automatically.
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set the site domain in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+    restart: unless-stopped
+
+  web:
+    image: ghcr.io/nerses01/mountain-breath-web:latest
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api:
+    image: ghcr.io/nerses01/mountain-breath-api:latest
+    environment:
+      MB_ADDR: ":8080"
+      MB_ENV: prod # HTTPS exists here → Secure session cookies on
+      MB_DATABASE_URL: postgres://${POSTGRES_USER:-mb}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-mountain_breath}?sslmode=disable
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/api", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  migrate:
+    image: migrate/migrate:v4.19.1
+    volumes:
+      - ../backend/migrations:/migrations:ro
+    command:
+      [
+        "-path=/migrations",
+        "-database=postgres://${POSTGRES_USER:-mb}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-mountain_breath}?sslmode=disable",
+        "up",
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-mountain_breath}
+    # no ports: unreachable from outside the compose network
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata_prod:
+  caddy_data:
+  caddy_config:
