@@ -18,6 +18,13 @@ import (
 )
 
 func main() {
+	// `api healthcheck` probes the running server and exits 0/1. It exists
+	// for Docker HEALTHCHECK: the distroless production image has no shell
+	// or curl, but it always has this very binary.
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(healthcheck())
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
@@ -27,6 +34,20 @@ func main() {
 		logger.Error("fatal", "error", err)
 		os.Exit(1)
 	}
+}
+
+func healthcheck() int {
+	addr := os.Getenv("MB_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get("http://localhost" + addr + "/health")
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return 1
+	}
+	_ = resp.Body.Close()
+	return 0
 }
 
 func run(logger *slog.Logger) error {

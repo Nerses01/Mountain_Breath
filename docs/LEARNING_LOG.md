@@ -17,6 +17,19 @@ Template for an entry:
 
 ---
 
+## 2026-07-29 — Phase 8 complete: the stack containerized
+
+**Worked on:** multi-stage Dockerfiles (Go: deps-layer caching, CGO_ENABLED=0 static build, distroless nonroot final 22.5MB; frontend: npm ci → vite build → nginx 93MB); `api healthcheck` self-probe subcommand (distroless has no curl); nginx.conf (SPA try_files fallback, immutable asset caching, /api proxy via Docker DNS); production compose with health-gated startup chain (postgres healthy → migrate completes → api healthy → web); `.dockerignore` keeping `.env` out of images; GHCR publish job in CI (green master only).
+**Learned:**
+- Multi-stage builds: the toolchain (~800MB) never ships; only the artifact does. Layer order matters — lockfiles first.
+- Distroless: no shell = tiny attack surface; healthchecks must be built into your binary.
+- `depends_on` conditions (`service_healthy`, `service_completed_successfully`) encode startup order declaratively; migrations as a one-shot service.
+- Not publishing postgres's port = the DB is unreachable from outside the compose network. Security by topology.
+- The nginx config is the production twin of Vite's dev proxy — same origin story, same SPA fallback.
+- MB_ENV stays dev until HTTPS exists: Secure cookies would break plain-http localhost logins.
+**Questions / to revisit:**
+- Phase 9: VPS, domain, TLS, CD pulling the GHCR images; MB_ENV=prod then.
+
 ## 2026-07-29 — Phase 7: GitHub Actions CI
 
 **Worked on:** `.github/workflows/ci.yml` with three parallel jobs — backend (vet, golangci-lint pinned to local version, build, `go test -race` incl. testcontainers on the runner's Docker), frontend (npm ci, lint, vitest, tsc+build), e2e (Postgres service container with healthcheck, migrations via `go run migrate@version`, seed via psql, Playwright with trace upload on failure). README badge. `reuseExistingServer: !process.env.CI` for Playwright.

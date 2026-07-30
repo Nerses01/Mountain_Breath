@@ -1,0 +1,72 @@
+# The whole Mountain Breath stack: docker compose -f deploy/docker-compose.yml up -d --build
+# Reads secrets from deploy/.env (same file as the dev compose).
+name: mountain-breath
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-mountain_breath}
+    # NOTE: no `ports:` — the database is reachable ONLY from inside the
+    # compose network. Nothing on the host (or the internet) can touch it.
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # One-shot job: applies migrations, exits. The api waits for it to
+  # complete successfully — schema is always current before the app starts.
+  migrate:
+    image: migrate/migrate:v4.19.1
+    volumes:
+      - ../backend/migrations:/migrations:ro
+    command:
+      [
+        "-path=/migrations",
+        "-database=postgres://${POSTGRES_USER:-mb}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-mountain_breath}?sslmode=disable",
+        "up",
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: ../backend
+    image: mountain-breath-api:local
+    environment:
+      MB_ADDR: ":8080"
+      # dev until Phase 9 puts HTTPS in front: MB_ENV=prod makes session
+      # cookies Secure-only, which plain http://localhost would break.
+      MB_ENV: ${MB_ENV:-dev}
+      MB_DATABASE_URL: postgres://${POSTGRES_USER:-mb}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-mountain_breath}?sslmode=disable
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # the binary probes itself — distroless has no curl (see cmd/api/main.go)
+      test: ["CMD", "/api", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  web:
+    build: ../frontend
+    image: mountain-breath-web:local
+    ports:
+      - "${WEB_PORT:-80}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata_prod:

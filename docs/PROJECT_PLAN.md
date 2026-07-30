@@ -233,13 +233,13 @@ binaries!), image layers and caching, docker-compose networking, Nginx as revers
 proxy and static file server, environment/secret handling, health checks.
 
 **Tasks:**
-- [ ] Multi-stage `Dockerfile` for the Go API (scratch/distroless final image)
-- [ ] `Dockerfile` for frontend (build → static files served by Nginx)
-- [ ] `deploy/docker-compose.yml`: nginx + api + postgres, one network, volumes, healthchecks
-- [ ] Nginx config: serve frontend, proxy `/api` to the Go service
-- [ ] CI builds and pushes images (GitHub Container Registry)
+- [x] Multi-stage `Dockerfile` for the Go API — distroless, 22.5MB, non-root, self-probing healthcheck (`api healthcheck`)
+- [x] `Dockerfile` for frontend (npm ci → vite build → nginx:alpine, 93MB)
+- [x] `deploy/docker-compose.yml`: postgres (no host port!) + one-shot migrate job + api + web; health-gated startup chain
+- [x] Nginx config: static + SPA fallback + asset caching + `/api` proxy to the api service via Docker DNS
+- [x] CI builds and pushes images to GHCR on green master builds (`images` job, sha + latest tags)
 
-**Done when:** `docker compose up` on a clean machine serves the whole store.
+**Done when:** `docker compose up` on a clean machine serves the whole store. ✅ **Completed 2026-07-29** — verified end-to-end incl. register/cart/checkout through nginx on port 80
 
 ---
 

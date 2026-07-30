@@ -1,0 +1,7 @@
+# Never let local artifacts or secrets into the build context.
+.env
+bin/
+tmp/
+*.exe
+Dockerfile
+.dockerignore

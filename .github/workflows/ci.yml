@@ -129,3 +129,39 @@ jobs:
           name: playwright-results
           path: frontend/test-results/
           retention-days: 7
+
+  # Publish images to GitHub Container Registry — only for green builds of
+  # master, never for PRs. Phase 9's deploy will pull exactly these.
+  images:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: [backend, frontend, e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # allows pushing to ghcr.io with the built-in token
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push api image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            ghcr.io/nerses01/mountain-breath-api:latest
+            ghcr.io/nerses01/mountain-breath-api:${{ github.sha }}
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: true
+          tags: |
+            ghcr.io/nerses01/mountain-breath-web:latest
+            ghcr.io/nerses01/mountain-breath-web:${{ github.sha }}
