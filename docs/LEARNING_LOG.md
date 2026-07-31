@@ -17,6 +17,16 @@ Template for an entry:
 
 ---
 
+## 2026-07-31 — Alerting: rules + Alertmanager, fire drill included
+
+**Worked on:** `alerts.yml` with 4 rules (APIDown via the free `up` metric; HighErrorRate; SlowRequests p95; DBPoolSaturated via wait-rate); `evaluation_interval`, `rule_files` and `alerting:` blocks in prometheus.yml; Alertmanager v0.28 service (UI :9093, receiver empty until real hosting — Telegram config documented in place). Fire drill: stopped api → watched pending (45s) → firing (105s) → active in Alertmanager → restarted api → auto-resolved.
+**Learned:**
+- Alert anatomy: `expr` (a PromQL query) + `for` (flap protection — brief blips never page) + labels/annotations (severity, human-readable context).
+- The `up` metric is monitoring-for-free: every scrape target gets liveness alerting without any instrumentation.
+- pending → firing → resolved is the full lifecycle; Prometheus evaluates, Alertmanager routes/groups/throttles (group_wait, repeat_interval).
+- Alert thresholds encode the SLOs we load-tested: the k6 baseline (p95 ~20ms) justifies alerting at 500ms — alerts and load tests reference the same numbers.
+- Test the fire alarm by lighting a real (controlled) fire — an unverified alert rule is a hope, like an unrestored backup.
+
 ## 2026-07-31 — k6 load testing: baseline + a real bug found
 
 **Worked on:** `load/catalog-test.js` — two k6 scenarios (ramping browsers 0→20 VUs; 5 constant buyers doing register→cart→checkout with per-VU sessions), SLO thresholds in code (p95<200ms, errors<1%). First run FAILED usefully: k6 v2 resets its cookie jar every iteration → sessions died after iteration 0 (255 × 401s). Fixed by capturing the session cookie into per-VU module state and sending it manually. Final: 3,986 reqs @ 38/s, p95 19ms client / 8.5ms server, 0 errors, ~250 orders; pool wait 0.17s cumulative on 12 conns → no contention.

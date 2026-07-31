@@ -271,7 +271,7 @@ deploy automation from CI.
 - **Observability:** ⏳ in progress —
   - [x] Prometheus metrics from the API: RED middleware (rate/errors/duration by route pattern), Go runtime, custom pgx pool collector, `mb_orders_created_total` business metric (2026-07-30)
   - [x] Prometheus + Grafana in the compose stack; provisioned datasource + dashboard (6 panels)
-  - [ ] Alerting rules (e.g. 5xx rate, pool saturation)
+  - [x] Alerting: 4 rules (APIDown, HighErrorRate, SlowRequests, DBPoolSaturated) + Alertmanager in the stack; full pending→firing→resolved cycle verified by killing the api (2026-07-31). Notification channel (Telegram) left for when it runs on the real server
   - [ ] Structured logs aggregation; request tracing (OpenTelemetry)
 - **Payments:** integrate a real payment provider (Stripe or a local one)
 - **Performance:** ⏳ started —

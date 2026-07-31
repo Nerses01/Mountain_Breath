@@ -1,0 +1,21 @@
+# Alertmanager: receives fired alerts from Prometheus, groups/deduplicates
+# them, and routes to notification channels.
+route:
+  receiver: default
+  group_by: [alertname]
+  # A new alert notifies quickly; repeats of the SAME alert are throttled.
+  group_wait: 30s
+  repeat_interval: 4h
+
+receivers:
+  - name: default
+    # No channel configured yet — alerts are visible in the UI (localhost:9093).
+    # When ready for real notifications (Telegram):
+    #   1. Put the token from @BotFather into deploy/observability/telegram.token
+    #      (already git-ignored; mount it in compose next to this file)
+    #   2. Uncomment:
+    #   telegram_configs:
+    #     - bot_token_file: /etc/alertmanager/telegram.token
+    #       chat_id: <your numeric chat id — not a secret>
+    # This file stays committable: it references the secret by PATH,
+    # never contains it (same pattern as compose + .env).

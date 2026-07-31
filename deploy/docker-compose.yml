@@ -72,12 +72,21 @@ services:
     image: prom/prometheus:v3.5.0
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prom_data:/prometheus
     ports:
       - "9090:9090" # local browsing; on a real server this would not be published
     depends_on:
       api:
         condition: service_healthy
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    volumes:
+      - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
     restart: unless-stopped
 
   grafana:
