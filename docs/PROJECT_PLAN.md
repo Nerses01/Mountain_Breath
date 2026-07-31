@@ -274,7 +274,10 @@ deploy automation from CI.
   - [ ] Alerting rules (e.g. 5xx rate, pool saturation)
   - [ ] Structured logs aggregation; request tracing (OpenTelemetry)
 - **Payments:** integrate a real payment provider (Stripe or a local one)
-- **Performance:** load testing (k6), query optimization, caching (Redis), CDN
+- **Performance:** ⏳ started —
+  - [x] k6 load test (`load/catalog-test.js`): browse + full purchase scenarios, SLO thresholds as code; baseline 2026-07-31: ~40 req/s, p95 19ms client / 8.5ms server, 0 errors, zero pool contention (12 conns) → no bottleneck at this scale
+  - [ ] Find the actual breaking point (crank VUs until thresholds fail), then optimize what breaks
+  - [ ] Caching (Redis) — only if measurements ever justify it; CDN with real hosting
 - **Email:** transactional emails (order confirmation)
 - **Search:** product search (Postgres full-text first)
 - **API evolution:** OpenAPI spec + generated clients; explore gRPC or GraphQL
