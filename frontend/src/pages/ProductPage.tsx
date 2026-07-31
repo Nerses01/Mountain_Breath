@@ -49,6 +49,13 @@ export function ProductPage() {
       </Link>
 
       <div className="mt-4 rounded-xl border border-stone-200 bg-white p-6">
+        {p.image_url && (
+          <img
+            src={p.image_url}
+            alt={p.name}
+            className="mb-4 h-64 w-full rounded-lg object-cover"
+          />
+        )}
         <h2 className="text-2xl font-bold text-stone-800">{p.name}</h2>
         <p className="mt-2 text-stone-500">{p.description}</p>
 

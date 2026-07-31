@@ -673,6 +673,176 @@
 					"response": []
 				},
 				{
+					"name": "List all products (incl. inactive)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/admin/products",
+							"host": ["{{apiV1}}"],
+							"path": ["admin", "products"]
+						},
+						"description": "Admin product list: same envelope as the public list, plus is_active, including deactivated products."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Create product",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"category_id\": 1,\n    \"slug\": \"{{newProductSlug}}\",\n    \"name\": \"Test Product\",\n    \"description\": \"Created from Postman.\",\n    \"variants\": [\n        {\"sku\": \"{{newProductSku}}\", \"label\": \"100 g\", \"price_minor\": 150000, \"stock_qty\": 20}\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{apiV1}}/admin/products",
+							"host": ["{{apiV1}}"],
+							"path": ["admin", "products"]
+						},
+						"description": "Creates a product with variants in one transaction. Pre-request script randomizes slug/sku so runs stay repeatable. category_id 1 exists in seeded databases."
+					},
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const stamp = Date.now();",
+									"pm.collectionVariables.set(\"newProductSlug\", \"test-product-\" + stamp);",
+									"pm.collectionVariables.set(\"newProductSku\", \"TST-\" + stamp);"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 201\", () => {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"",
+									"pm.test(\"created active with one variant\", () => {",
+									"    pm.expect(body.is_active).to.be.true;",
+									"    pm.expect(body.variants).to.have.lengthOf(1);",
+									"    pm.collectionVariables.set(\"newVariantId\", body.variants[0].id);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Upload product image",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "image",
+									"type": "file",
+									"src": "",
+									"description": "pick a JPEG/PNG/WebP under 5 MB"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{apiV1}}/admin/products/1/image",
+							"host": ["{{apiV1}}"],
+							"path": ["admin", "products", "1", "image"]
+						},
+						"description": "Multipart upload, field name `image`. Content type is sniffed from magic bytes server-side (filename/headers ignored); wrong type → 400 unsupported_type, >5MB → 413. Select a file before sending — Postman cannot store file paths portably."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"returns the image url\", () => {",
+									"    pm.expect(pm.response.json().image_url).to.match(/^\\/uploads\\//);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Update variant price/stock",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"price_minor\": 180000,\n    \"stock_qty\": 55\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{apiV1}}/admin/variants/{{newVariantId}}",
+							"host": ["{{apiV1}}"],
+							"path": ["admin", "variants", "{{newVariantId}}"]
+						},
+						"description": "Updates the two daily-operations fields. Uses the variant id saved by 'Create product' — run that first."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 204\", () => {",
+									"    pm.response.to.have.status(204);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
 					"name": "Create category — validation errors (400)",
 					"request": {
 						"method": "POST",

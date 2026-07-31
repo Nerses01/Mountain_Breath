@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, type ProductListParams } from './client'
-import type { OrderStatus, User } from './types'
+import type { OrderStatus, UpdateProduct, User } from './types'
 
 // TanStack Query caches by queryKey: two components asking for the same key
 // share one request and one cached result.
@@ -138,6 +138,59 @@ export function useAdminOrders() {
   return useQuery({
     queryKey: ['admin-orders'],
     queryFn: api.adminOrders,
+  })
+}
+
+export function useAdminProducts() {
+  return useQuery({
+    queryKey: ['admin-products'],
+    queryFn: api.adminProducts,
+  })
+}
+
+// All product writes invalidate both worlds: the admin list and the public
+// catalog caches (lists + detail pages).
+function useInvalidateProducts() {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: ['admin-products'] })
+    qc.invalidateQueries({ queryKey: ['products'] })
+    qc.invalidateQueries({ queryKey: ['product'] })
+  }
+}
+
+export function useCreateProduct() {
+  const invalidate = useInvalidateProducts()
+  return useMutation({
+    mutationFn: api.createProduct,
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateProduct() {
+  const invalidate = useInvalidateProducts()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: UpdateProduct }) =>
+      api.updateProduct(id, data),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUploadProductImage() {
+  const invalidate = useInvalidateProducts()
+  return useMutation({
+    mutationFn: ({ id, file }: { id: number; file: File }) =>
+      api.uploadProductImage(id, file),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateVariant() {
+  const invalidate = useInvalidateProducts()
+  return useMutation({
+    mutationFn: ({ id, priceMinor, stockQty }: { id: number; priceMinor: number; stockQty: number }) =>
+      api.updateVariant(id, priceMinor, stockQty),
+    onSuccess: invalidate,
   })
 }
 

@@ -251,7 +251,9 @@ proxy and static file server, environment/secret handling, health checks.
 HTTPS/TLS with Let's Encrypt, zero-ish-downtime deploys, database backups,
 deploy automation from CI.
 
-**Tasks:** *(all artifacts prepared 2026-07-30 — see docs/DEPLOYMENT.md; execution awaits VPS + domain)*
+**Status: ⏸️ FROZEN 2026-07-30** — hosting on own hardware (second laptop) chosen; blocked on port forwarding through the ISP's locked FiberHome HG6245D terminal (local admin disabled; ISP call pending). Cloudflare Tunnel considered and declined — classic port-forwarding path preferred. All artifacts ready; resumes the day 80/443 reach the LAN.
+
+**Tasks:** *(all artifacts prepared 2026-07-30 — see docs/DEPLOYMENT.md)*
 - [ ] Choose hosting (recommendation: cheap VPS — Hetzner/DigitalOcean — for maximum learning) ← **user decision pending**
 - [ ] Harden the server: non-root user, SSH keys, firewall, fail2ban (runbook §2)
 - [ ] Domain + DNS + TLS — Caddy chosen for auto-Let's Encrypt (`deploy/Caddyfile`, runbook §1/§6)
@@ -266,10 +268,21 @@ deploy automation from CI.
 
 **Goal:** the topics that distinguish senior backend engineers. Pick by interest.
 
-- **Observability:** structured logs aggregation, metrics with Prometheus + Grafana, alerting, request tracing
+- **Observability:** ⏳ in progress —
+  - [x] Prometheus metrics from the API: RED middleware (rate/errors/duration by route pattern), Go runtime, custom pgx pool collector, `mb_orders_created_total` business metric (2026-07-30)
+  - [x] Prometheus + Grafana in the compose stack; provisioned datasource + dashboard (6 panels)
+  - [x] Alerting: 4 rules (APIDown, HighErrorRate, SlowRequests, DBPoolSaturated) + Alertmanager in the stack; full pending→firing→resolved cycle verified by killing the api (2026-07-31). Notification channel (Telegram) left for when it runs on the real server
+  - [ ] Structured logs aggregation; request tracing (OpenTelemetry)
 - **Payments:** integrate a real payment provider (Stripe or a local one)
-- **Performance:** load testing (k6), query optimization, caching (Redis), CDN
+- **Performance:** ⏳ started —
+  - [x] k6 load test (`load/catalog-test.js`): browse + full purchase scenarios, SLO thresholds as code; baseline 2026-07-31: ~40 req/s, p95 19ms client / 8.5ms server, 0 errors, zero pool contention (12 conns) → no bottleneck at this scale
+  - [ ] Find the actual breaking point (crank VUs until thresholds fail), then optimize what breaks
+  - [ ] Caching (Redis) — only if measurements ever justify it; CDN with real hosting
 - **Email:** transactional emails (order confirmation)
+- **Complete the shop:** ⏳ started —
+  - [x] Backend admin product management: create product+variants (transactional, constraint-name error mapping), update product (slug immutable), variant price/stock PATCH, admin list incl. inactive (2026-07-31)
+  - [x] Frontend admin products UI: create form with dynamic variant rows + JSON-path field errors, inline variant price/stock editing (dirty-tracking save), active toggle, shared AdminNav (2026-07-31)
+  - [x] Product images: multipart upload with magic-byte sniffing (5MB cap, server-named files), Go file server + nginx `/uploads/` proxy with caching, persistent volume in both compose stacks, thumbnail-as-upload-button admin UI, images in catalog + product pages (2026-07-31)
 - **Search:** product search (Postgres full-text first)
 - **API evolution:** OpenAPI spec + generated clients; explore gRPC or GraphQL
 - **Infrastructure as Code:** Terraform/Ansible for the server setup

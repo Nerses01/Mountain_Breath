@@ -113,5 +113,6 @@ frontend/
 | 9 | Cart requires login (amends #4); `PUT /cart/items` with set-semantics | avoids a parallel anonymous-token system for now; idempotent cart writes | 2026-07-29 |
 | 10 | Checkout locks variant rows (`FOR UPDATE`, ordered) inside one transaction | overselling impossible under concurrency; proven with a live race test | 2026-07-29 |
 | 11 | Repo stays private; no enforced branch protection | business code privacy over free protection; CI status + discipline instead | 2026-07-29 |
+| 12 | Host on own hardware via classic port forwarding; Cloudflare Tunnel declined | keep TLS end-to-end (Caddy/Let's Encrypt), no third party in the traffic path; Phase 9 paused until ISP unlocks 80/443 | 2026-07-30 |
 
 Add a new row whenever we make a significant technical decision.

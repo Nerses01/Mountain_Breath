@@ -17,6 +17,82 @@ Template for an entry:
 
 ---
 
+## 2026-07-31 — Product images: first file upload
+
+**Worked on:** `POST /admin/products/{id}/image` — multipart parsing, content type sniffed from magic bytes (`http.DetectContentType`; filename and client headers ignored as attacker-controlled), 5MB `MaxBytesReader` cap, server-generated filenames, orphan-file cleanup on failed DB update; Go `http.FileServer` at `/uploads/*`; nginx proxy location with cache headers; `uploads_data` volume in both compose stacks; `FormData` path in the frontend client (browser sets multipart boundary itself); ImageSlot thumbnail-as-button UI (hidden file input); images render in catalog/product pages.
+**Learned:**
+- Never trust uploads: sniff real content type, cap size, generate your own filenames — the three rules of accepting user files.
+- The test caught a REAL platform bug: `os.Remove` on a still-open file fails on Windows (fine on Linux) — close before delete; deferred-close was too late. Tests of cleanup paths earn their keep.
+- Files don't belong in the DB; the DB stores the URL, the filesystem (a volume, later S3) stores bytes.
+- `FormData` uploads must NOT set Content-Type manually — the browser's boundary parameter is required.
+- Hidden `<input type="file">` triggered by a styled button is the standard upload UX.
+**Incident (same day):** in containers, upload failed with `permission denied` — the api runs as distroless **nonroot** (uid 65532) but Docker created the named volume owned by **root**. Fix: the Dockerfile now ships `/uploads` with `COPY --chown=65532:65532`; Docker copies that ownership into a named volume **on its first initialization** (had to `docker volume rm` the root-owned one). Lesson: non-root containers + named volumes = ownership must come from the image; "works with go run on the host" proves nothing about the container's permission reality.
+**Questions / to revisit:**
+- Image resizing/thumbnails; S3-compatible storage when hosting matures; nginx serving uploads from a shared volume directly (skip the proxy hop).
+
+## 2026-07-31 — Admin products UI
+
+**Worked on:** AdminProductsPage — create form with **array state** (dynamic variant rows added/removed immutably via map/filter), backend's `variants[i].field` errors mapped onto the exact form row, category `<select>`, major↔minor price conversion isolated at the UI edge (`toMinor`), per-variant inline editors with dirty-tracking save buttons, active/inactive toggle (full-fields PUT), shared `AdminNav` with `NavLink` active styling; product-write hooks invalidate admin + public caches together.
+**Learned:**
+- Array state in forms: rows live in one array; edits replace the array immutably — `map` for update, `filter` for remove, spread for append.
+- Dirty tracking (compare draft vs source, show save only when changed) is derived state — no extra flags needed.
+- Money conversion belongs at ONE edge: humans type 1500.00, everything else speaks minor units.
+- `NavLink` gives active-tab styling from the router for free.
+- Field-error contracts (JSON paths) designed on the backend pay off exactly here.
+**Questions / to revisit:**
+- Add-variant-to-existing-product; image upload; category management could join AdminNav pattern.
+
+## 2026-07-31 — Admin product management (backend)
+
+**Worked on:** `POST/PUT /admin/products`, `PATCH /admin/variants/{id}`, admin list with `IncludeInactive`; transactional CreateProduct (product+variants all-or-nothing); error mapping by pg **constraint name** (one SQLSTATE 23505 → ErrSlugTaken / ErrSKUTaken / ErrVariantLabelTaken); validation with `variants[i].field` JSON-path keys; slug immutability (public URLs must not break); tests at all three levels incl. rollback-no-orphan integration test; Postman admin requests with chained variables.
+**Learned:**
+- `pgErr.ConstraintName` distinguishes business meanings behind identical error codes — name constraints deliberately.
+- Nested validation errors need addressable keys (`variants[0].sku`) so forms can target inputs.
+- Immutable identifiers: anything that is a public URL (slug) or an external reference (SKU on invoices) should not be editable casually.
+- Soft delete via `is_active` + a filter flag beats DELETE: orders reference products forever.
+- Postman chaining: a test script saves a response id into a variable the next request uses.
+**Questions / to revisit:**
+- Admin products UI (next session); adding variants to an existing product; image upload.
+
+## 2026-07-31 — Alerting: rules + Alertmanager, fire drill included
+
+**Worked on:** `alerts.yml` with 4 rules (APIDown via the free `up` metric; HighErrorRate; SlowRequests p95; DBPoolSaturated via wait-rate); `evaluation_interval`, `rule_files` and `alerting:` blocks in prometheus.yml; Alertmanager v0.28 service (UI :9093, receiver empty until real hosting — Telegram config documented in place). Fire drill: stopped api → watched pending (45s) → firing (105s) → active in Alertmanager → restarted api → auto-resolved.
+**Learned:**
+- Alert anatomy: `expr` (a PromQL query) + `for` (flap protection — brief blips never page) + labels/annotations (severity, human-readable context).
+- The `up` metric is monitoring-for-free: every scrape target gets liveness alerting without any instrumentation.
+- pending → firing → resolved is the full lifecycle; Prometheus evaluates, Alertmanager routes/groups/throttles (group_wait, repeat_interval).
+- Alert thresholds encode the SLOs we load-tested: the k6 baseline (p95 ~20ms) justifies alerting at 500ms — alerts and load tests reference the same numbers.
+- Test the fire alarm by lighting a real (controlled) fire — an unverified alert rule is a hope, like an unrestored backup.
+
+## 2026-07-31 — k6 load testing: baseline + a real bug found
+
+**Worked on:** `load/catalog-test.js` — two k6 scenarios (ramping browsers 0→20 VUs; 5 constant buyers doing register→cart→checkout with per-VU sessions), SLO thresholds in code (p95<200ms, errors<1%). First run FAILED usefully: k6 v2 resets its cookie jar every iteration → sessions died after iteration 0 (255 × 401s). Fixed by capturing the session cookie into per-VU module state and sending it manually. Final: 3,986 reqs @ 38/s, p95 19ms client / 8.5ms server, 0 errors, ~250 orders; pool wait 0.17s cumulative on 12 conns → no contention.
+**Learned:**
+- Thresholds = SLOs as code; k6's exit code makes load tests CI-able.
+- Client p95 vs server p95 differ by the proxy/network layer — measuring both localizes overhead.
+- `mb_db_pool_acquire_wait_seconds_total` is the saturation signal: flat = pool comfortable, climbing = raise pool size or fix slow queries.
+- Load tests find *behavioral* bugs too (session handling), not just slowness.
+- "No bottleneck at this load" is a legitimate, valuable finding — measured, not assumed; the breaking-point hunt is a separate future experiment.
+- Tooling: PowerShell `Select-Object -First` closes the pipe and kills the upstream process mid-run — capture to file instead.
+
+## 2026-07-30 — Incident: web container crash-loop ("host not found in upstream")
+
+**What happened:** nginx crash-looped on `host not found in upstream "api"` while api was healthy. Root cause: the web container was *created* during an earlier failed `up` (port-80 conflict interrupted its network attachment) → it existed with NO networks; restart policies rerun the broken container as-is, never re-create it. Fixed with `up --force-recreate web`.
+**Hardening:** nginx.conf now uses `resolver 127.0.0.11` + a variable in `proxy_pass`, deferring DNS to request time — nginx boots even when api is absent (relevant after host restarts, where `depends_on` ordering does not apply). Verified: web restarts cleanly with api stopped; static pages 200, api routes 502, self-heals when api returns.
+**Lessons:** `docker inspect <container>` → Networks when behavior "can't happen"; restart ≠ recreate; literal `proxy_pass` binds DNS at boot; graceful degradation beats crash-looping.
+
+## 2026-07-30 — Phase 10 started: Prometheus metrics + Grafana dashboard
+
+**Worked on:** metrics middleware (`mb_http_requests_total`, duration histogram — labeled by chi route PATTERN, never raw path), `/metrics` endpoint (unproxied by nginx → never public), custom `PoolCollector` for pgxpool stats, `mb_orders_created_total` business counter, metrics test; Prometheus v3.5 + Grafana 12 joined the compose stack with provisioned-from-git datasource and 6-panel RED dashboard. Verified: target up, queries answering, traffic visible.
+**Learned:**
+- Prometheus is PULL-based: services answer /metrics, the server visits. Counters only grow; `rate()` derives per-second speed; histograms bucket latencies so `histogram_quantile()` can compute p95 later.
+- Label cardinality is the classic self-inflicted wound: label by route pattern, not URL; every unique label combo is a stored time series.
+- The RED method (Rate, Errors, Duration) is the standard first dashboard for a request-driven service.
+- Business metrics (orders placed) matter as much as infrastructure metrics — servers can be green while sales are zero.
+- Grafana provisioning = dashboards as code in git, surviving container wipes.
+**Questions / to revisit:**
+- Alerting rules; OpenTelemetry tracing; k6 load test to make these graphs interesting.
+
 ## 2026-07-30 — Phase 9 prepared: deploy artifacts + runbook (server pending)
 
 **Worked on:** `deploy/docker-compose.prod.yml` (pulls GHCR images, Caddy TLS edge, MB_ENV=prod); `deploy/Caddyfile` (auto-Let's Encrypt in one line); `deploy/backup.sh` (nightly pg_dump + rotation); CD `deploy` job in CI (SSH pull-and-restart, dormant behind `DEPLOY_ENABLED` variable); `docs/DEPLOYMENT.md` — the full runbook from empty Ubuntu VPS to live HTTPS shop with CD.

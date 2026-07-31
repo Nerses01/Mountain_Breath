@@ -9,6 +9,7 @@ type Config struct {
 	Addr        string // address the HTTP server listens on, e.g. ":8080"
 	Env         string // "dev" or "prod"
 	DatabaseURL string // postgres connection string (DSN)
+	UploadsDir  string // directory for uploaded product images
 }
 
 func Load() (Config, error) {
@@ -16,6 +17,7 @@ func Load() (Config, error) {
 		Addr:        getEnv("MB_ADDR", ":8080"),
 		Env:         getEnv("MB_ENV", "dev"),
 		DatabaseURL: os.Getenv("MB_DATABASE_URL"),
+		UploadsDir:  getEnv("MB_UPLOADS_DIR", "uploads"),
 	}
 	// No default for the DSN: it contains credentials, which never belong
 	// in source code. Fail loudly instead (same idea as compose's ${VAR:?}).

@@ -3,10 +3,13 @@ package api
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
 )
@@ -24,6 +27,10 @@ type CategoryStore interface {
 type ProductStore interface {
 	ListProducts(ctx context.Context, f domain.ProductFilter) ([]domain.Product, int, error)
 	GetProductBySlug(ctx context.Context, slug string) (domain.Product, error)
+	CreateProduct(ctx context.Context, p *domain.Product) error
+	UpdateProduct(ctx context.Context, p *domain.Product) error
+	UpdateVariant(ctx context.Context, variantID, priceMinor int64, stockQty int) error
+	UpdateProductImage(ctx context.Context, productID int64, imageURL string) error
 }
 
 type UserStore interface {
@@ -63,23 +70,44 @@ type Store interface {
 // Server holds the dependencies of the HTTP layer. Handlers are methods on it,
 // so they reach the logger and store (and later: sessions...) without globals.
 type Server struct {
-	log     *slog.Logger
-	store   Store
-	devMode bool
+	log        *slog.Logger
+	store      Store
+	devMode    bool
+	uploadsDir string
+	metrics    *metrics
 }
 
-func NewServer(log *slog.Logger, store Store, devMode bool) *Server {
-	return &Server{log: log, store: store, devMode: devMode}
+// extraCollectors lets main contribute collectors that need dependencies the
+// api layer doesn't own (e.g. the pgx pool stats collector).
+func NewServer(log *slog.Logger, store Store, devMode bool, uploadsDir string, extraCollectors ...prometheus.Collector) *Server {
+	return &Server{
+		log:        log,
+		store:      store,
+		devMode:    devMode,
+		uploadsDir: uploadsDir,
+		metrics:    newMetrics(extraCollectors...),
+	}
 }
 
 func (s *Server) Routes() chi.Router {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
+	r.Use(s.metricsMiddleware)
 	r.Use(s.requestLogger)
 	r.Use(s.recoverPanic)
 
 	r.Get("/health", s.handleHealth)
+
+	// Scrape endpoint for Prometheus. Reachable inside the compose network
+	// and on localhost in dev — nginx does NOT proxy it, so it is never
+	// exposed to the public internet.
+	r.Handle("/metrics", promhttp.HandlerFor(s.metrics.registry, promhttp.HandlerOpts{}))
+
+	// Uploaded product images. http.FileServer refuses path traversal (..)
+	// on its own; filenames are server-generated anyway.
+	r.Handle("/uploads/*", http.StripPrefix("/uploads/",
+		http.FileServer(http.Dir(s.uploadsDir))))
 
 	r.Route("/api/v1", func(r chi.Router) {
 		// Resolve the session cookie (if any) for every API request.
@@ -109,6 +137,11 @@ func (s *Server) Routes() chi.Router {
 			r.Post("/categories", s.handleCreateCategory)
 			r.Get("/orders", s.handleAdminListOrders)
 			r.Patch("/orders/{id}/status", s.handleUpdateOrderStatus)
+			r.Get("/products", s.handleAdminListProducts)
+			r.Post("/products", s.handleCreateProduct)
+			r.Put("/products/{id}", s.handleUpdateProduct)
+			r.Post("/products/{id}/image", s.handleUploadProductImage)
+			r.Patch("/variants/{id}", s.handleUpdateVariant)
 		})
 	})
 

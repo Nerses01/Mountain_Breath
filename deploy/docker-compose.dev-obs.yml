@@ -1,0 +1,26 @@
+# Opt-in observability for DEV: layer onto the dev compose when you are
+# working on metrics/dashboards against a host-run API (go run / air).
+#
+#   docker compose -f deploy/docker-compose.dev.yml -f deploy/docker-compose.dev-obs.yml up -d
+#
+# Ports are shifted (+1) so this can run alongside the prod-mirror stack's
+# prometheus (9090) and grafana (3000) without collisions:
+#   Prometheus: http://localhost:9091     Grafana: http://localhost:3001
+services:
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    volumes:
+      - ./observability/prometheus.dev.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9091:9090"
+
+  grafana:
+    image: grafana/grafana:12.0.0
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3001:3000"

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"time"
 
@@ -60,6 +61,57 @@ func (f *fakeStore) GetProductBySlug(_ context.Context, slug string) (domain.Pro
 	return domain.Product{}, domain.ErrNotFound
 }
 
+func (f *fakeStore) CreateProduct(_ context.Context, p *domain.Product) error {
+	for _, existing := range f.products {
+		if existing.Slug == p.Slug {
+			return domain.ErrSlugTaken
+		}
+		for _, v := range existing.Variants {
+			for _, nv := range p.Variants {
+				if v.SKU == nv.SKU {
+					return domain.ErrSKUTaken
+				}
+			}
+		}
+	}
+	p.ID = int64(len(f.products) + 1)
+	f.products = append(f.products, *p)
+	return nil
+}
+
+func (f *fakeStore) UpdateProduct(_ context.Context, p *domain.Product) error {
+	for i := range f.products {
+		if f.products[i].ID == p.ID {
+			f.products[i] = *p
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
+func (f *fakeStore) UpdateProductImage(_ context.Context, productID int64, imageURL string) error {
+	for i := range f.products {
+		if f.products[i].ID == productID {
+			f.products[i].ImageURL = imageURL
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
+func (f *fakeStore) UpdateVariant(_ context.Context, variantID, priceMinor int64, stockQty int) error {
+	for i := range f.products {
+		for j := range f.products[i].Variants {
+			if f.products[i].Variants[j].ID == variantID {
+				f.products[i].Variants[j].PriceMinor = priceMinor
+				f.products[i].Variants[j].StockQty = stockQty
+				return nil
+			}
+		}
+	}
+	return domain.ErrNotFound
+}
+
 // --- UserStore / SessionStore (only what these tests exercise) ---
 
 func (f *fakeStore) CreateUser(_ context.Context, u *domain.User) error {
@@ -111,7 +163,7 @@ func (f *fakeStore) UpdateOrderStatus(_ context.Context, _ int64, _ string) (dom
 // newTestServer wires a real router (all real middleware!) around the fake.
 func newTestServer(fake *fakeStore) http.Handler {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil)) // silent in tests
-	return api.NewServer(logger, fake, false).Routes()
+	return api.NewServer(logger, fake, false, os.TempDir()).Routes()
 }
 
 // loginAs plants a session directly in the fake and returns its cookie.

@@ -1,0 +1,43 @@
+# Alert rules. Prometheus evaluates every rule on a schedule; when `expr`
+# is true for `for` long, the alert FIRES and is handed to Alertmanager.
+# The `for` duration is flap protection: a 10-second blip never pages anyone.
+groups:
+  - name: mountain-breath
+    rules:
+      - alert: APIDown
+        # `up` is free with every scrape target: 1 = last scrape worked.
+        expr: up{job="mountain-breath-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API is unreachable"
+          description: "Prometheus has failed to scrape the API for over a minute — the shop backend is likely down."
+
+      - alert: HighErrorRate
+        expr: sum(rate(mb_http_requests_total{status=~"5.."}[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Elevated 5xx rate"
+          description: "More than 0.5 server errors/second for 5 minutes — customers are seeing failures."
+
+      - alert: SlowRequests
+        expr: histogram_quantile(0.95, sum by (le) (rate(mb_http_request_duration_seconds_bucket[5m]))) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API p95 latency above 500ms"
+          description: "The slowest 5% of requests exceed 500ms sustained — investigate before customers complain."
+
+      - alert: DBPoolSaturated
+        # Wait-time counter climbing means requests queue for connections.
+        expr: rate(mb_db_pool_acquire_wait_seconds_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DB connection pool under pressure"
+          description: "Handlers are spending >100ms/s waiting for pool connections — raise pool size or find the slow query."

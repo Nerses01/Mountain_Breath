@@ -1,5 +1,5 @@
-import { Link } from 'react-router'
 import { useAdminOrders, useMe, useUpdateOrderStatus } from '../api/hooks'
+import { AdminNav } from '../components/AdminNav'
 import { OrderCard } from '../components/OrderCard'
 import type { OrderStatus } from '../api/types'
 
@@ -31,11 +31,9 @@ export function AdminOrdersPage() {
 
   return (
     <Shell>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-6">
         <h2 className="text-xl font-bold text-stone-800">Admin — Orders</h2>
-        <Link to="/admin" className="text-sm text-emerald-700 hover:underline">
-          → Categories
-        </Link>
+        <AdminNav />
       </div>
 
       {orders.isPending && <p className="mt-4 text-stone-400">Loading…</p>}

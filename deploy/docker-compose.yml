@@ -46,6 +46,10 @@ services:
       # cookies Secure-only, which plain http://localhost would break.
       MB_ENV: ${MB_ENV:-dev}
       MB_DATABASE_URL: postgres://${POSTGRES_USER:-mb}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-mountain_breath}?sslmode=disable
+      MB_UPLOADS_DIR: /uploads
+    volumes:
+      # images survive container rebuilds, like the database does
+      - uploads_data:/uploads
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -68,5 +72,44 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prom_data:/prometheus
+    ports:
+      - "9090:9090" # local browsing; on a real server this would not be published
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    volumes:
+      - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.0.0
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 volumes:
   pgdata_prod:
+  uploads_data:
+  prom_data:
+  grafana_data:

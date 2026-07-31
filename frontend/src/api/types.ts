@@ -87,6 +87,35 @@ export interface Order {
   items: OrderItem[]
 }
 
+// Admin shapes: the public product plus admin-only fields.
+export interface AdminProduct extends Product {
+  is_active: boolean
+}
+
+export interface NewVariantInput {
+  sku: string
+  label: string
+  price_minor: number
+  stock_qty: number
+}
+
+export interface NewProduct {
+  category_id: number
+  slug: string
+  name: string
+  description: string
+  image_url: string
+  variants: NewVariantInput[]
+}
+
+export interface UpdateProduct {
+  category_id: number
+  name: string
+  description: string
+  image_url: string
+  is_active: boolean
+}
+
 // Shape of the backend's error envelope (docs/ARCHITECTURE.md).
 export interface ApiErrorBody {
   error: {

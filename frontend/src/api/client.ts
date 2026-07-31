@@ -1,13 +1,16 @@
 import type {
+  AdminProduct,
   ApiErrorBody,
   Cart,
   Category,
   Credentials,
   NewCategory,
+  NewProduct,
   Order,
   OrderStatus,
   Paginated,
   Product,
+  UpdateProduct,
   User,
 } from './types'
 
@@ -36,10 +39,20 @@ interface RequestOptions {
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  // FormData goes through untouched — the browser sets the multipart
+  // Content-Type (with boundary) itself; setting it manually breaks uploads.
+  const isForm = options.body instanceof FormData
   const res = await fetch(path, {
     method: options.method ?? 'GET',
-    headers: options.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    headers:
+      options.body !== undefined && !isForm
+        ? { 'Content-Type': 'application/json' }
+        : undefined,
+    body: isForm
+      ? (options.body as FormData)
+      : options.body !== undefined
+        ? JSON.stringify(options.body)
+        : undefined,
   })
   if (!res.ok) {
     // Try to read our standard error envelope; fall back to the HTTP status.
@@ -107,6 +120,25 @@ export const api = {
   createCategory: (data: NewCategory) =>
     request<Category>('/api/v1/admin/categories', { method: 'POST', body: data }),
   adminOrders: () => request<Order[]>('/api/v1/admin/orders'),
+  adminProducts: () =>
+    request<Paginated<AdminProduct>>('/api/v1/admin/products?per_page=100'),
+  createProduct: (p: NewProduct) =>
+    request<AdminProduct>('/api/v1/admin/products', { method: 'POST', body: p }),
+  updateProduct: (id: number, p: UpdateProduct) =>
+    request<AdminProduct>(`/api/v1/admin/products/${id}`, { method: 'PUT', body: p }),
+  updateVariant: (id: number, priceMinor: number, stockQty: number) =>
+    request<void>(`/api/v1/admin/variants/${id}`, {
+      method: 'PATCH',
+      body: { price_minor: priceMinor, stock_qty: stockQty },
+    }),
+  uploadProductImage: (id: number, file: File) => {
+    const form = new FormData()
+    form.append('image', file)
+    return request<{ image_url: string }>(`/api/v1/admin/products/${id}/image`, {
+      method: 'POST',
+      body: form,
+    })
+  },
   updateOrderStatus: (orderId: number, status: OrderStatus) =>
     request<Order>(`/api/v1/admin/orders/${orderId}/status`, {
       method: 'PATCH',
