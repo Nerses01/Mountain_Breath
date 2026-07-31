@@ -218,7 +218,7 @@ protection, PR-based workflow, status checks, artifacts.
 - [x] Workflow: lint + component tests + typecheck/build for frontend
 - [x] Playwright e2e job (service-container Postgres, migrations + seed applied, traces uploaded on failure)
 - [x] Branch protection on `master` — **consciously skipped**: requires public repo or GitHub Pro; decided to stay private (decision #11). CI still reports red/green on everything; merging green is discipline.
-- [ ] Adopt PR workflow even solo — small PRs with self-review (start with the next feature)
+- [x] Adopt PR workflow even solo — PR #1 merged 2026-07-31 (dev → master, merge commit, dev kept long-lived and synced)
 
 **Done when:** a broken test blocks a PR; green checks required to merge.
 
@@ -283,12 +283,35 @@ deploy automation from CI.
   - [x] Backend admin product management: create product+variants (transactional, constraint-name error mapping), update product (slug immutable), variant price/stock PATCH, admin list incl. inactive (2026-07-31)
   - [x] Frontend admin products UI: create form with dynamic variant rows + JSON-path field errors, inline variant price/stock editing (dirty-tracking save), active toggle, shared AdminNav (2026-07-31)
   - [x] Product images: multipart upload with magic-byte sniffing (5MB cap, server-named files), Go file server + nginx `/uploads/` proxy with caching, persistent volume in both compose stacks, thumbnail-as-upload-button admin UI, images in catalog + product pages (2026-07-31)
-- **Search:** product search (Postgres full-text first)
+- **Search:** ✅ v1: Postgres full-text (2026-07-31) — weighted generated tsvector column + GIN index, websearch syntax, rank-ordered results, debounced search box. **Known limitation: whole-word matching only** (lexemes) — v2 upgrade planned, see Phase 11 backlog
 - **API evolution:** OpenAPI spec + generated clients; explore gRPC or GraphQL
 - **Infrastructure as Code:** Terraform/Ansible for the server setup
 - **Kubernetes:** optional; only after Docker Compose feels limiting
 
 ---
+
+### Phase 11 — Idea Backlog (living)
+
+A permanent parking lot for future plans. **Anyone adds ideas here anytime**
+(a line is enough); when one is picked for work, it moves into a real phase
+section with tasks and a definition of done. Nothing here is committed-to —
+it exists so ideas survive.
+
+**Product / business:**
+- [ ] **Search v2** — better matching: prefix search (type "hon" → find honey), typo tolerance (`pg_trgm` similarity), multilingual (Armenian/Russian names need per-language ts configs or trigram fallback)
+- [ ] Payments: real provider integration (research Armenian options: Idram, Ameriabank vPOS, …)
+- [ ] Order e-mail notifications (confirmation, status changes)
+- [ ] Anonymous carts (buy without registering first)
+- [ ] Product image galleries (multiple photos) + server-side thumbnails/resizing
+- [ ] Customer-facing order cancellation (while pending)
+
+**Engineering:**
+- [ ] Login rate limiting + auth hardening batch (security headers, session cleanup job)
+- [ ] OpenAPI spec + generated TS client (replace hand-maintained types.ts)
+- [ ] k6 breaking-point experiment (find what fails first under 10x load)
+- [ ] S3-compatible object storage for uploads (when hosting matures)
+- [ ] Log aggregation + OpenTelemetry tracing
+- [ ] Category management: edit/delete/reorder in admin UI
 
 ## 5. Milestone Summary
 

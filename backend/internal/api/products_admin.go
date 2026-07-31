@@ -55,6 +55,7 @@ func (s *Server) handleAdminListProducts(w http.ResponseWriter, r *http.Request)
 	q := r.URL.Query()
 	filter := domain.ProductFilter{
 		CategorySlug:    q.Get("category"),
+		Search:          q.Get("q"),
 		IncludeInactive: true,
 		Page:            intQueryParam(q.Get("page"), 1),
 		PerPage:         intQueryParam(q.Get("per_page"), 50),

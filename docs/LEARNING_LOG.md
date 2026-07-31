@@ -17,6 +17,18 @@ Template for an entry:
 
 ---
 
+## 2026-07-31 — Product search: Postgres full-text + debounced UI
+
+**Worked on:** migration 000005 — GENERATED tsvector column (weighted: name=A, description=B) + GIN index; `websearch_to_tsquery` in ListProducts with rank ordering when searching (CASE in ORDER BY, one query for both modes); `q` param through public+admin endpoints; `useDebouncedValue` hook (300ms) with fake-timer Vitest test; search box with live result count on the catalog.
+**Learned:**
+- FTS pipeline: text → to_tsvector (lexemes, stemmed by language config) → @@ match against tsquery → ts_rank for ordering; GENERATED column means the DB keeps the index source in sync — application can't forget.
+- GIN = inverted index (word → rows), the tsvector workhorse.
+- websearch_to_tsquery accepts raw human input safely — quotes, OR, -exclusion — no parsing on our side.
+- setweight lets structure (name vs description) influence ranking.
+- Debouncing: input state updates instantly, the derived query value trails typing by 300ms — cancel-previous-timer in useEffect cleanup IS the mechanism; tested with vi.useFakeTimers.
+**Questions / to revisit:**
+- Multilingual search (Armenian/Russian product names need different ts configs); typo tolerance (pg_trgm) if ever needed.
+
 ## 2026-07-31 — Product images: first file upload
 
 **Worked on:** `POST /admin/products/{id}/image` — multipart parsing, content type sniffed from magic bytes (`http.DetectContentType`; filename and client headers ignored as attacker-controlled), 5MB `MaxBytesReader` cap, server-generated filenames, orphan-file cleanup on failed DB update; Go `http.FileServer` at `/uploads/*`; nginx proxy location with cache headers; `uploads_data` volume in both compose stacks; `FormData` path in the frontend client (browser sets multipart boundary itself); ImageSlot thumbnail-as-button UI (hidden file input); images render in catalog/product pages.

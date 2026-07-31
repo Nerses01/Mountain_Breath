@@ -14,17 +14,24 @@ import (
 // and the total count of products matching the filter.
 func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]domain.Product, int, error) {
 	// ($1 = '' OR c.slug = $1): one query serves both the filtered and the
-	// unfiltered case — no string-built SQL. Same trick for $2: admins pass
-	// IncludeInactive=true and see everything.
+	// unfiltered case — no string-built SQL. Same trick for $2 (admins see
+	// inactive) and $3 (text search). websearch_to_tsquery parses human
+	// input safely: quoted phrases, OR, minus-exclusion — never SQL.
+	// Ordering: by relevance rank when searching, alphabetical otherwise.
 	const listQ = `
 		SELECT p.id, p.category_id, p.slug, p.name, p.description, p.image_url, p.is_active, p.created_at
 		FROM products p
 		JOIN categories c ON c.id = p.category_id
 		WHERE (p.is_active OR $2) AND ($1 = '' OR c.slug = $1)
-		ORDER BY p.name
-		LIMIT $3 OFFSET $4`
+		  AND ($3 = '' OR p.search_tsv @@ websearch_to_tsquery('english', $3))
+		ORDER BY
+		  CASE WHEN $3 = '' THEN NULL
+		       ELSE ts_rank(p.search_tsv, websearch_to_tsquery('english', $3))
+		  END DESC NULLS LAST,
+		  p.name
+		LIMIT $4 OFFSET $5`
 
-	rows, err := s.pool.Query(ctx, listQ, f.CategorySlug, f.IncludeInactive, f.PerPage, f.Offset())
+	rows, err := s.pool.Query(ctx, listQ, f.CategorySlug, f.IncludeInactive, f.Search, f.PerPage, f.Offset())
 	if err != nil {
 		return nil, 0, fmt.Errorf("querying products: %w", err)
 	}
@@ -52,8 +59,9 @@ func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]dom
 		SELECT count(*)
 		FROM products p
 		JOIN categories c ON c.id = p.category_id
-		WHERE (p.is_active OR $2) AND ($1 = '' OR c.slug = $1)`
-	if err := s.pool.QueryRow(ctx, countQ, f.CategorySlug, f.IncludeInactive).Scan(&total); err != nil {
+		WHERE (p.is_active OR $2) AND ($1 = '' OR c.slug = $1)
+		  AND ($3 = '' OR p.search_tsv @@ websearch_to_tsquery('english', $3))`
+	if err := s.pool.QueryRow(ctx, countQ, f.CategorySlug, f.IncludeInactive, f.Search).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("counting products: %w", err)
 	}
 

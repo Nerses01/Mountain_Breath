@@ -1,17 +1,30 @@
 import { useState } from 'react'
 import { useCategories, useProducts } from '../api/hooks'
 import { ProductCard } from '../components/ProductCard'
+import { useDebouncedValue } from '../lib/useDebounce'
 
 export function CatalogPage() {
   // '' means "all categories"; changing this state re-renders the page and
   // useProducts fetches (or serves from cache) the matching list.
   const [category, setCategory] = useState('')
+  const [search, setSearch] = useState('')
+  // The input updates instantly (responsive typing); the QUERY only fires
+  // when typing pauses — debounced value is part of the query key.
+  const debouncedSearch = useDebouncedValue(search, 300)
 
   const categories = useCategories()
-  const products = useProducts({ category })
+  const products = useProducts({ category, q: debouncedSearch })
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
+      <input
+        type="search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search the shop… (try: honey, tea -thyme)"
+        className="mb-4 w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm focus:border-emerald-600 focus:outline-none"
+      />
+
       <nav className="flex flex-wrap gap-2">
         <FilterChip
           label="All"
@@ -43,6 +56,7 @@ export function CatalogPage() {
           <>
             <p className="text-sm text-stone-400">
               {products.data.total} product{products.data.total === 1 ? '' : 's'}
+              {debouncedSearch && ` for “${debouncedSearch}”`}
             </p>
             <div className="mt-3 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {products.data.items.map((p) => (
