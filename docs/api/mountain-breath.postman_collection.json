@@ -760,6 +760,48 @@
 					"response": []
 				},
 				{
+					"name": "Upload product image",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "image",
+									"type": "file",
+									"src": "",
+									"description": "pick a JPEG/PNG/WebP under 5 MB"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{apiV1}}/admin/products/1/image",
+							"host": ["{{apiV1}}"],
+							"path": ["admin", "products", "1", "image"]
+						},
+						"description": "Multipart upload, field name `image`. Content type is sniffed from magic bytes server-side (filename/headers ignored); wrong type → 400 unsupported_type, >5MB → 413. Select a file before sending — Postman cannot store file paths portably."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"returns the image url\", () => {",
+									"    pm.expect(pm.response.json().image_url).to.match(/^\\/uploads\\//);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
 					"name": "Update variant price/stock",
 					"request": {
 						"method": "PATCH",

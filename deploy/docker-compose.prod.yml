@@ -36,6 +36,9 @@ services:
       MB_ADDR: ":8080"
       MB_ENV: prod # HTTPS exists here → Secure session cookies on
       MB_DATABASE_URL: postgres://${POSTGRES_USER:-mb}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-mountain_breath}?sslmode=disable
+      MB_UPLOADS_DIR: /uploads
+    volumes:
+      - uploads_data:/uploads
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -80,5 +83,6 @@ services:
 
 volumes:
   pgdata_prod:
+  uploads_data:
   caddy_data:
   caddy_config:

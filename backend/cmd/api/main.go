@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -79,10 +80,14 @@ func run(logger *slog.Logger) error {
 	}
 	logger.Info("database connected")
 
+	if err := os.MkdirAll(cfg.UploadsDir, 0o755); err != nil {
+		return fmt.Errorf("creating uploads dir: %w", err)
+	}
+
 	srv := &http.Server{
 		Addr: cfg.Addr,
 		Handler: api.NewServer(logger, store.New(pool), cfg.Env == "dev",
-			store.NewPoolCollector(pool)).Routes(),
+			cfg.UploadsDir, store.NewPoolCollector(pool)).Routes(),
 		// Never run an HTTP server without timeouts: a client that sends
 		// its request one byte per minute would otherwise hold a goroutine
 		// and a connection open forever (slowloris attack).

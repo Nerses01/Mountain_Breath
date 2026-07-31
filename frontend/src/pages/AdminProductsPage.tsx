@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ApiError } from '../api/client'
 import {
   useAdminProducts,
@@ -7,6 +7,7 @@ import {
   useMe,
   useUpdateProduct,
   useUpdateVariant,
+  useUploadProductImage,
 } from '../api/hooks'
 import type { AdminProduct, NewVariantInput, ProductVariant } from '../api/types'
 import { AdminNav } from '../components/AdminNav'
@@ -214,6 +215,7 @@ function ProductRow({ product }: { product: AdminProduct }) {
       className={`rounded-xl border border-stone-200 bg-white p-5 ${product.is_active ? '' : 'opacity-60'}`}
     >
       <div className="flex flex-wrap items-center gap-3">
+        <ImageSlot product={product} />
         <h3 className="font-semibold text-stone-800">{product.name}</h3>
         <span className="text-xs text-stone-400">{product.slug}</span>
         {!product.is_active && (
@@ -283,6 +285,47 @@ function VariantEditor({ variant }: { variant: ProductVariant }) {
       {!dirty && (
         <span className="text-xs text-stone-300">{formatPrice(variant.price_minor)}</span>
       )}
+    </div>
+  )
+}
+
+// ImageSlot: thumbnail that doubles as the upload button — clicking it opens
+// the file picker via a hidden <input type="file">.
+function ImageSlot({ product }: { product: AdminProduct }) {
+  const upload = useUploadProductImage()
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const err = upload.error instanceof ApiError ? upload.error : null
+
+  return (
+    <div className="flex flex-col items-center">
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={upload.isPending}
+        title={product.image_url ? 'Replace photo' : 'Add photo'}
+        className="h-14 w-14 overflow-hidden rounded-lg border border-dashed border-stone-300 bg-stone-50 text-xs text-stone-400 hover:border-emerald-600 disabled:opacity-50"
+      >
+        {product.image_url ? (
+          <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
+        ) : upload.isPending ? (
+          '…'
+        ) : (
+          '+ 📷'
+        )}
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) upload.mutate({ id: product.id, file })
+          e.target.value = '' // same file can be re-picked later
+        }}
+      />
+      {err && <span className="mt-1 max-w-24 text-center text-xs text-red-600">{err.message}</span>}
     </div>
   )
 }

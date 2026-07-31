@@ -17,6 +17,19 @@ Template for an entry:
 
 ---
 
+## 2026-07-31 — Product images: first file upload
+
+**Worked on:** `POST /admin/products/{id}/image` — multipart parsing, content type sniffed from magic bytes (`http.DetectContentType`; filename and client headers ignored as attacker-controlled), 5MB `MaxBytesReader` cap, server-generated filenames, orphan-file cleanup on failed DB update; Go `http.FileServer` at `/uploads/*`; nginx proxy location with cache headers; `uploads_data` volume in both compose stacks; `FormData` path in the frontend client (browser sets multipart boundary itself); ImageSlot thumbnail-as-button UI (hidden file input); images render in catalog/product pages.
+**Learned:**
+- Never trust uploads: sniff real content type, cap size, generate your own filenames — the three rules of accepting user files.
+- The test caught a REAL platform bug: `os.Remove` on a still-open file fails on Windows (fine on Linux) — close before delete; deferred-close was too late. Tests of cleanup paths earn their keep.
+- Files don't belong in the DB; the DB stores the URL, the filesystem (a volume, later S3) stores bytes.
+- `FormData` uploads must NOT set Content-Type manually — the browser's boundary parameter is required.
+- Hidden `<input type="file">` triggered by a styled button is the standard upload UX.
+**Incident (same day):** in containers, upload failed with `permission denied` — the api runs as distroless **nonroot** (uid 65532) but Docker created the named volume owned by **root**. Fix: the Dockerfile now ships `/uploads` with `COPY --chown=65532:65532`; Docker copies that ownership into a named volume **on its first initialization** (had to `docker volume rm` the root-owned one). Lesson: non-root containers + named volumes = ownership must come from the image; "works with go run on the host" proves nothing about the container's permission reality.
+**Questions / to revisit:**
+- Image resizing/thumbnails; S3-compatible storage when hosting matures; nginx serving uploads from a shared volume directly (skip the proxy hop).
+
 ## 2026-07-31 — Admin products UI
 
 **Worked on:** AdminProductsPage — create form with **array state** (dynamic variant rows added/removed immutably via map/filter), backend's `variants[i].field` errors mapped onto the exact form row, category `<select>`, major↔minor price conversion isolated at the UI edge (`toMinor`), per-variant inline editors with dirty-tracking save buttons, active/inactive toggle (full-fields PUT), shared `AdminNav` with `NavLink` active styling; product-write hooks invalidate admin + public caches together.

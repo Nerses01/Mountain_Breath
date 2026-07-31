@@ -12,6 +12,7 @@ export default defineConfig({
     // same relative URLs work in production behind Nginx.
     proxy: {
       '/api': 'http://localhost:8080',
+      '/uploads': 'http://localhost:8080',
     },
   },
   test: {

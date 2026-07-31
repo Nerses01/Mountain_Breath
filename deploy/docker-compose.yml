@@ -46,6 +46,10 @@ services:
       # cookies Secure-only, which plain http://localhost would break.
       MB_ENV: ${MB_ENV:-dev}
       MB_DATABASE_URL: postgres://${POSTGRES_USER:-mb}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-mountain_breath}?sslmode=disable
+      MB_UPLOADS_DIR: /uploads
+    volumes:
+      # images survive container rebuilds, like the database does
+      - uploads_data:/uploads
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -106,5 +110,6 @@ services:
 
 volumes:
   pgdata_prod:
+  uploads_data:
   prom_data:
   grafana_data:

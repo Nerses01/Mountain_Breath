@@ -6,6 +6,14 @@ export function ProductCard({ product }: { product: Product }) {
   return (
     <Link to={`/products/${product.slug}`} aria-label={product.name} className="group">
       <article className="flex h-full flex-col rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition-shadow group-hover:shadow-md">
+        {product.image_url && (
+          <img
+            src={product.image_url}
+            alt={product.name}
+            className="mb-3 h-36 w-full rounded-lg object-cover"
+            loading="lazy"
+          />
+        )}
         <h3 className="text-lg font-semibold text-stone-800 group-hover:text-emerald-800">
           {product.name}
         </h3>

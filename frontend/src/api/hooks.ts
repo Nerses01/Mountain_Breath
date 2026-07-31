@@ -176,6 +176,15 @@ export function useUpdateProduct() {
   })
 }
 
+export function useUploadProductImage() {
+  const invalidate = useInvalidateProducts()
+  return useMutation({
+    mutationFn: ({ id, file }: { id: number; file: File }) =>
+      api.uploadProductImage(id, file),
+    onSuccess: invalidate,
+  })
+}
+
 export function useUpdateVariant() {
   const invalidate = useInvalidateProducts()
   return useMutation({

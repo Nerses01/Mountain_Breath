@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -29,6 +30,7 @@ type ProductStore interface {
 	CreateProduct(ctx context.Context, p *domain.Product) error
 	UpdateProduct(ctx context.Context, p *domain.Product) error
 	UpdateVariant(ctx context.Context, variantID, priceMinor int64, stockQty int) error
+	UpdateProductImage(ctx context.Context, productID int64, imageURL string) error
 }
 
 type UserStore interface {
@@ -68,20 +70,22 @@ type Store interface {
 // Server holds the dependencies of the HTTP layer. Handlers are methods on it,
 // so they reach the logger and store (and later: sessions...) without globals.
 type Server struct {
-	log     *slog.Logger
-	store   Store
-	devMode bool
-	metrics *metrics
+	log        *slog.Logger
+	store      Store
+	devMode    bool
+	uploadsDir string
+	metrics    *metrics
 }
 
 // extraCollectors lets main contribute collectors that need dependencies the
 // api layer doesn't own (e.g. the pgx pool stats collector).
-func NewServer(log *slog.Logger, store Store, devMode bool, extraCollectors ...prometheus.Collector) *Server {
+func NewServer(log *slog.Logger, store Store, devMode bool, uploadsDir string, extraCollectors ...prometheus.Collector) *Server {
 	return &Server{
-		log:     log,
-		store:   store,
-		devMode: devMode,
-		metrics: newMetrics(extraCollectors...),
+		log:        log,
+		store:      store,
+		devMode:    devMode,
+		uploadsDir: uploadsDir,
+		metrics:    newMetrics(extraCollectors...),
 	}
 }
 
@@ -99,6 +103,11 @@ func (s *Server) Routes() chi.Router {
 	// and on localhost in dev — nginx does NOT proxy it, so it is never
 	// exposed to the public internet.
 	r.Handle("/metrics", promhttp.HandlerFor(s.metrics.registry, promhttp.HandlerOpts{}))
+
+	// Uploaded product images. http.FileServer refuses path traversal (..)
+	// on its own; filenames are server-generated anyway.
+	r.Handle("/uploads/*", http.StripPrefix("/uploads/",
+		http.FileServer(http.Dir(s.uploadsDir))))
 
 	r.Route("/api/v1", func(r chi.Router) {
 		// Resolve the session cookie (if any) for every API request.
@@ -131,6 +140,7 @@ func (s *Server) Routes() chi.Router {
 			r.Get("/products", s.handleAdminListProducts)
 			r.Post("/products", s.handleCreateProduct)
 			r.Put("/products/{id}", s.handleUpdateProduct)
+			r.Post("/products/{id}/image", s.handleUploadProductImage)
 			r.Patch("/variants/{id}", s.handleUpdateVariant)
 		})
 	})

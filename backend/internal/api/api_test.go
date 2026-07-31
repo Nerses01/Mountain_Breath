@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"time"
 
@@ -88,6 +89,16 @@ func (f *fakeStore) UpdateProduct(_ context.Context, p *domain.Product) error {
 	return domain.ErrNotFound
 }
 
+func (f *fakeStore) UpdateProductImage(_ context.Context, productID int64, imageURL string) error {
+	for i := range f.products {
+		if f.products[i].ID == productID {
+			f.products[i].ImageURL = imageURL
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
 func (f *fakeStore) UpdateVariant(_ context.Context, variantID, priceMinor int64, stockQty int) error {
 	for i := range f.products {
 		for j := range f.products[i].Variants {
@@ -152,7 +163,7 @@ func (f *fakeStore) UpdateOrderStatus(_ context.Context, _ int64, _ string) (dom
 // newTestServer wires a real router (all real middleware!) around the fake.
 func newTestServer(fake *fakeStore) http.Handler {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil)) // silent in tests
-	return api.NewServer(logger, fake, false).Routes()
+	return api.NewServer(logger, fake, false, os.TempDir()).Routes()
 }
 
 // loginAs plants a session directly in the fake and returns its cookie.

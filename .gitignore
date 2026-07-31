@@ -1,5 +1,7 @@
 # --- Go ---
 backend/bin/
+# uploaded product images (dev)
+backend/uploads/
 # air hot-reload build dirs (backend, and repo root if air is started there)
 backend/tmp/
 tmp/

@@ -96,6 +96,18 @@ func (s *Store) UpdateProduct(ctx context.Context, p *domain.Product) error {
 	return nil
 }
 
+func (s *Store) UpdateProductImage(ctx context.Context, productID int64, imageURL string) error {
+	tag, err := s.pool.Exec(ctx,
+		`UPDATE products SET image_url = $1 WHERE id = $2`, imageURL, productID)
+	if err != nil {
+		return fmt.Errorf("updating product image: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) UpdateVariant(ctx context.Context, variantID, priceMinor int64, stockQty int) error {
 	tag, err := s.pool.Exec(ctx, `
 		UPDATE product_variants SET price_minor = $1, stock_qty = $2 WHERE id = $3`,

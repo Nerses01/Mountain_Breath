@@ -282,7 +282,7 @@ deploy automation from CI.
 - **Complete the shop:** ⏳ started —
   - [x] Backend admin product management: create product+variants (transactional, constraint-name error mapping), update product (slug immutable), variant price/stock PATCH, admin list incl. inactive (2026-07-31)
   - [x] Frontend admin products UI: create form with dynamic variant rows + JSON-path field errors, inline variant price/stock editing (dirty-tracking save), active toggle, shared AdminNav (2026-07-31)
-  - [ ] Product images (upload/storage)
+  - [x] Product images: multipart upload with magic-byte sniffing (5MB cap, server-named files), Go file server + nginx `/uploads/` proxy with caching, persistent volume in both compose stacks, thumbnail-as-upload-button admin UI, images in catalog + product pages (2026-07-31)
 - **Search:** product search (Postgres full-text first)
 - **API evolution:** OpenAPI spec + generated clients; explore gRPC or GraphQL
 - **Infrastructure as Code:** Terraform/Ansible for the server setup
