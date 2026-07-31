@@ -279,6 +279,10 @@ deploy automation from CI.
   - [ ] Find the actual breaking point (crank VUs until thresholds fail), then optimize what breaks
   - [ ] Caching (Redis) — only if measurements ever justify it; CDN with real hosting
 - **Email:** transactional emails (order confirmation)
+- **Complete the shop:** ⏳ started —
+  - [x] Backend admin product management: create product+variants (transactional, constraint-name error mapping), update product (slug immutable), variant price/stock PATCH, admin list incl. inactive (2026-07-31)
+  - [ ] Frontend admin products UI (list, create form with dynamic variant rows, inline price/stock editing, active toggle)
+  - [ ] Product images (upload/storage)
 - **Search:** product search (Postgres full-text first)
 - **API evolution:** OpenAPI spec + generated clients; explore gRPC or GraphQL
 - **Infrastructure as Code:** Terraform/Ansible for the server setup

@@ -14,16 +14,17 @@ import (
 // and the total count of products matching the filter.
 func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]domain.Product, int, error) {
 	// ($1 = '' OR c.slug = $1): one query serves both the filtered and the
-	// unfiltered case — no string-built SQL.
+	// unfiltered case — no string-built SQL. Same trick for $2: admins pass
+	// IncludeInactive=true and see everything.
 	const listQ = `
 		SELECT p.id, p.category_id, p.slug, p.name, p.description, p.image_url, p.is_active, p.created_at
 		FROM products p
 		JOIN categories c ON c.id = p.category_id
-		WHERE p.is_active AND ($1 = '' OR c.slug = $1)
+		WHERE (p.is_active OR $2) AND ($1 = '' OR c.slug = $1)
 		ORDER BY p.name
-		LIMIT $2 OFFSET $3`
+		LIMIT $3 OFFSET $4`
 
-	rows, err := s.pool.Query(ctx, listQ, f.CategorySlug, f.PerPage, f.Offset())
+	rows, err := s.pool.Query(ctx, listQ, f.CategorySlug, f.IncludeInactive, f.PerPage, f.Offset())
 	if err != nil {
 		return nil, 0, fmt.Errorf("querying products: %w", err)
 	}
@@ -51,8 +52,8 @@ func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]dom
 		SELECT count(*)
 		FROM products p
 		JOIN categories c ON c.id = p.category_id
-		WHERE p.is_active AND ($1 = '' OR c.slug = $1)`
-	if err := s.pool.QueryRow(ctx, countQ, f.CategorySlug).Scan(&total); err != nil {
+		WHERE (p.is_active OR $2) AND ($1 = '' OR c.slug = $1)`
+	if err := s.pool.QueryRow(ctx, countQ, f.CategorySlug, f.IncludeInactive).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("counting products: %w", err)
 	}
 

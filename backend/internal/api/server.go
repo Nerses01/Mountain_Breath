@@ -26,6 +26,9 @@ type CategoryStore interface {
 type ProductStore interface {
 	ListProducts(ctx context.Context, f domain.ProductFilter) ([]domain.Product, int, error)
 	GetProductBySlug(ctx context.Context, slug string) (domain.Product, error)
+	CreateProduct(ctx context.Context, p *domain.Product) error
+	UpdateProduct(ctx context.Context, p *domain.Product) error
+	UpdateVariant(ctx context.Context, variantID, priceMinor int64, stockQty int) error
 }
 
 type UserStore interface {
@@ -125,6 +128,10 @@ func (s *Server) Routes() chi.Router {
 			r.Post("/categories", s.handleCreateCategory)
 			r.Get("/orders", s.handleAdminListOrders)
 			r.Patch("/orders/{id}/status", s.handleUpdateOrderStatus)
+			r.Get("/products", s.handleAdminListProducts)
+			r.Post("/products", s.handleCreateProduct)
+			r.Put("/products/{id}", s.handleUpdateProduct)
+			r.Patch("/variants/{id}", s.handleUpdateVariant)
 		})
 	})
 

@@ -1,0 +1,225 @@
+package api
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strconv"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
+)
+
+type newVariantRequest struct {
+	SKU        string `json:"sku"`
+	Label      string `json:"label"`
+	PriceMinor int64  `json:"price_minor"`
+	StockQty   int    `json:"stock_qty"`
+}
+
+type createProductRequest struct {
+	CategoryID  int64               `json:"category_id"`
+	Slug        string              `json:"slug"`
+	Name        string              `json:"name"`
+	Description string              `json:"description"`
+	ImageURL    string              `json:"image_url"`
+	Variants    []newVariantRequest `json:"variants"`
+}
+
+type updateProductRequest struct {
+	CategoryID  int64  `json:"category_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	ImageURL    string `json:"image_url"`
+	IsActive    bool   `json:"is_active"`
+}
+
+type updateVariantRequest struct {
+	PriceMinor int64 `json:"price_minor"`
+	StockQty   int   `json:"stock_qty"`
+}
+
+// adminProductResponse extends the public shape with admin-only fields.
+type adminProductResponse struct {
+	productResponse
+	IsActive bool `json:"is_active"`
+}
+
+func toAdminProductResponse(p domain.Product) adminProductResponse {
+	return adminProductResponse{productResponse: toProductResponse(p), IsActive: p.IsActive}
+}
+
+// GET /admin/products — like the public list, but includes inactive products.
+func (s *Server) handleAdminListProducts(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	filter := domain.ProductFilter{
+		CategorySlug:    q.Get("category"),
+		IncludeInactive: true,
+		Page:            intQueryParam(q.Get("page"), 1),
+		PerPage:         intQueryParam(q.Get("per_page"), 50),
+	}
+	if filter.Page < 1 {
+		filter.Page = 1
+	}
+	if filter.PerPage < 1 || filter.PerPage > 100 {
+		filter.PerPage = 50
+	}
+
+	products, total, err := s.store.ListProducts(r.Context(), filter)
+	if err != nil {
+		s.log.Error("admin listing products", "error", err)
+		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
+	items := make([]adminProductResponse, 0, len(products))
+	for _, p := range products {
+		items = append(items, toAdminProductResponse(p))
+	}
+	s.respondJSON(w, http.StatusOK, paginated[adminProductResponse]{
+		Items: items, Page: filter.Page, PerPage: filter.PerPage, Total: total,
+	})
+}
+
+// POST /admin/products — create a product with its variants.
+func (s *Server) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	var req createProductRequest
+	if err := dec.Decode(&req); err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_json", "request body is not valid JSON: "+err.Error())
+		return
+	}
+
+	product := domain.Product{
+		CategoryID:  req.CategoryID,
+		Slug:        req.Slug,
+		Name:        req.Name,
+		Description: req.Description,
+		ImageURL:    req.ImageURL,
+		IsActive:    true,
+	}
+	for _, v := range req.Variants {
+		product.Variants = append(product.Variants, domain.ProductVariant{
+			SKU: v.SKU, Label: v.Label, PriceMinor: v.PriceMinor, StockQty: v.StockQty,
+		})
+	}
+
+	if fields := domain.ValidateProduct(product); len(fields) > 0 {
+		s.respondValidationError(w, fields)
+		return
+	}
+
+	if err := s.store.CreateProduct(r.Context(), &product); err != nil {
+		s.respondProductError(w, err)
+		return
+	}
+	s.respondJSON(w, http.StatusCreated, toAdminProductResponse(product))
+}
+
+// PUT /admin/products/{id} — full update of mutable fields (slug immutable:
+// it is a public URL).
+func (s *Server) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_id", "product id must be a number")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	var req updateProductRequest
+	if err := dec.Decode(&req); err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_json", "request body is not valid JSON: "+err.Error())
+		return
+	}
+
+	fields := make(map[string]string)
+	if req.Name == "" {
+		fields["name"] = "required"
+	}
+	if req.CategoryID <= 0 {
+		fields["category_id"] = "required"
+	}
+	if len(fields) > 0 {
+		s.respondValidationError(w, fields)
+		return
+	}
+
+	product := domain.Product{
+		ID: id, CategoryID: req.CategoryID, Name: req.Name,
+		Description: req.Description, ImageURL: req.ImageURL, IsActive: req.IsActive,
+	}
+	if err := s.store.UpdateProduct(r.Context(), &product); err != nil {
+		s.respondProductError(w, err)
+		return
+	}
+	s.respondJSON(w, http.StatusOK, toAdminProductResponse(product))
+}
+
+// PATCH /admin/variants/{id} — price and stock, the two fields that change
+// in daily shop operation.
+func (s *Server) handleUpdateVariant(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_id", "variant id must be a number")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	var req updateVariantRequest
+	if err := dec.Decode(&req); err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_json", "request body is not valid JSON: "+err.Error())
+		return
+	}
+
+	fields := make(map[string]string)
+	if req.PriceMinor <= 0 {
+		fields["price_minor"] = "must be positive"
+	}
+	if req.StockQty < 0 {
+		fields["stock_qty"] = "must not be negative"
+	}
+	if len(fields) > 0 {
+		s.respondValidationError(w, fields)
+		return
+	}
+
+	if err := s.store.UpdateVariant(r.Context(), id, req.PriceMinor, req.StockQty); err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			s.respondError(w, http.StatusNotFound, "not_found", "no such variant")
+			return
+		}
+		s.log.Error("updating variant", "error", err)
+		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// respondProductError maps the product-domain sentinels to HTTP once, for
+// both create and update paths.
+func (s *Server) respondProductError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, domain.ErrSlugTaken):
+		s.respondError(w, http.StatusConflict, "slug_taken", "a product with this slug already exists")
+	case errors.Is(err, domain.ErrSKUTaken):
+		s.respondError(w, http.StatusConflict, "sku_taken", "a variant with this SKU already exists")
+	case errors.Is(err, domain.ErrVariantLabelTaken):
+		s.respondError(w, http.StatusConflict, "variant_label_taken", "two variants of one product cannot share a label")
+	case errors.Is(err, domain.ErrCategoryNotFound):
+		s.respondValidationError(w, map[string]string{"category_id": "no such category"})
+	case errors.Is(err, domain.ErrNotFound):
+		s.respondError(w, http.StatusNotFound, "not_found", "no such product")
+	default:
+		s.log.Error("product write", "error", err)
+		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+	}
+}

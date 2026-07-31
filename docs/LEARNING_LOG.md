@@ -17,6 +17,18 @@ Template for an entry:
 
 ---
 
+## 2026-07-31 — Admin product management (backend)
+
+**Worked on:** `POST/PUT /admin/products`, `PATCH /admin/variants/{id}`, admin list with `IncludeInactive`; transactional CreateProduct (product+variants all-or-nothing); error mapping by pg **constraint name** (one SQLSTATE 23505 → ErrSlugTaken / ErrSKUTaken / ErrVariantLabelTaken); validation with `variants[i].field` JSON-path keys; slug immutability (public URLs must not break); tests at all three levels incl. rollback-no-orphan integration test; Postman admin requests with chained variables.
+**Learned:**
+- `pgErr.ConstraintName` distinguishes business meanings behind identical error codes — name constraints deliberately.
+- Nested validation errors need addressable keys (`variants[0].sku`) so forms can target inputs.
+- Immutable identifiers: anything that is a public URL (slug) or an external reference (SKU on invoices) should not be editable casually.
+- Soft delete via `is_active` + a filter flag beats DELETE: orders reference products forever.
+- Postman chaining: a test script saves a response id into a variable the next request uses.
+**Questions / to revisit:**
+- Admin products UI (next session); adding variants to an existing product; image upload.
+
 ## 2026-07-31 — Alerting: rules + Alertmanager, fire drill included
 
 **Worked on:** `alerts.yml` with 4 rules (APIDown via the free `up` metric; HighErrorRate; SlowRequests p95; DBPoolSaturated via wait-rate); `evaluation_interval`, `rule_files` and `alerting:` blocks in prometheus.yml; Alertmanager v0.28 service (UI :9093, receiver empty until real hosting — Telegram config documented in place). Fire drill: stopped api → watched pending (45s) → firing (105s) → active in Alertmanager → restarted api → auto-resolved.
