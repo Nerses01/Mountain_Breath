@@ -21,7 +21,7 @@ export function CatalogPage() {
         type="search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search the shop… (try: honey, tea -thyme)"
+        placeholder="Search the shop… typos and prefixes welcome (hon, hony, tea -thyme)"
         className="mb-4 w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm focus:border-emerald-600 focus:outline-none"
       />
 

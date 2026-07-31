@@ -283,7 +283,7 @@ deploy automation from CI.
   - [x] Backend admin product management: create product+variants (transactional, constraint-name error mapping), update product (slug immutable), variant price/stock PATCH, admin list incl. inactive (2026-07-31)
   - [x] Frontend admin products UI: create form with dynamic variant rows + JSON-path field errors, inline variant price/stock editing (dirty-tracking save), active toggle, shared AdminNav (2026-07-31)
   - [x] Product images: multipart upload with magic-byte sniffing (5MB cap, server-named files), Go file server + nginx `/uploads/` proxy with caching, persistent volume in both compose stacks, thumbnail-as-upload-button admin UI, images in catalog + product pages (2026-07-31)
-- **Search:** ✅ v1: Postgres full-text (2026-07-31) — weighted generated tsvector column + GIN index, websearch syntax, rank-ordered results, debounced search box. **Known limitation: whole-word matching only** (lexemes) — v2 upgrade planned, see Phase 11 backlog
+- **Search:** ✅ v1: Postgres full-text (2026-07-31) — weighted generated tsvector + GIN, websearch syntax, rank-ordered, debounced UI. ✅ **v2 (same day): pg_trgm trigram doors** — prefix ("hon"→Honey), typo tolerance ("hony"→Honey), substring, language-agnostic name matching; operators stripped from fuzzy paths (no `-tea` leak); LIKE wildcards escaped; hybrid rank = FTS + similarity
 - **API evolution:** OpenAPI spec + generated clients; explore gRPC or GraphQL
 - **Infrastructure as Code:** Terraform/Ansible for the server setup
 - **Kubernetes:** optional; only after Docker Compose feels limiting
@@ -298,7 +298,7 @@ section with tasks and a definition of done. Nothing here is committed-to —
 it exists so ideas survive.
 
 **Product / business:**
-- [ ] **Search v2** — better matching: prefix search (type "hon" → find honey), typo tolerance (`pg_trgm` similarity), multilingual (Armenian/Russian names need per-language ts configs or trigram fallback)
+- [x] ~~Search v2~~ — done 2026-07-31 (promoted to the Search track); multilingual *content* (Armenian/Russian descriptions in FTS) still open if the catalog goes multilingual
 - [ ] Payments: real provider integration (research Armenian options: Idram, Ameriabank vPOS, …)
 - [ ] Order e-mail notifications (confirmation, status changes)
 - [ ] Anonymous carts (buy without registering first)

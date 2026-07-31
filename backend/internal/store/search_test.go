@@ -65,9 +65,40 @@ func TestProductSearch(t *testing.T) {
 	})
 
 	t.Run("websearch syntax: exclusion with minus", func(t *testing.T) {
+		// The -tea operator must NOT leak into the trigram doors as literal
+		// text (it would match "Herbal Tea" by name): strict single result.
 		got := search("honey -tea")
 		if len(got) != 1 || got[0].Slug != "wildflower-honey" {
 			t.Errorf("exclusion failed: %+v", got)
+		}
+	})
+
+	// --- v2: the trigram doors ---
+
+	t.Run("prefix: 'hon' finds honey by substring", func(t *testing.T) {
+		got := search("hon")
+		if len(got) == 0 || got[0].Slug != "wildflower-honey" {
+			t.Errorf("prefix search failed: %+v", got)
+		}
+	})
+
+	t.Run("typo: 'hony' finds honey by similarity", func(t *testing.T) {
+		got := search("hony")
+		if len(got) == 0 || got[0].Slug != "wildflower-honey" {
+			t.Errorf("fuzzy search failed: %+v", got)
+		}
+	})
+
+	t.Run("mid-word substring: 'flower' finds Wildflower", func(t *testing.T) {
+		got := search("flower")
+		if len(got) == 0 || got[0].Slug != "wildflower-honey" {
+			t.Errorf("substring search failed: %+v", got)
+		}
+	})
+
+	t.Run("LIKE wildcards in input are literal, not magic", func(t *testing.T) {
+		if got := search("%"); len(got) != 0 {
+			t.Errorf("bare %% matched %d products — wildcard escaping broken", len(got))
 		}
 	})
 

@@ -4,34 +4,71 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
 )
 
+// escapeLike neutralizes LIKE wildcards in user input: someone searching
+// for "100%" means the literal text, not "anything starting with 100".
+func escapeLike(s string) string {
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return r.Replace(s)
+}
+
+// fuzzyQuery strips websearch operators for the trigram doors: in
+// "honey -tea" the "-tea" is an instruction (exclude), not text to match —
+// leaving it in would let trigrams literally match the word "tea".
+func fuzzyQuery(s string) string {
+	var words []string
+	for _, w := range strings.Fields(s) {
+		if strings.HasPrefix(w, "-") || strings.EqualFold(w, "or") {
+			continue
+		}
+		if w = strings.Trim(w, `"`); w != "" {
+			words = append(words, w)
+		}
+	}
+	return strings.Join(words, " ")
+}
+
 // ListProducts returns one page of active products (with their variants)
 // and the total count of products matching the filter.
 func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]domain.Product, int, error) {
 	// ($1 = '' OR c.slug = $1): one query serves both the filtered and the
 	// unfiltered case — no string-built SQL. Same trick for $2 (admins see
-	// inactive) and $3 (text search). websearch_to_tsquery parses human
-	// input safely: quoted phrases, OR, minus-exclusion — never SQL.
-	// Ordering: by relevance rank when searching, alphabetical otherwise.
+	// inactive) and $3/$4 (text search).
+	//
+	// Search matches through THREE doors, widest reach to narrowest:
+	//   1. full-text ($3, raw): whole words, stemmed, websearch syntax
+	//   2. substring on name ($5, cleaned+LIKE-escaped): "hon" finds Honey
+	//   3. fuzzy on name ($4, cleaned): trigram similarity — "hony" → Honey
+	// The trigram doors use the CLEANED query (operators stripped) and are
+	// closed entirely when cleaning leaves nothing (pure-exclusion query).
+	// Ranking sums FTS rank and name similarity: exact words float above
+	// fuzzy matches.
 	const listQ = `
 		SELECT p.id, p.category_id, p.slug, p.name, p.description, p.image_url, p.is_active, p.created_at
 		FROM products p
 		JOIN categories c ON c.id = p.category_id
 		WHERE (p.is_active OR $2) AND ($1 = '' OR c.slug = $1)
-		  AND ($3 = '' OR p.search_tsv @@ websearch_to_tsquery('english', $3))
+		  AND ($3 = ''
+		       OR p.search_tsv @@ websearch_to_tsquery('english', $3)
+		       OR ($4 <> '' AND (p.name ILIKE '%' || $5 || '%'
+		                         OR word_similarity($4, p.name) > 0.35)))
 		ORDER BY
 		  CASE WHEN $3 = '' THEN NULL
 		       ELSE ts_rank(p.search_tsv, websearch_to_tsquery('english', $3))
+		            + word_similarity($4, p.name)
 		  END DESC NULLS LAST,
 		  p.name
-		LIMIT $4 OFFSET $5`
+		LIMIT $6 OFFSET $7`
 
-	rows, err := s.pool.Query(ctx, listQ, f.CategorySlug, f.IncludeInactive, f.Search, f.PerPage, f.Offset())
+	fuzzy := fuzzyQuery(f.Search)
+	rows, err := s.pool.Query(ctx, listQ,
+		f.CategorySlug, f.IncludeInactive, f.Search, fuzzy, escapeLike(fuzzy), f.PerPage, f.Offset())
 	if err != nil {
 		return nil, 0, fmt.Errorf("querying products: %w", err)
 	}
@@ -60,8 +97,12 @@ func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]dom
 		FROM products p
 		JOIN categories c ON c.id = p.category_id
 		WHERE (p.is_active OR $2) AND ($1 = '' OR c.slug = $1)
-		  AND ($3 = '' OR p.search_tsv @@ websearch_to_tsquery('english', $3))`
-	if err := s.pool.QueryRow(ctx, countQ, f.CategorySlug, f.IncludeInactive, f.Search).Scan(&total); err != nil {
+		  AND ($3 = ''
+		       OR p.search_tsv @@ websearch_to_tsquery('english', $3)
+		       OR ($4 <> '' AND (p.name ILIKE '%' || $5 || '%'
+		                         OR word_similarity($4, p.name) > 0.35)))`
+	if err := s.pool.QueryRow(ctx, countQ,
+		f.CategorySlug, f.IncludeInactive, f.Search, fuzzy, escapeLike(fuzzy)).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("counting products: %w", err)
 	}
 

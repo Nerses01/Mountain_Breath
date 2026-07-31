@@ -17,6 +17,18 @@ Template for an entry:
 
 ---
 
+## 2026-07-31 — Search v2: trigram prefix + typo tolerance
+
+**Worked on:** migration 000006 (`pg_trgm` extension + trigram GIN on name); three-door search predicate — FTS (raw query) OR name-substring (ILIKE) OR fuzzy (`word_similarity > 0.35`), hybrid ranking (ts_rank + similarity); `escapeLike` (user's `%`/`_` are literal); `fuzzyQuery` stripping websearch operators from the trigram doors; 4 new integration subtests (prefix, typo, mid-word, wildcard-literal).
+**Learned:**
+- Trigrams: text → 3-char fragments; overlap = similarity. Gives substring + typo matching and is language-blind (works for Armenian names where stemming can't).
+- A trigram GIN index accelerates ILIKE '%…%' — the classic "can't index a leading-wildcard LIKE" rule has this exception.
+- **Query-language leakage bug (caught by tests):** the FTS operator `-tea` reached the trigram doors as literal text and matched "Herbal Tea" — when one input feeds engines with different syntaxes, sanitize per engine.
+- Guard empty fallback inputs: ILIKE '%%' matches everything.
+- Layered search = layered ranking: sum the signals so exact beats fuzzy.
+**Questions / to revisit:**
+- Multilingual FTS configs if descriptions go Armenian/Russian; similarity threshold may need tuning with a real catalog.
+
 ## 2026-07-31 — Product search: Postgres full-text + debounced UI
 
 **Worked on:** migration 000005 — GENERATED tsvector column (weighted: name=A, description=B) + GIN index; `websearch_to_tsquery` in ListProducts with rank ordering when searching (CASE in ORDER BY, one query for both modes); `q` param through public+admin endpoints; `useDebouncedValue` hook (300ms) with fake-timer Vitest test; search box with live result count on the catalog.
