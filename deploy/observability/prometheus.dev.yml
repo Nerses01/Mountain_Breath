@@ -1,0 +1,9 @@
+# Dev variant: the API runs on the HOST (go run / air), not in a container,
+# so Prometheus scrapes it through Docker Desktop's host alias.
+global:
+  scrape_interval: 5s # faster feedback while iterating on metrics
+
+scrape_configs:
+  - job_name: mountain-breath-api
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
