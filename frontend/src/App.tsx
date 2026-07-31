@@ -3,6 +3,7 @@ import { AuthStatus } from './components/AuthStatus'
 import { CartLink } from './components/CartLink'
 import { AdminOrdersPage } from './pages/AdminOrdersPage'
 import { AdminPage } from './pages/AdminPage'
+import { AdminProductsPage } from './pages/AdminProductsPage'
 import { CartPage } from './pages/CartPage'
 import { CatalogPage } from './pages/CatalogPage'
 import { LoginPage } from './pages/LoginPage'
@@ -35,6 +36,7 @@ function App() {
         <Route path="/cart" element={<CartPage />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/products" element={<AdminProductsPage />} />
         <Route path="/admin/orders" element={<AdminOrdersPage />} />
       </Routes>
     </div>

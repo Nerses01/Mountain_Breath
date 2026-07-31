@@ -281,7 +281,7 @@ deploy automation from CI.
 - **Email:** transactional emails (order confirmation)
 - **Complete the shop:** ⏳ started —
   - [x] Backend admin product management: create product+variants (transactional, constraint-name error mapping), update product (slug immutable), variant price/stock PATCH, admin list incl. inactive (2026-07-31)
-  - [ ] Frontend admin products UI (list, create form with dynamic variant rows, inline price/stock editing, active toggle)
+  - [x] Frontend admin products UI: create form with dynamic variant rows + JSON-path field errors, inline variant price/stock editing (dirty-tracking save), active toggle, shared AdminNav (2026-07-31)
   - [ ] Product images (upload/storage)
 - **Search:** product search (Postgres full-text first)
 - **API evolution:** OpenAPI spec + generated clients; explore gRPC or GraphQL

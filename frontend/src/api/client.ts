@@ -1,13 +1,16 @@
 import type {
+  AdminProduct,
   ApiErrorBody,
   Cart,
   Category,
   Credentials,
   NewCategory,
+  NewProduct,
   Order,
   OrderStatus,
   Paginated,
   Product,
+  UpdateProduct,
   User,
 } from './types'
 
@@ -107,6 +110,17 @@ export const api = {
   createCategory: (data: NewCategory) =>
     request<Category>('/api/v1/admin/categories', { method: 'POST', body: data }),
   adminOrders: () => request<Order[]>('/api/v1/admin/orders'),
+  adminProducts: () =>
+    request<Paginated<AdminProduct>>('/api/v1/admin/products?per_page=100'),
+  createProduct: (p: NewProduct) =>
+    request<AdminProduct>('/api/v1/admin/products', { method: 'POST', body: p }),
+  updateProduct: (id: number, p: UpdateProduct) =>
+    request<AdminProduct>(`/api/v1/admin/products/${id}`, { method: 'PUT', body: p }),
+  updateVariant: (id: number, priceMinor: number, stockQty: number) =>
+    request<void>(`/api/v1/admin/variants/${id}`, {
+      method: 'PATCH',
+      body: { price_minor: priceMinor, stock_qty: stockQty },
+    }),
   updateOrderStatus: (orderId: number, status: OrderStatus) =>
     request<Order>(`/api/v1/admin/orders/${orderId}/status`, {
       method: 'PATCH',

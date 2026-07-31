@@ -17,6 +17,18 @@ Template for an entry:
 
 ---
 
+## 2026-07-31 — Admin products UI
+
+**Worked on:** AdminProductsPage — create form with **array state** (dynamic variant rows added/removed immutably via map/filter), backend's `variants[i].field` errors mapped onto the exact form row, category `<select>`, major↔minor price conversion isolated at the UI edge (`toMinor`), per-variant inline editors with dirty-tracking save buttons, active/inactive toggle (full-fields PUT), shared `AdminNav` with `NavLink` active styling; product-write hooks invalidate admin + public caches together.
+**Learned:**
+- Array state in forms: rows live in one array; edits replace the array immutably — `map` for update, `filter` for remove, spread for append.
+- Dirty tracking (compare draft vs source, show save only when changed) is derived state — no extra flags needed.
+- Money conversion belongs at ONE edge: humans type 1500.00, everything else speaks minor units.
+- `NavLink` gives active-tab styling from the router for free.
+- Field-error contracts (JSON paths) designed on the backend pay off exactly here.
+**Questions / to revisit:**
+- Add-variant-to-existing-product; image upload; category management could join AdminNav pattern.
+
 ## 2026-07-31 — Admin product management (backend)
 
 **Worked on:** `POST/PUT /admin/products`, `PATCH /admin/variants/{id}`, admin list with `IncludeInactive`; transactional CreateProduct (product+variants all-or-nothing); error mapping by pg **constraint name** (one SQLSTATE 23505 → ErrSlugTaken / ErrSKUTaken / ErrVariantLabelTaken); validation with `variants[i].field` JSON-path keys; slug immutability (public URLs must not break); tests at all three levels incl. rollback-no-orphan integration test; Postman admin requests with chained variables.

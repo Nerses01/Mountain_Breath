@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { ApiError } from '../api/client'
 import { useCategories, useCreateCategory, useMe } from '../api/hooks'
+import { AdminNav } from '../components/AdminNav'
 
 // NOTE: this guard is user experience, not security. The backend's
 // requireAdmin middleware is the real gate — anyone can bypass this page
@@ -27,11 +28,9 @@ export function AdminPage() {
 
   return (
     <Shell>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-6">
         <h2 className="text-xl font-bold text-stone-800">Admin — Categories</h2>
-        <Link to="/admin/orders" className="text-sm text-emerald-700 hover:underline">
-          → Orders
-        </Link>
+        <AdminNav />
       </div>
       <CategoryForm />
       <CategoryList />
