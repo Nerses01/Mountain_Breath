@@ -1,0 +1,9 @@
+# Prometheus works by PULL: every 10s it visits each target's /metrics and
+# stores the samples. Services don't send anything — they just answer.
+global:
+  scrape_interval: 10s
+
+scrape_configs:
+  - job_name: mountain-breath-api
+    static_configs:
+      - targets: ["api:8080"] # Docker DNS, inside the compose network

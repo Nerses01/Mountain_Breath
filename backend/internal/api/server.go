@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
 )
@@ -66,20 +68,34 @@ type Server struct {
 	log     *slog.Logger
 	store   Store
 	devMode bool
+	metrics *metrics
 }
 
-func NewServer(log *slog.Logger, store Store, devMode bool) *Server {
-	return &Server{log: log, store: store, devMode: devMode}
+// extraCollectors lets main contribute collectors that need dependencies the
+// api layer doesn't own (e.g. the pgx pool stats collector).
+func NewServer(log *slog.Logger, store Store, devMode bool, extraCollectors ...prometheus.Collector) *Server {
+	return &Server{
+		log:     log,
+		store:   store,
+		devMode: devMode,
+		metrics: newMetrics(extraCollectors...),
+	}
 }
 
 func (s *Server) Routes() chi.Router {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
+	r.Use(s.metricsMiddleware)
 	r.Use(s.requestLogger)
 	r.Use(s.recoverPanic)
 
 	r.Get("/health", s.handleHealth)
+
+	// Scrape endpoint for Prometheus. Reachable inside the compose network
+	// and on localhost in dev — nginx does NOT proxy it, so it is never
+	// exposed to the public internet.
+	r.Handle("/metrics", promhttp.HandlerFor(s.metrics.registry, promhttp.HandlerOpts{}))
 
 	r.Route("/api/v1", func(r chi.Router) {
 		// Resolve the session cookie (if any) for every API request.

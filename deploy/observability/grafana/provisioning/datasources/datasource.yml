@@ -1,0 +1,11 @@
+# Provisioning = Grafana configured from files instead of clicks — the
+# dashboard survives `docker compose down -v` because its source lives in git.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true

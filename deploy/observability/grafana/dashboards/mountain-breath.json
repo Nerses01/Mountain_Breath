@@ -1,0 +1,80 @@
+{
+	"uid": "mountain-breath",
+	"title": "Mountain Breath — API",
+	"schemaVersion": 39,
+	"refresh": "10s",
+	"time": { "from": "now-30m", "to": "now" },
+	"panels": [
+		{
+			"id": 1,
+			"type": "timeseries",
+			"title": "Request rate by route (req/s)",
+			"gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+			"datasource": { "type": "prometheus", "uid": "prometheus" },
+			"targets": [
+				{
+					"expr": "sum by (route) (rate(mb_http_requests_total[1m]))",
+					"legendFormat": "{{route}}"
+				}
+			]
+		},
+		{
+			"id": 2,
+			"type": "timeseries",
+			"title": "Latency p95 / p50 (s)",
+			"gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+			"datasource": { "type": "prometheus", "uid": "prometheus" },
+			"targets": [
+				{
+					"expr": "histogram_quantile(0.95, sum by (le) (rate(mb_http_request_duration_seconds_bucket[5m])))",
+					"legendFormat": "p95"
+				},
+				{
+					"expr": "histogram_quantile(0.50, sum by (le) (rate(mb_http_request_duration_seconds_bucket[5m])))",
+					"legendFormat": "p50"
+				}
+			]
+		},
+		{
+			"id": 3,
+			"type": "timeseries",
+			"title": "5xx errors (req/s)",
+			"gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+			"datasource": { "type": "prometheus", "uid": "prometheus" },
+			"targets": [
+				{
+					"expr": "sum(rate(mb_http_requests_total{status=~\"5..\"}[5m]))",
+					"legendFormat": "5xx"
+				}
+			]
+		},
+		{
+			"id": 4,
+			"type": "stat",
+			"title": "Orders placed (total)",
+			"gridPos": { "h": 8, "w": 4, "x": 8, "y": 8 },
+			"datasource": { "type": "prometheus", "uid": "prometheus" },
+			"targets": [{ "expr": "mb_orders_created_total" }]
+		},
+		{
+			"id": 5,
+			"type": "timeseries",
+			"title": "Goroutines",
+			"gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+			"datasource": { "type": "prometheus", "uid": "prometheus" },
+			"targets": [{ "expr": "go_goroutines", "legendFormat": "goroutines" }]
+		},
+		{
+			"id": 6,
+			"type": "timeseries",
+			"title": "DB pool connections",
+			"gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+			"datasource": { "type": "prometheus", "uid": "prometheus" },
+			"targets": [
+				{ "expr": "mb_db_pool_acquired_conns", "legendFormat": "in use" },
+				{ "expr": "mb_db_pool_idle_conns", "legendFormat": "idle" },
+				{ "expr": "mb_db_pool_max_conns", "legendFormat": "max" }
+			]
+		}
+	]
+}

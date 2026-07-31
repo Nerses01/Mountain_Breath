@@ -17,6 +17,24 @@ Template for an entry:
 
 ---
 
+## 2026-07-30 — Incident: web container crash-loop ("host not found in upstream")
+
+**What happened:** nginx crash-looped on `host not found in upstream "api"` while api was healthy. Root cause: the web container was *created* during an earlier failed `up` (port-80 conflict interrupted its network attachment) → it existed with NO networks; restart policies rerun the broken container as-is, never re-create it. Fixed with `up --force-recreate web`.
+**Hardening:** nginx.conf now uses `resolver 127.0.0.11` + a variable in `proxy_pass`, deferring DNS to request time — nginx boots even when api is absent (relevant after host restarts, where `depends_on` ordering does not apply). Verified: web restarts cleanly with api stopped; static pages 200, api routes 502, self-heals when api returns.
+**Lessons:** `docker inspect <container>` → Networks when behavior "can't happen"; restart ≠ recreate; literal `proxy_pass` binds DNS at boot; graceful degradation beats crash-looping.
+
+## 2026-07-30 — Phase 10 started: Prometheus metrics + Grafana dashboard
+
+**Worked on:** metrics middleware (`mb_http_requests_total`, duration histogram — labeled by chi route PATTERN, never raw path), `/metrics` endpoint (unproxied by nginx → never public), custom `PoolCollector` for pgxpool stats, `mb_orders_created_total` business counter, metrics test; Prometheus v3.5 + Grafana 12 joined the compose stack with provisioned-from-git datasource and 6-panel RED dashboard. Verified: target up, queries answering, traffic visible.
+**Learned:**
+- Prometheus is PULL-based: services answer /metrics, the server visits. Counters only grow; `rate()` derives per-second speed; histograms bucket latencies so `histogram_quantile()` can compute p95 later.
+- Label cardinality is the classic self-inflicted wound: label by route pattern, not URL; every unique label combo is a stored time series.
+- The RED method (Rate, Errors, Duration) is the standard first dashboard for a request-driven service.
+- Business metrics (orders placed) matter as much as infrastructure metrics — servers can be green while sales are zero.
+- Grafana provisioning = dashboards as code in git, surviving container wipes.
+**Questions / to revisit:**
+- Alerting rules; OpenTelemetry tracing; k6 load test to make these graphs interesting.
+
 ## 2026-07-30 — Phase 9 prepared: deploy artifacts + runbook (server pending)
 
 **Worked on:** `deploy/docker-compose.prod.yml` (pulls GHCR images, Caddy TLS edge, MB_ENV=prod); `deploy/Caddyfile` (auto-Let's Encrypt in one line); `deploy/backup.sh` (nightly pg_dump + rotation); CD `deploy` job in CI (SSH pull-and-restart, dormant behind `DEPLOY_ENABLED` variable); `docs/DEPLOYMENT.md` — the full runbook from empty Ubuntu VPS to live HTTPS shop with CD.
