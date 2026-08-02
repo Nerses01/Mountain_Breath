@@ -178,7 +178,22 @@ jobs:
     needs: [images]
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy over SSH
+      # 1. Checkout the code on the GitHub Runner
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Securely copy ONLY the deploy folder to your VPS
+      - name: Copy Compose file to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "deploy/docker-compose.prod.yml"
+          target: ${{ vars.TARGET_DIR }}
+
+      # 3. SSH in and start the containers
+      - name: Start services
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -186,23 +201,14 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             set -e
-            # Pulling TARGET_DIR from GitHub Variables
-            TARGET_DIR="${{ vars.TARGET_DIR }}"
+            cd ${{ vars.TARGET_DIR }}
             
-            # Using the PAT secret to authenticate the private repository clone
-            REPO_URL="https://${{ secrets.GH_PAT }}@github.com/Nerses01/Mountain_Breath.git"
+            # 1. Login to GHCR on the VPS using your Personal Access Token
+            echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             
-            if [ -d "$TARGET_DIR" ]; then
-              echo "Directory exists. Pulling latest changes..."
-              cd "$TARGET_DIR"
-              git remote set-url origin "$REPO_URL"
-              git pull --ff-only
-            else
-              echo "Directory not found. Cloning for the first time..."
-              git clone "$REPO_URL" "$TARGET_DIR"
-              cd "$TARGET_DIR"
-            fi
-            
+            # 2. Pull the new images and start them
             docker compose -f deploy/docker-compose.prod.yml pull
             docker compose -f deploy/docker-compose.prod.yml up -d
+            
+            # 3. Clean up old images to save disk space
             docker image prune -f
