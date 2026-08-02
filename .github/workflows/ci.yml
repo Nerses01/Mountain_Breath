@@ -195,14 +195,22 @@ jobs:
       # 3. SSH in and start the containers
       - name: Start services
         uses: appleboy/ssh-action@v1
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          # Add any other required variables here, like:
+          # DB_USER: ${{ secrets.DB_USER }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: POSTGRES_PASSWORD # This tells the action to explicitly pass this variable to the server
           script: |
             set -e
             mkdir -p ${{ vars.TARGET_DIR }}
             cd ${{ vars.TARGET_DIR }}
+            
+            # Export the variable so Docker Compose can see it in this session
+            export POSTGRES_PASSWORD=$POSTGRES_PASSWORD
             
             # 1. Login to GHCR on the VPS using your Personal Access Token
             echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
