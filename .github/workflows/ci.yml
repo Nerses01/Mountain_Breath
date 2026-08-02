@@ -189,7 +189,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "deploy/docker-compose.prod.yml,backend/migrations" 
+          source: "deploy/docker-compose.prod.yml,deploy/Caddyfile,backend/migrations"
           target: ${{ vars.TARGET_DIR }}
 
       # 3. SSH in and start the containers
