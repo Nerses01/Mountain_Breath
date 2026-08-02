@@ -1,6 +1,10 @@
 # Caddy config: one line of substance. Caddy sees a real domain, obtains a
 # Let's Encrypt certificate for it, renews it forever, and redirects HTTP
 # to HTTPS — all by default, zero certificate commands.
+{
+	default_sni {$DOMAIN}
+}
+
 {$DOMAIN} {
 	encode gzip
 	
