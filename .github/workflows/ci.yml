@@ -186,12 +186,16 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             set -e
-            TARGET_DIR="/home/canary/mountain-breath"
-            REPO_URL="https://github.com/Nerses01/Mountain_Breath.git"
+            # Pulling TARGET_DIR from GitHub Variables
+            TARGET_DIR="${{ vars.TARGET_DIR }}"
+            
+            # Using the PAT secret to authenticate the private repository clone
+            REPO_URL="https://${{ secrets.GH_PAT }}@github.com/Nerses01/Mountain_Breath.git"
             
             if [ -d "$TARGET_DIR" ]; then
               echo "Directory exists. Pulling latest changes..."
               cd "$TARGET_DIR"
+              git remote set-url origin "$REPO_URL"
               git pull --ff-only
             else
               echo "Directory not found. Cloning for the first time..."
