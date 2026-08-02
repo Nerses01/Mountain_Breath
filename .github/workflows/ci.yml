@@ -182,14 +182,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Securely copy ONLY the deploy folder to your VPS
-      - name: Copy Compose file to VPS
+      # 2. Securely copy the Compose file AND your migrations folder to your VPS
+      - name: Copy files to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "deploy/docker-compose.prod.yml"
+          source: "deploy/docker-compose.prod.yml,backend/migrations" 
           target: ${{ vars.TARGET_DIR }}
 
       # 3. SSH in and start the containers
