@@ -186,7 +186,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             set -e
-            TARGET_DIR="/opt/mountain-breath"
+            TARGET_DIR="/home/canary/mountain-breath"
             REPO_URL="https://github.com/Nerses01/Mountain_Breath.git"
             
             if [ -d "$TARGET_DIR" ]; then
