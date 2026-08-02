@@ -27,7 +27,10 @@ How we (developer + Claude) collaborate on this project. Read at the start of ea
 
 8. **Everything through Git.** Small, focused commits with meaningful messages
    (Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
-9. **PR workflow from Phase 7 onward.** Feature branches + pull requests, even solo.
+9. **Branch workflow (refined 2026-07-31):** daily work is committed and pushed
+    to `dev` (fast CI checks run there); periodically a batch PR merges `dev`
+    into `master` (full battery + image publishing). Merge commits, never
+    squash; `dev` is permanent; after every merge, sync `dev` from `master`.
 10. **Linters always pass.** `golangci-lint` / ESLint clean before committing.
 11. **New code comes with tests** (from Phase 6 onward).
 12. **Secrets never in Git.** Configuration via environment variables; `.env` files

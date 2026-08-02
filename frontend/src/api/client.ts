@@ -77,6 +77,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 export interface ProductListParams {
   category?: string
+  q?: string
   page?: number
   perPage?: number
 }
@@ -87,6 +88,7 @@ export const api = {
   listProducts: (params: ProductListParams = {}) => {
     const q = new URLSearchParams()
     if (params.category) q.set('category', params.category)
+    if (params.q) q.set('q', params.q)
     if (params.page) q.set('page', String(params.page))
     if (params.perPage) q.set('per_page', String(params.perPage))
     const qs = q.toString()

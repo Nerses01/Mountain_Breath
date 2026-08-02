@@ -42,6 +42,7 @@ type ProductVariant struct {
 // ProductFilter describes what a product listing should return.
 type ProductFilter struct {
 	CategorySlug    string // empty = all categories
+	Search          string // empty = no text search
 	IncludeInactive bool   // admin listings see deactivated products too
 	Page            int    // 1-based
 	PerPage         int

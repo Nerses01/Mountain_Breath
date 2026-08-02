@@ -59,6 +59,7 @@ func (s *Server) handleListProducts(w http.ResponseWriter, r *http.Request) {
 
 	filter := domain.ProductFilter{
 		CategorySlug: q.Get("category"),
+		Search:       q.Get("q"),
 		Page:         intQueryParam(q.Get("page"), 1),
 		PerPage:      intQueryParam(q.Get("per_page"), 20),
 	}

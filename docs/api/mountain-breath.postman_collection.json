@@ -335,7 +335,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{apiV1}}/products?category=&page=1&per_page=20",
+							"raw": "{{apiV1}}/products?category=&q=&page=1&per_page=20",
 							"host": ["{{apiV1}}"],
 							"path": ["products"],
 							"query": [
@@ -343,6 +343,11 @@
 									"key": "category",
 									"value": "",
 									"description": "optional category slug filter, e.g. herbal-tea"
+								},
+								{
+									"key": "q",
+									"value": "",
+									"description": "full-text search; websearch syntax (phrases in quotes, -word excludes)"
 								},
 								{
 									"key": "page",
