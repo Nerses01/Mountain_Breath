@@ -3,5 +3,10 @@
 # to HTTPS — all by default, zero certificate commands.
 {$DOMAIN} {
 	encode gzip
+	
+	# Intercept any request starting with /api/ and send it to the C++ backend
+	reverse_proxy /api/* api:8080
+	
+	# Send everything else (HTML, CSS, JS) to the frontend container
 	reverse_proxy web:80
 }
