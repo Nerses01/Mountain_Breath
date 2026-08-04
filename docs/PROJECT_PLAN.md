@@ -328,3 +328,6 @@ it exists so ideas survive.
 - [RULES.md](RULES.md) — how we work together (read this first each session)
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system design and domain model
 - [LEARNING_LOG.md](LEARNING_LOG.md) — journal of learned topics per session/phase
+- [PLAN_ERA_2.md](PLAN_ERA_2.md) — **Era II** (phases E1–E10): building the
+  designed storefront from `Mountain Breath Store.dc.html`. Phase 11 above
+  stays open and feeds both eras.
