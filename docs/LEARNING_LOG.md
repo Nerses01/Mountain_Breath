@@ -321,7 +321,7 @@ Template for an entry:
 - Git identity resolution: repo-local config overrides global (`git config user.email` vs `--global`).
 - `gh` (GitHub CLI) can create a repo from an existing local one and set up the `origin` remote + tracking branch in one command.
 **Questions / to revisit:**
-- Is `ner.manukyan@gmail.com` added to the GitHub account (Nerses01)? If not, commits won't link to the profile — check GitHub → Settings → Emails.
+- Is the commit e-mail added to the GitHub account (Nerses01)? If not, commits won't link to the profile — check GitHub → Settings → Emails.
 
 ## 2026-07-02 — Project kickoff
 
