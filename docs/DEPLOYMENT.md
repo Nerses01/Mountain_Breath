@@ -66,9 +66,13 @@ docker ps
 
 ## 4. Give the server read access to the repo and images
 
-The repo is private, so the server needs two credentials:
+The repo itself is public (clone needs no credential), but the GHCR images
+are private — so the server needs the pull token in (b). The deploy key in
+(a) is only required if the repo is ever made private again; skip it
+otherwise and clone over HTTPS.
 
-**a) Deploy key (git clone/pull).** 🖥️ `ssh-keygen -t ed25519 -f ~/.ssh/repo_key -N ""`,
+**a) Deploy key (git clone/pull) — optional while the repo is public.**
+🖥️ `ssh-keygen -t ed25519 -f ~/.ssh/repo_key -N ""`,
 then 💻 add the PUBLIC key at GitHub → repo → Settings → Deploy keys
 (read-only). 🖥️ Tell git to use it:
 
