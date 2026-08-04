@@ -14,6 +14,13 @@ import exec from 'k6/execution'
 
 const BASE = __ENV.BASE_URL || 'http://localhost'
 
+// Registration requires a password, but nothing ever logs back in with it —
+// each VU reuses the session cookie from its own register response. The value
+// is therefore write-only, so a random default keeps a credential literal out
+// of the repository (and out of secret scanners) with no loss of realism.
+const PASSWORD =
+  __ENV.LOAD_USER_PASSWORD || `k6-${Math.random().toString(36).slice(2)}-${Date.now()}`
+
 export const options = {
   scenarios: {
     // The crowd: window-shoppers ramping 0 → 20 concurrent users.
@@ -67,7 +74,7 @@ export function buy() {
     const email = `k6-vu${exec.vu.idInTest}-${Date.now()}@load.test`
     const res = http.post(
       `${BASE}/api/v1/auth/register`,
-      JSON.stringify({ email, password: 'k6-load-pass-123' }),
+      JSON.stringify({ email, password: PASSWORD }),
       { headers: { 'Content-Type': 'application/json' } },
     )
     check(res, { registered: (r) => r.status === 201 })

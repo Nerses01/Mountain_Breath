@@ -9,6 +9,7 @@ tmp/
 *.test
 *.out
 coverage.txt
+CLAUDE.md
 
 # --- Node / frontend ---
 node_modules/
