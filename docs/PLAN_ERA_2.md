@@ -198,8 +198,9 @@ answered earlier than it needs to be.
       most third-party-dependent item in the plan. Confirm they are in scope,
       or drop the buttons from the design.
 - [x] **6. Translatable content strategy — translation tables.**
-      `product_translations` / `category_translations` / `benefit_translations`
-      (parent_id, locale, name, description, …), locale-invariant fields
+      `product_translations` / `category_translations` in E1.5, and
+      `benefit_translations` later in E2 alongside the `benefits` table it
+      references (parent_id, locale, name, description, …), locale-invariant fields
       (slug, sku, price, stock) staying on the parent row. Chosen over JSONB
       for the constraints and FK safety, at the cost of one migration per
       translatable entity and a `LEFT JOIN … ON locale = ?` on every read.
@@ -223,10 +224,16 @@ Same shape as Era I: **Goal**, **You will learn**, **Backend**, **Frontend**,
 
 ---
 
-### Phase E1 — Design system & app shell
+### Phase E1 — Design system foundations
 
-**Goal:** the visual language exists as tokens and primitives, and every
-existing page already renders inside it.
+**Goal:** the visual language exists as tokens, primitives and icons — the
+whole string-free layer of the design system, ready for the shell in E1.5 to
+assemble into pages.
+
+*(Renamed from "Design system & app shell" on 2026-08-05, when the shell
+bullets moved to E1.5 — see the moved bullet below. Keeping "app shell" in
+the title while the shell lives in another phase would have been the same
+inconsistency in a different place.)*
 
 **You will learn:** Tailwind v4's CSS-first `@theme` configuration, design
 tokens vs. ad-hoc utility classes, building a small component library,
@@ -283,10 +290,15 @@ WCAG contrast maths and why it belongs at token-definition time.
       (not honey — `#F6C244` reads too pale as a 2px outline on the `#FFF8EE`
       card surface). Decided once, here; primitives in the next bullet inherit
       it for free and only need an override if a specific control asks for one.
-- [ ] `SiteHeader` (logo mark, wordmark + tagline, 5 nav links, search and
-      wishlist icon buttons, cart pill with count) and `SiteFooter`
-      (4 columns, newsletter form, bottom bar with the currency switcher slot).
-- [ ] `Layout` route wrapper in `App.tsx`; `/admin/*` keeps its own chrome.
+- [→] **Moved to E1.5, 2026-08-05:** `SiteHeader` / `SiteFooter` and the
+      `Layout` route wrapper. They were listed here, but they are the first
+      components in the rebuild that contain user-facing strings — building
+      them in this phase means writing English into JSX and reopening both
+      files a day later to extract every string into translation keys.
+      Interleaving E1 and E1.5 to avoid that would have broken RULES.md #6
+      ("finish a phase's definition of done before moving on"), so the
+      bullets move to the phase that owns their dependency instead. E1 is now
+      exactly the layer that has no strings in it.
 - [x] ~~Extend `public/icons.svg` with the sprite~~ → **inline React icon
       components** in `src/components/ui/icons.tsx`: search, heart,
       arrow-right, chevron-down, minus, plus, check, star.
@@ -306,9 +318,14 @@ WCAG contrast maths and why it belongs at token-definition time.
       place — it asserts `primary` resolves to `bg-brand-ink`, so restoring
       the mock's failing orange breaks a test rather than shipping quietly.
 
-**Done when:** all eight existing routes render inside the new shell with the
-new palette, no raw hex outside the token block, and every control is reachable
-and visibly focused by keyboard.
+**Done when:** ~~all eight existing routes render inside the new shell~~ →
+every token, primitive and icon the design needs exists and is tested, no raw
+hex lives outside the token block, and every interactive primitive is
+reachable and visibly focused by keyboard. **✅ Complete 2026-08-05.**
+
+*(The original wording required the routes to render inside the shell, which
+is no longer this phase's job — that clause moved to E1.5's definition of
+done along with the components that satisfy it.)*
 
 ---
 
@@ -436,8 +453,18 @@ configurations, font coverage per writing system.
       namespace instead of editing a shared file. `common` and `footer` exist
       now; the rest arrive with the phases that need them.
 - [ ] `LanguageSwitcher` primitive, built into `SiteHeader`/`SiteFooter` from
-      the start — those components are not yet built (E1's bullet is still
-      open), so this lands before, not after, that work.
+      the start rather than retrofitted.
+- [ ] **`SiteHeader` / `SiteFooter` (moved here from E1, 2026-08-05.)**
+      Header: logo mark, wordmark + tagline, 5 nav links, search and wishlist
+      icon buttons, cart pill with count. Footer: 4 columns, newsletter form,
+      bottom bar with the language switcher and a slot for E5's currency
+      switcher. Every string comes from the `common` / `footer` namespaces —
+      these are the first components in the rebuild to contain user-facing
+      text, which is the whole reason they wait for this phase.
+- [ ] **`Layout` route wrapper (moved here from E1.)** Wraps the routes in
+      header + footer; `/admin/*` keeps its own chrome. This is also where
+      `App.tsx` grows the `/hy` and `/ru` route prefixes, so the routing and
+      the shell change in one edit instead of touching the file twice.
 - [x] `useLocale()` hook wrapping `useParams()` + i18next, so every future
       page reads the active locale one way instead of each poking
       `i18next.language` directly. Also owns the `<html lang>` attribute
@@ -448,10 +475,12 @@ configurations, font coverage per writing system.
       choice; a missing translation key renders visibly in dev (so a gap is
       caught, not silently blank) and falls back to English in production.
 
-**Done when:** the whole existing shell (header, footer, nav, auth forms,
-error toasts) reads correctly in all three languages with no hardcoded
-English string left in JSX, switching language never loses the current page,
-and Armenian and Russian render in a font that actually has their glyphs.
+**Done when:** the whole shell (header, footer, nav, auth forms, error toasts)
+reads correctly in all three languages with no hardcoded English string left
+in JSX, switching language never loses the current page, Armenian and Russian
+render in a font that actually has their glyphs, and — inherited from E1 when
+the shell bullets moved here — **all eight existing routes render inside that
+shell with the new palette.**
 
 ---
 
