@@ -380,13 +380,6 @@ configurations, font coverage per writing system.
       reads them, so they go in a follow-up once it reads translations —
       the same add-backfill-then-drop sequence this plan uses for
       `products.image_url`.
-- [ ] **Variant labels are translatable text too, and are not covered here.**
-      The design's sizes read "500 g jar", "30 ml dropper", "250 g pouch" —
-      a measurement plus an English noun. Either `product_variants.label`
-      gains a translation table, or labels become pure measurements ("500 g")
-      with the container moved into translatable product copy. The second is
-      cleaner and probably right; decide it in E3 when variants are reworked,
-      not silently here.
 - [x] Locale resolution: `?lang=` → cookie → `Accept-Language` → default
       `en`, validated against `{en, hy, ru}` — the same shape as E5's planned
       currency resolution. Worth merging into one "preferences" middleware
@@ -645,10 +638,34 @@ filters), keyset vs. offset pagination.
 - [ ] `GET /api/v1/catalog/facets` → category counts, benefit counts, price
       bounds, respecting the *other* active filters. One round trip, CTEs +
       `count(*) FILTER (WHERE …)`.
+- [ ] **Decide what a variant label is — before the seed is written.**
+      *(Moved here from E1.5 on 2026-08-05. It was noted there as "decide in
+      E3 when variants are reworked", which was wrong: E3 only DISPLAYS
+      labels in the variant picker, whereas this phase's seed is what
+      CREATES them. Deciding after seeding means re-seeding.)*
+
+      The design's sizes read "500 g jar", "4 × 100 g", "30 ml dropper",
+      "250 g pouch", "15 ml bottle" — a measurement plus an English noun, so
+      `product_variants.label` is translatable text that E1.5 did not cover.
+      Two ways out:
+
+      1. **Labels become pure measurements** ("500 g", "30 ml") and the
+         container word moves into the product's translatable copy.
+         Recommended: a measurement is language-neutral, so the column stays
+         locale-invariant like `sku` and `price_minor`, and no fourth
+         translation table is needed. Costs a small loss of fidelity to the
+         mock's card text.
+      2. **`variant_translations` (variant_id, locale, label)** — full
+         fidelity, at the price of another table, another join on every
+         product read, and another input set in the admin form.
+
+      Whichever wins, the seed row below, `ValidateProduct`, the admin form
+      and E3's variant picker all follow from it — which is why it sits
+      immediately before the seed bullet rather than after it.
 - [ ] Rewrite `seed/seed.sql` for the six hive products with the design's copy,
       badges, benefits and both currencies' prices (or USD only until E5) —
       seeded in all three languages from the start, not English-only with
-      translations bolted on later.
+      translations bolted on later. Variant labels follow the decision above.
       **Also update the Postman collection in the same commit:** three
       requests hardcode seed slugs that decision #14 deletes
       (`/products/armenian-coffee`, and the category/product create bodies
