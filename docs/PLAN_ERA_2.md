@@ -8,6 +8,14 @@
 > Era II turns it into the store in the design: `Mountain Breath Store.dc.html`,
 > six desktop screens (Home, Shop, Product, Cart, Checkout, Account).
 >
+> **Design source.** claude.ai/design project `Mountain Breath E-commerce Store`,
+> id `70fac810-0193-46d2-979e-d1c281beeae2`
+> ([open](https://claude.ai/design/p/70fac810-0193-46d2-979e-d1c281beeae2?file=Mountain+Breath+Store.dc.html)).
+> The design is **not** copied into this repo on purpose — it is read live with
+> the `DesignSync` tool (`get_project` / `list_files` / `get_file` by that id),
+> so a stale duplicate can never disagree with the canvas. When the design
+> changes, re-read it; when this plan and the canvas disagree, the canvas wins.
+>
 > Phases are numbered **E1–E10** so they never collide with Era I's 0–11.
 > Phase 11 (Idea Backlog) stays permanently open and feeds both eras.
 
