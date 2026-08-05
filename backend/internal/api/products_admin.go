@@ -18,21 +18,47 @@ type newVariantRequest struct {
 	StockQty   int    `json:"stock_qty"`
 }
 
+// productTextRequest is one language's copy of a product. Same shape for
+// create and update, and the same shape the admin form posts per locale tab.
+type productTextRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
 type createProductRequest struct {
-	CategoryID  int64               `json:"category_id"`
-	Slug        string              `json:"slug"`
+	CategoryID int64  `json:"category_id"`
+	Slug       string `json:"slug"`
+	// Name/Description are the English copy — required, because every other
+	// language falls back to them.
 	Name        string              `json:"name"`
 	Description string              `json:"description"`
 	ImageURL    string              `json:"image_url"`
 	Variants    []newVariantRequest `json:"variants"`
+	// Optional, non-default locales only: {"hy": {"name": "...", ...}}.
+	// Additive, so existing clients are unaffected.
+	Translations map[string]productTextRequest `json:"translations"`
 }
 
 type updateProductRequest struct {
-	CategoryID  int64  `json:"category_id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	ImageURL    string `json:"image_url"`
-	IsActive    bool   `json:"is_active"`
+	CategoryID   int64                         `json:"category_id"`
+	Name         string                        `json:"name"`
+	Description  string                        `json:"description"`
+	ImageURL     string                        `json:"image_url"`
+	IsActive     bool                          `json:"is_active"`
+	Translations map[string]productTextRequest `json:"translations"`
+}
+
+// toDomainTranslations converts the wire shape into the domain one.
+func toDomainTranslations(in map[string]productTextRequest) map[domain.Locale]domain.ProductText {
+	parsed := parseLocaleMap(in)
+	if parsed == nil {
+		return nil
+	}
+	out := make(map[domain.Locale]domain.ProductText, len(parsed))
+	for locale, t := range parsed {
+		out[locale] = domain.ProductText{Name: t.Name, Description: t.Description}
+	}
+	return out
 }
 
 type updateVariantRequest struct {
@@ -95,12 +121,13 @@ func (s *Server) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	product := domain.Product{
-		CategoryID:  req.CategoryID,
-		Slug:        req.Slug,
-		Name:        req.Name,
-		Description: req.Description,
-		ImageURL:    req.ImageURL,
-		IsActive:    true,
+		CategoryID:   req.CategoryID,
+		Slug:         req.Slug,
+		Name:         req.Name,
+		Description:  req.Description,
+		ImageURL:     req.ImageURL,
+		IsActive:     true,
+		Translations: toDomainTranslations(req.Translations),
 	}
 	for _, v := range req.Variants {
 		product.Variants = append(product.Variants, domain.ProductVariant{
@@ -139,12 +166,24 @@ func (s *Server) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	translations := toDomainTranslations(req.Translations)
+
+	// These two were still literal "required" strings after the switch to
+	// validation codes — the constant makes that impossible to miss again.
 	fields := make(map[string]string)
 	if req.Name == "" {
-		fields["name"] = "required"
+		fields["name"] = domain.ValidationRequired
 	}
 	if req.CategoryID <= 0 {
-		fields["category_id"] = "required"
+		fields["category_id"] = domain.ValidationRequired
+	}
+	for locale, text := range translations {
+		if text.Name == "" {
+			fields["translations."+string(locale)+".name"] = domain.ValidationRequired
+		}
+	}
+	for k, v := range domain.ValidateTranslationLocales("translations", translations) {
+		fields[k] = v
 	}
 	if len(fields) > 0 {
 		s.respondValidationError(w, fields)
@@ -154,6 +193,7 @@ func (s *Server) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
 	product := domain.Product{
 		ID: id, CategoryID: req.CategoryID, Name: req.Name,
 		Description: req.Description, ImageURL: req.ImageURL, IsActive: req.IsActive,
+		Translations: translations,
 	}
 	if err := s.store.UpdateProduct(r.Context(), &product); err != nil {
 		s.respondProductError(w, err)

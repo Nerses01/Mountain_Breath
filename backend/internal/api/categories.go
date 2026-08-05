@@ -21,9 +21,33 @@ type categoryResponse struct {
 }
 
 type createCategoryRequest struct {
-	Slug      string `json:"slug"`
+	Slug string `json:"slug"`
+	// Name is the English name and is required — every other language falls
+	// back to it, so it is the one translation that cannot be missing.
 	Name      string `json:"name"`
 	SortOrder int    `json:"sort_order"`
+	// Translations is optional and holds only the non-default languages:
+	// {"hy": "Մեղր", "ru": "Мёд"}. Leaving a language out is normal and means
+	// "show English there"; an "en" key is rejected, since that value already
+	// has a home in Name.
+	//
+	// Added rather than replacing Name so the change is backward compatible —
+	// every existing client and Postman request keeps working untouched.
+	Translations map[string]string `json:"translations"`
+}
+
+// parseLocaleMap converts the wire's string keys into domain.Locale keys.
+// Unknown keys are preserved as-is rather than dropped, so validation can
+// report them as `translations.xx` instead of silently ignoring a typo.
+func parseLocaleMap[T any](in map[string]T) map[domain.Locale]T {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[domain.Locale]T, len(in))
+	for k, v := range in {
+		out[domain.Locale(k)] = v
+	}
+	return out
 }
 
 func toCategoryResponse(c domain.Category) categoryResponse {
@@ -65,12 +89,23 @@ func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if fields := domain.ValidateCategory(req.Slug, req.Name); len(fields) > 0 {
+	translations := parseLocaleMap(req.Translations)
+
+	fields := domain.ValidateCategory(req.Slug, req.Name)
+	for k, v := range domain.ValidateCategoryTranslations(translations) {
+		fields[k] = v
+	}
+	if len(fields) > 0 {
 		s.respondValidationError(w, fields)
 		return
 	}
 
-	cat := domain.Category{Slug: req.Slug, Name: req.Name, SortOrder: req.SortOrder}
+	cat := domain.Category{
+		Slug:         req.Slug,
+		Name:         req.Name,
+		SortOrder:    req.SortOrder,
+		Translations: translations,
+	}
 	if err := s.store.CreateCategory(r.Context(), &cat); err != nil {
 		if errors.Is(err, domain.ErrSlugTaken) {
 			s.respondError(w, http.StatusConflict, "slug_taken", "a category with this slug already exists")

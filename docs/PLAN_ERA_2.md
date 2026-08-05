@@ -442,7 +442,25 @@ configurations, font coverage per writing system.
       well-tuned for this catalog's vocabulary." The trigram layer Era I
       already built stays as the fuzzy/typo-tolerant layer under all three,
       exactly as it is for English today.
-- [ ] Admin: category/benefit/product forms grow one input set per locale
+- [~] Admin write path — **backend done, form pending.** `POST /admin/categories`,
+      `POST /admin/products` and `PUT /admin/products/{id}` now accept an
+      optional `translations` map alongside the existing fields, so
+      translations can be written through the API instead of raw SQL.
+      **Additive, not breaking:** `name`/`description` stay required and mean
+      *English*, which maps exactly onto storage — they are still the parent
+      columns the read fallback ends at. An `"en"` key inside `translations`
+      is rejected (`locale_is_default`) rather than accepted as a second place
+      to write one value, and an unknown language is caught here as a field
+      error rather than at the database's CHECK constraint, which would
+      surface as a 500-shaped driver error.
+      `CreateCategory` and `UpdateProduct` became transactional; `UpdateProduct`
+      upserts with `ON CONFLICT (product_id, locale) DO UPDATE`, so create and
+      update share one write helper and re-editing never has a window where a
+      product has no text. Rollback is covered by a test that duplicates a slug
+      and asserts no orphan translation rows survive.
+      Also fixed here: two literal `"required"` strings in the update handler
+      that the earlier codes change had missed.
+      *Remaining:* the admin **forms** themselves —
       (tabs or stacked fields) so the family can leave a translation blank
       and it falls back to English rather than the form blocking submission.
 - [x] Tests: a request with no `Accept-Language` gets English; an

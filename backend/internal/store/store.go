@@ -69,9 +69,23 @@ func (s *Store) ListCategories(ctx context.Context, locale domain.Locale) ([]dom
 	return cats, nil
 }
 
-// CreateCategory inserts c and fills in its DB-generated fields (ID, CreatedAt).
+// CreateCategory inserts c with its translations and fills in the
+// DB-generated fields (ID, CreatedAt).
+//
+// Transactional because a category and its translations are one fact: a
+// category that exists with no English translation row would read back
+// through the legacy-column fallback and look fine, which is exactly the kind
+// of half-written state that is worse than a clean failure.
 func (s *Store) CreateCategory(ctx context.Context, c *domain.Category) error {
-	err := s.pool.QueryRow(ctx, `
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("beginning create-category tx: %w", err)
+	}
+	// Rollback after a successful Commit is a no-op; this line guarantees no
+	// path leaves the transaction open.
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	err = tx.QueryRow(ctx, `
 		INSERT INTO categories (slug, name, sort_order)
 		VALUES ($1, $2, $3)
 		RETURNING id, created_at`,
@@ -83,6 +97,26 @@ func (s *Store) CreateCategory(ctx context.Context, c *domain.Category) error {
 			return domain.ErrSlugTaken
 		}
 		return fmt.Errorf("inserting category: %w", err)
+	}
+
+	// English is written from Name, not from Translations — the API rejects
+	// "en" as a translations key precisely so there is one source for it.
+	names := map[domain.Locale]string{domain.DefaultLocale: c.Name}
+	for locale, name := range c.Translations {
+		names[locale] = name
+	}
+	for locale, name := range names {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO category_translations (category_id, locale, name)
+			VALUES ($1, $2, $3)`,
+			c.ID, locale, name,
+		); err != nil {
+			return fmt.Errorf("inserting %s category translation: %w", locale, err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("committing create-category: %w", err)
 	}
 	return nil
 }

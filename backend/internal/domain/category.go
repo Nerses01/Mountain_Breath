@@ -10,9 +10,20 @@ import (
 type Category struct {
 	ID        int64
 	Slug      string
-	Name      string
 	SortOrder int
 	CreatedAt time.Time
+
+	// Name is the English name — the value every other locale falls back to,
+	// and what reads return when no translation matches. On a read it holds
+	// the RESOLVED name for the requested locale; on a write it is always
+	// English. That dual meaning is deliberate: it keeps one field for "the
+	// name to show" instead of forcing every caller to resolve one.
+	Name string
+
+	// Translations holds the non-default locales only. English lives in Name,
+	// so a key of "en" here is a validation error rather than a second place
+	// to write the same value.
+	Translations map[Locale]string
 }
 
 // ErrSlugTaken is a sentinel error: the store returns it, the API layer
@@ -37,6 +48,21 @@ func ValidateCategory(slug, name string) map[string]string {
 		fields["slug"] = ValidationRequired
 	case !slugRe.MatchString(slug):
 		fields["slug"] = ValidationSlugFormat
+	}
+	return fields
+}
+
+// ValidateCategoryTranslations checks the optional per-locale names.
+//
+// A blank translation is REJECTED rather than ignored: the form is allowed to
+// leave a language out entirely (it falls back to English), so sending a key
+// with an empty value means something went wrong rather than "no translation".
+func ValidateCategoryTranslations(tr map[Locale]string) map[string]string {
+	fields := ValidateTranslationLocales("translations", tr)
+	for locale, name := range tr {
+		if strings.TrimSpace(name) == "" {
+			fields["translations."+string(locale)+".name"] = ValidationRequired
+		}
 	}
 	return fields
 }

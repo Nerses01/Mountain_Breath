@@ -17,6 +17,129 @@ Template for an entry:
 
 ---
 
+## 2026-08-05 — Phase E1.5: three languages, front to back
+
+**Worked on:** i18next + react-i18next with the URL as the only source of
+locale truth; `/hy` and `/ru` route prefixes (English unprefixed); Noto Sans
+Armenian/Cyrillic fallback; migration 000007 (`product_translations`,
+`category_translations`) with a per-locale generated tsvector; locale
+negotiation middleware; translated reads with a three-level fallback;
+validation codes replacing English prose; admin write path for translations;
+Postman Localization folder.
+
+**Learned:**
+- **Postgres volatility classes.** `IMMUTABLE` / `STABLE` / `VOLATILE` are a
+  promise about determinism. A `GENERATED … STORED` column *requires*
+  immutable, because the value is computed once and written to disk — if the
+  function could later answer differently, the stored value silently becomes
+  a lie. `to_tsvector('english', x)` qualifies; `to_tsvector(locale::regconfig, x)`
+  does not, because the cast reads the system catalog. A `CASE` over literal
+  config names does. **C++:** `constexpr` vs `const` vs an ordinary function
+  reading a global — a generated column is a `constexpr` context.
+- **All three languages get real stemming.** Postgres ships 29 text search
+  configurations including `armenian`; `SELECT cfgname FROM pg_ts_config`
+  proved it before any code was written. Russian normalises ё→е, so "мед"
+  finds "мёд".
+- **`LEFT JOIN` + `COALESCE` is a declarative fallback chain.** Inner join
+  drops unmatched rows; left join keeps them and fills NULL — join twice at
+  different locales and `COALESCE` picks the first that exists. **C++:**
+  chained `optional::value_or`, evaluated set-at-a-time.
+- **A fallback chain must be complete.** Coalescing text three levels but the
+  tsvector only two silently removed every untranslated product from
+  full-text search. An existing test caught it — 2 results became 1.
+- **CSS resolves `font-family` per character, not per element.** So appending
+  Noto to the stack beats `:lang()` overrides: an Armenian name inside an
+  English page just works. `unicode-range` also gates the download — English
+  visitors fetch neither font. **C++:** overload resolution picking per
+  argument, not per call site.
+- **`context.WithValue` needs an unexported key type.** `type ctxKey struct{}`
+  cannot be named by another package, so collision is impossible by
+  construction rather than convention; zero-size, so free. **C++:** a private
+  tag type, or a type in an anonymous namespace.
+- **Accept-Language is q-values, not order.** `en;q=0.3,hy;q=0.9` means
+  Armenian. Hand-parsed in ~30 lines rather than taking
+  `golang.org/x/text/language`.
+- **Negotiation must never fail.** An unknown tag or malformed `q` falls
+  through to the next source. A shop that refuses to render because a header
+  was odd is worse than one that renders in English.
+- **CLDR plural categories.** Russian picks one/few/many from the last digit
+  *and* the tens: 21 товар, 22 товара, 25 товаров. No `count === 1 ? a : b`
+  expresses that — the concrete reason this project accepted an i18n
+  dependency.
+- **Error prose is part of the API contract.** Returning English sentences
+  hardcoded one language into every client. Codes fixed it; the frontend had
+  to change in the same commit, because all three forms printed
+  `fields[x]` raw.
+- **`ON CONFLICT … DO UPDATE`** is atomic write-whatever-the-current-state,
+  with no window where the row is absent, and lets create and update share one
+  path. `EXCLUDED` is the would-be-inserted row. **C++:**
+  `map::insert_or_assign` vs erase-then-insert.
+- **Transactions are about invariants, not statement counts.** `CreateCategory`
+  needed one because "a category has text in at least English" is an
+  invariant — and a half-written state would have *read back as fine* through
+  the fallback.
+- **Go generics that never inspect `T`.** `parseLocaleMap[T any]` re-keys a
+  map for both `string` and a struct; no constraint needed. **C++:** a
+  pass-through template, except Go compiles one shared implementation rather
+  than one instantiation per type.
+
+**Questions / to revisit:**
+- Armenian and Russian copy is machine-assisted and wants a native speaker's
+  eye — the apiary vocabulary especially (propolis, royal jelly, bee venom).
+- Untranslated products match against an English-stemmed tsvector, so
+  non-English full-text is weak for them; trigram still finds them. Revisit if
+  the catalogue grows.
+- `COALESCE(t.name, en.name, p.name)` cannot use the trigram index. Fine at
+  six products; E10's k6 re-baseline should confirm.
+- Variant labels ("500 g jar") are translatable text and are *not* covered —
+  decide in E3 whether labels become pure measurements.
+- `i18next-browser-languagedetector` is installed but unused; drop it if
+  nothing needs it.
+
+## 2026-08-04 — Phase E1: design system foundations
+
+**Worked on:** Tailwind v4 `@theme` token layer, WCAG contrast corrections,
+self-hosted Poppins/Karla, eleven UI primitives + `Field` + `cx`, a global
+`:focus-visible` ring, and eight inline icon components.
+
+**Learned:**
+- **Tailwind v4 is CSS-first.** `@theme` declares tokens that become both
+  custom properties and utilities: `--color-panel` generates `bg-panel`,
+  `text-panel`, `border-panel`. **C++:** a single `constants.h` replacing
+  magic numbers — except CSS custom properties resolve at *runtime* in the
+  browser, closer to a global read through a pointer than to a compile-time
+  substitution.
+- **WCAG contrast is arithmetic, and the design failed it.** Relative
+  luminance → ratio. The mock's orange measures 2.9:1 as a button fill and
+  2.7:1 as text, both under 4.5:1; its muted browns fail at body sizes on
+  *both* the light and dark surfaces. Fixing at token-definition time is much
+  cheaper than after components consume them.
+- **Fix contrast where the value is defined, not where it is used.** Baking
+  `#e4761f` into `Button` would have meant repainting every screen in E10.
+- **Subset your fonts.** `@fontsource/poppins/400.css` pulls every subset
+  Google publishes — ~450 kB of unused Devanagari. Import
+  `latin-400.css` instead.
+- **Tailwind variants compile to real selectors.** `peer-checked:x` becomes
+  `.peer:checked ~ .x` — a *sibling* combinator, so a nested element can never
+  match. My first `Checkbox` nested the tick and it would have been invisible
+  forever. When an abstraction misbehaves, expand it to the CSS it generates.
+- **Types can enforce accessibility.** `IconButton`'s `label` prop is
+  required, so `tsc` refuses an unnamed icon button — the compiler doing what
+  a code review would otherwise have to catch.
+- **`currentColor` makes icons free.** Inline SVG icons inherit whatever text
+  colour the token system already applied, so no per-icon wiring — and they
+  tree-shake, unlike a sprite.
+- **Assertions must be able to fail.** The Postman validation test asserted
+  the `fields` keys merely *existed*, which passed both before and after the
+  contract changed. A test that cannot fail is not protecting anything.
+
+**Questions / to revisit:**
+- Of the eleven primitives, `Select`, `Checkbox` and `Breadcrumbs` have no
+  consumer until E3–E6 — speculative work; demand-driven would have been
+  defensible.
+- The whole palette needs an axe re-verification in E10; the ratios here were
+  computed by hand.
+
 ## 2026-07-31 — Search v2: trigram prefix + typo tolerance
 
 **Worked on:** migration 000006 (`pg_trgm` extension + trigram GIN on name); three-door search predicate — FTS (raw query) OR name-substring (ILIKE) OR fuzzy (`word_similarity > 0.35`), hybrid ranking (ts_rank + similarity); `escapeLike` (user's `%`/`_` are literal); `fuzzyQuery` stripping websearch operators from the trigram doors; 4 new integration subtests (prefix, typo, mid-word, wildcard-literal).

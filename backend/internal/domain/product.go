@@ -18,16 +18,31 @@ var (
 	ErrCategoryNotFound  = errors.New("no such category")
 )
 
-type Product struct {
-	ID          int64
-	CategoryID  int64
-	Slug        string
+// ProductText is the translatable half of a product. The slug, SKU, price
+// and stock are not in here on purpose — they mean the same thing in every
+// language, and duplicating them per locale would create three ways to
+// disagree about one fact.
+type ProductText struct {
 	Name        string
 	Description string
-	ImageURL    string
-	IsActive    bool
-	CreatedAt   time.Time
-	Variants    []ProductVariant
+}
+
+type Product struct {
+	ID         int64
+	CategoryID int64
+	Slug       string
+	ImageURL   string
+	IsActive   bool
+	CreatedAt  time.Time
+	Variants   []ProductVariant
+
+	// Name/Description are English on a write and the RESOLVED text for the
+	// requested locale on a read — see the note on Category.Name.
+	Name        string
+	Description string
+
+	// Translations holds non-default locales only; English is the pair above.
+	Translations map[Locale]ProductText
 }
 
 type ProductVariant struct {
@@ -87,6 +102,18 @@ func ValidateProduct(p Product) map[string]string {
 	}
 	if len(p.Variants) == 0 {
 		fields["variants"] = ValidationVariantsRequired
+	}
+
+	for locale, text := range p.Translations {
+		key := "translations." + string(locale)
+		if strings.TrimSpace(text.Name) == "" {
+			// Omitting a language is fine — it falls back to English. Sending
+			// one with a blank name is not: that is a form bug, not a choice.
+			fields[key+".name"] = ValidationRequired
+		}
+	}
+	for k, v := range ValidateTranslationLocales("translations", p.Translations) {
+		fields[k] = v
 	}
 
 	for i, v := range p.Variants {

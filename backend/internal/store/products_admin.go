@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
@@ -70,16 +71,59 @@ func (s *Store) CreateProduct(ctx context.Context, p *domain.Product) error {
 		v.ProductID = p.ID
 	}
 
+	if err := upsertProductTranslations(ctx, tx, p); err != nil {
+		return err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("committing create-product: %w", err)
 	}
 	return nil
 }
 
+// upsertProductTranslations writes the English row from p.Name/p.Description
+// and one row per additional locale.
+//
+// ON CONFLICT DO UPDATE rather than DELETE-then-INSERT: the composite primary
+// key (product_id, locale) already identifies the row, so an upsert makes the
+// operation idempotent without a window where the product has no text at all.
+// It also means create and update share this one function.
+func upsertProductTranslations(ctx context.Context, tx pgx.Tx, p *domain.Product) error {
+	texts := map[domain.Locale]domain.ProductText{
+		domain.DefaultLocale: {Name: p.Name, Description: p.Description},
+	}
+	for locale, text := range p.Translations {
+		texts[locale] = text
+	}
+
+	for locale, text := range texts {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO product_translations (product_id, locale, name, description)
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT (product_id, locale)
+			DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description`,
+			p.ID, locale, text.Name, text.Description,
+		); err != nil {
+			return fmt.Errorf("upserting %s product translation: %w", locale, err)
+		}
+	}
+	return nil
+}
+
 // UpdateProduct updates the mutable fields (slug stays immutable — it is a
-// public URL).
+// public URL) and rewrites the product's translations.
+//
+// Transactional since E1.5: the product row and its translation rows are one
+// edit, and committing the first without the second would leave a product
+// whose Armenian name still describes the previous product.
 func (s *Store) UpdateProduct(ctx context.Context, p *domain.Product) error {
-	tag, err := s.pool.Exec(ctx, `
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("beginning update-product tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(ctx, `
 		UPDATE products
 		SET category_id = $1, name = $2, description = $3, image_url = $4, is_active = $5
 		WHERE id = $6`,
@@ -92,6 +136,14 @@ func (s *Store) UpdateProduct(ctx context.Context, p *domain.Product) error {
 	}
 	if tag.RowsAffected() == 0 {
 		return domain.ErrNotFound
+	}
+
+	if err := upsertProductTranslations(ctx, tx, p); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("committing update-product: %w", err)
 	}
 	return nil
 }
