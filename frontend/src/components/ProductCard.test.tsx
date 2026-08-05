@@ -48,8 +48,10 @@ describe('ProductCard', () => {
   it('marks stock state per variant', () => {
     renderCard(product)
 
+    // Copy now comes from the `catalog` namespace; these are the English
+    // values, which is the default locale the suite runs in.
     expect(screen.getByText('40 left')).toBeInTheDocument()
-    expect(screen.getByText('out of stock')).toBeInTheDocument()
+    expect(screen.getByText('Out of stock')).toBeInTheDocument()
   })
 
   it('links to the product page', () => {

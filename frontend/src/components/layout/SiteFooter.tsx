@@ -24,7 +24,7 @@ export function SiteFooter() {
 
   return (
     <footer className="mt-16 bg-bark">
-      <div className="mx-auto flex max-w-[1440px] flex-col gap-8 px-6 py-12 lg:px-14">
+      <div className="mx-auto flex max-w-360 flex-col gap-8 px-6 py-12 lg:px-14">
         <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
           <div className="flex flex-col gap-3">
             <span className="font-display text-lg font-extrabold tracking-wide text-ink-on-dark">

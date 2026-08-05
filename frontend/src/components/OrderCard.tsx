@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { Order, OrderStatus } from '../api/types'
 import { formatPrice } from '../lib/format'
 
@@ -10,18 +11,22 @@ const statusStyles: Record<OrderStatus, string> = {
 }
 
 export function StatusBadge({ status }: { status: OrderStatus }) {
+  const { t } = useTranslation()
   return (
     <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusStyles[status]}`}>
-      {status}
+      {t(`account:status.${status}`)}
     </span>
   )
 }
 
 export function OrderCard({ order, children }: { order: Order; children?: React.ReactNode }) {
+  const { t } = useTranslation()
   return (
     <article className="rounded-xl border border-stone-200 bg-white p-5">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="font-semibold text-stone-800">Order #{order.id}</span>
+        <span className="font-semibold text-stone-800">
+          {t('account:orderNumber', { id: order.id })}
+        </span>
         <StatusBadge status={order.status} />
         {order.user_email && <span className="text-xs text-stone-400">{order.user_email}</span>}
         <span className="ml-auto text-xs text-stone-400">

@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useCategories, useProducts } from '../api/hooks'
 import { ProductCard } from '../components/ProductCard'
 import { useDebouncedValue } from '../lib/useDebounce'
 
 export function CatalogPage() {
+  const { t } = useTranslation()
   // '' means "all categories"; changing this state re-renders the page and
   // useProducts fetches (or serves from cache) the matching list.
   const [category, setCategory] = useState('')
@@ -21,13 +23,14 @@ export function CatalogPage() {
         type="search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search the shop… typos and prefixes welcome (hon, hony, tea -thyme)"
+        placeholder={t('catalog:searchPlaceholder')}
+        aria-label={t('common:actions.search')}
         className="mb-4 w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm focus:border-emerald-600 focus:outline-none"
       />
 
       <nav className="flex flex-wrap gap-2">
         <FilterChip
-          label="All"
+          label={t('catalog:all')}
           active={category === ''}
           onClick={() => setCategory('')}
         />
@@ -43,20 +46,27 @@ export function CatalogPage() {
 
       <main className="mt-6">
         {products.isPending && (
-          <p className="text-stone-400">Loading products…</p>
+          <p className="text-stone-400">{t('common:state.loading')}</p>
         )}
 
         {products.isError && (
           <p className="rounded-lg bg-red-50 p-4 text-red-600">
-            Failed to load products: {products.error.message}
+            {t('common:state.loadFailed')}
           </p>
         )}
 
         {products.data && (
           <>
             <p className="text-sm text-stone-400">
-              {products.data.total} product{products.data.total === 1 ? '' : 's'}
-              {debouncedSearch && ` for “${debouncedSearch}”`}
+              {/* The count drives plural selection, so Russian gets
+                  продукт/продукта/продуктов rather than an English rule
+                  applied to a Russian word. */}
+              {debouncedSearch
+                ? t('catalog:resultsFor', {
+                    count: products.data.total,
+                    query: debouncedSearch,
+                  })
+                : t('catalog:resultCount', { count: products.data.total })}
             </p>
             <div className="mt-3 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {products.data.items.map((p) => (

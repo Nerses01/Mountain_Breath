@@ -1,48 +1,58 @@
 import { Link, useNavigate } from 'react-router'
-import { ApiError } from '../api/client'
+import { Trans, useTranslation } from 'react-i18next'
 import { useCart, useCheckout, useMe, useRemoveCartItem, useSetCartItem } from '../api/hooks'
+import { useFieldErrors } from '../i18n/useFieldErrors'
+import { useLocale } from '../i18n/useLocale'
 import { formatPrice } from '../lib/format'
 
 export function CartPage() {
+  const { t } = useTranslation()
+  const { localePath } = useLocale()
   const me = useMe()
   const cart = useCart(!!me.data)
   const setItem = useSetCartItem()
   const removeItem = useRemoveCartItem()
   const checkout = useCheckout()
   const navigate = useNavigate()
+  const { formError } = useFieldErrors(checkout.error)
 
   if (me.isPending || cart.isPending) {
-    return <Shell>Loading…</Shell>
+    return <Shell>{t('common:state.loading')}</Shell>
   }
   if (!me.data) {
     return (
       <Shell>
         <p className="text-stone-500">
-          Please{' '}
-          <Link to="/login" className="text-emerald-700 underline">
-            sign in
-          </Link>{' '}
-          to use the cart.
+          {/* <Trans> renders a sentence that CONTAINS a link. Splitting it
+              into "Please " + link + " to use the cart" would be untranslatable:
+              word order differs per language, and Armenian puts the verb last.
+              The <1> placeholder in the message says where the link goes. */}
+          <Trans
+            i18nKey="cart:signInRequired"
+            components={[
+              <span key="0" />,
+              <Link key="1" to={localePath('/login')} className="text-emerald-700 underline" />,
+            ]}
+          />
         </p>
       </Shell>
     )
   }
   if (cart.isError) {
-    return <Shell><p className="text-red-600">Failed to load cart.</p></Shell>
+    return <Shell><p className="text-red-600">{t('common:state.loadFailed')}</p></Shell>
   }
 
   const items = cart.data?.items ?? []
-  const checkoutErr = checkout.error instanceof ApiError ? checkout.error : null
 
   return (
     <Shell>
-      <h2 className="text-xl font-bold text-stone-800">Your cart</h2>
+      <h2 className="text-xl font-bold text-stone-800">{t('cart:title')}</h2>
 
       {items.length === 0 && (
         <p className="mt-4 text-stone-500">
-          Empty.{' '}
-          <Link to="/" className="text-emerald-700 underline">
-            Browse the catalog
+          {t('cart:empty')}{' '}
+          <Link to={localePath('/')} className="text-emerald-700 underline">
+            {t('cart:browse')}
           </Link>
         </p>
       )}
@@ -63,13 +73,14 @@ export function CartPage() {
                     {it.product_name}
                   </Link>
                   <p className="text-xs text-stone-400">
-                    {it.label} · {formatPrice(it.price_minor)} each
+                    {it.label} · {formatPrice(it.price_minor)} {t('cart:each')}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <QtyButton
                     label="−"
+                    title={t('cart:decrease')}
                     onClick={() =>
                       it.qty <= 1
                         ? removeItem.mutate(it.variant_id)
@@ -79,6 +90,7 @@ export function CartPage() {
                   <span className="w-8 text-center font-medium">{it.qty}</span>
                   <QtyButton
                     label="+"
+                    title={t('cart:increase')}
                     disabled={it.qty >= it.stock_qty}
                     onClick={() => setItem.mutate({ variantId: it.variant_id, qty: it.qty + 1 })}
                   />
@@ -92,7 +104,8 @@ export function CartPage() {
                   type="button"
                   onClick={() => removeItem.mutate(it.variant_id)}
                   className="text-stone-300 hover:text-red-500"
-                  title="Remove"
+                  title={t('cart:remove')}
+                  aria-label={t('cart:remove')}
                 >
                   ✕
                 </button>
@@ -100,15 +113,15 @@ export function CartPage() {
             ))}
           </ul>
 
-          {checkoutErr && (
+          {formError && (
             <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
-              {checkoutErr.message}
+              {formError}
             </p>
           )}
 
           <div className="mt-6 flex items-center justify-between rounded-xl border border-stone-200 bg-white p-4">
             <div>
-              <p className="text-sm text-stone-500">Total</p>
+              <p className="text-sm text-stone-500">{t('cart:total')}</p>
               <p className="text-2xl font-bold text-stone-800">
                 {formatPrice(cart.data?.total_minor ?? 0)}
               </p>
@@ -121,7 +134,7 @@ export function CartPage() {
               }
               className="rounded-lg bg-emerald-700 px-8 py-3 font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
             >
-              {checkout.isPending ? 'Placing order…' : 'Checkout'}
+              {checkout.isPending ? t('cart:placingOrder') : t('cart:checkout')}
             </button>
           </div>
         </>
@@ -132,10 +145,12 @@ export function CartPage() {
 
 function QtyButton({
   label,
+  title,
   onClick,
   disabled,
 }: {
   label: string
+  title: string
   onClick: () => void
   disabled?: boolean
 }) {
@@ -144,6 +159,9 @@ function QtyButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      // The glyph is decoration; the accessible name comes from the title.
+      aria-label={title}
+      title={title}
       className="h-8 w-8 rounded-lg bg-stone-100 font-bold text-stone-600 hover:bg-stone-200 disabled:opacity-40"
     >
       {label}

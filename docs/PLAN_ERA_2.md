@@ -590,7 +590,30 @@ reads correctly in all three languages with no hardcoded English string left
 in JSX, switching language never loses the current page, Armenian and Russian
 render in a font that actually has their glyphs, and — inherited from E1 when
 the shell bullets moved here — **all eight existing routes render inside that
-shell with the new palette.**
+shell with the new palette.** ✅ **Complete 2026-08-05.**
+
+- [x] **Storefront copy translated.** Catalog, product, cart, orders and
+      sign-in pages plus `ProductCard` and `OrderCard` now read from the
+      `catalog` / `cart` / `account` / `common:state` namespaces. Order
+      statuses were rendering the raw enum (`pending`, `shipped`) as
+      user-facing text and are now translated too.
+      `<Trans>` carries the sentences that CONTAIN a link ("Please *sign in*
+      to use the cart") — splitting those into string + link + string is
+      untranslatable, since word order differs per language and Armenian puts
+      the verb last.
+- [x] **Scope decision: the admin back office stays English.** It is an
+      internal tool for one family who share a working language, and the
+      Done-when names the storefront shell, not every screen. Translating it
+      would triple the copy for no reader. Revisit only if someone who does
+      not read English needs to run the shop.
+
+**Two regressions found by auditing against this definition of done, rather
+than by assuming the phase was finished:**
+- `AuthStatus` was the **only sign-out control**, and replacing the header
+  with `SiteHeader` silently dropped it — the app could be signed into but not
+  out of. `SiteHeader` now carries sign-out until E8 builds the account area.
+- `CartLink` and `AuthStatus` had been **dead code** since the `Layout`
+  rewrite, mounted by nothing. Deleted; `SiteHeader` supersedes both.
 
 ---
 

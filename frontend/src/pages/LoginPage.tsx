@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
+import { useTranslation } from 'react-i18next'
 import { useLogin, useRegister } from '../api/hooks'
 import { useFieldErrors } from '../i18n/useFieldErrors'
+import { useLocale } from '../i18n/useLocale'
 
 export function LoginPage() {
+  const { t } = useTranslation()
+  const { localePath } = useLocale()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   // Controlled inputs: React state is the single source of truth for the
   // field values; the DOM just displays them.
@@ -19,7 +23,7 @@ export function LoginPage() {
     e.preventDefault() // stop the browser's own form POST + page reload
     active.mutate(
       { email, password },
-      { onSuccess: () => navigate('/') },
+      { onSuccess: () => navigate(localePath('/')) },
     )
   }
 
@@ -31,20 +35,20 @@ export function LoginPage() {
     <div className="mx-auto max-w-sm px-4 py-12">
       <div className="rounded-xl border border-stone-200 bg-white p-6">
         <div className="flex gap-2">
-          <ModeTab label="Sign in" active={mode === 'login'} onClick={() => setMode('login')} />
-          <ModeTab label="Create account" active={mode === 'register'} onClick={() => setMode('register')} />
+          <ModeTab label={t('account:signIn')} active={mode === 'login'} onClick={() => setMode('login')} />
+          <ModeTab label={t('account:createAccount')} active={mode === 'register'} onClick={() => setMode('register')} />
         </div>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <Field
-            label="Email"
+            label={t('account:email')}
             type="email"
             value={email}
             onChange={setEmail}
             error={fieldError('email')}
           />
           <Field
-            label="Password"
+            label={t('account:password')}
             type="password"
             value={password}
             onChange={setPassword}
@@ -61,10 +65,10 @@ export function LoginPage() {
             className="w-full rounded-lg bg-emerald-700 py-2.5 font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
           >
             {active.isPending
-              ? 'Please wait…'
+              ? t('account:working')
               : mode === 'login'
-                ? 'Sign in'
-                : 'Create account'}
+                ? t('account:signIn')
+                : t('account:createAccount')}
           </button>
         </form>
       </div>

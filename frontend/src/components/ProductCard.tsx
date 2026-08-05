@@ -1,10 +1,19 @@
 import { Link } from 'react-router'
+import { useTranslation } from 'react-i18next'
 import type { Product } from '../api/types'
+import { useLocale } from '../i18n/useLocale'
 import { formatPrice } from '../lib/format'
 
 export function ProductCard({ product }: { product: Product }) {
+  const { t } = useTranslation()
+  const { localePath } = useLocale()
+
   return (
-    <Link to={`/products/${product.slug}`} aria-label={product.name} className="group">
+    <Link
+      to={localePath(`/products/${product.slug}`)}
+      aria-label={product.name}
+      className="group"
+    >
       <article className="flex h-full flex-col rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition-shadow group-hover:shadow-md">
         {product.image_url && (
           <img
@@ -28,9 +37,11 @@ export function ProductCard({ product }: { product: Product }) {
               <span className="font-medium text-stone-700">{v.label}</span>
               <span className="flex items-center gap-3">
                 {v.stock_qty === 0 ? (
-                  <span className="text-xs text-red-500">out of stock</span>
+                  <span className="text-xs text-red-500">{t('catalog:outOfStock')}</span>
                 ) : (
-                  <span className="text-xs text-stone-400">{v.stock_qty} left</span>
+                  <span className="text-xs text-stone-400">
+                    {t('catalog:stockLeft', { count: v.stock_qty })}
+                  </span>
                 )}
                 <span className="font-semibold text-stone-800">
                   {formatPrice(v.price_minor)}

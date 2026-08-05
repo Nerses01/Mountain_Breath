@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { cx } from '../../lib/cx'
 import { useLocale } from '../../i18n/useLocale'
-import { useCart, useMe } from '../../api/hooks'
+import { useCart, useLogout, useMe } from '../../api/hooks'
 import { IconButton } from '../ui/IconButton'
 import { HeartIcon, SearchIcon, UserIcon } from '../ui/icons'
 
@@ -28,12 +28,13 @@ export function SiteHeader() {
   const { pathname } = useLocation()
   const me = useMe()
   const cart = useCart(!!me.data)
+  const logout = useLogout()
 
   const cartCount = cart.data?.items.reduce((sum, it) => sum + it.qty, 0) ?? 0
 
   return (
-    <header className="bg-gradient-to-b from-panel-soft to-panel">
-      <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-4 px-6 py-5 lg:px-14">
+    <header className="bg-linear-to-b from-panel-soft to-panel">
+      <div className="mx-auto flex max-w-360 flex-wrap items-center justify-between gap-4 px-6 py-5 lg:px-14">
         <Link to={localePath('/')} className="flex items-center gap-3">
           <span
             aria-hidden
@@ -105,6 +106,21 @@ export function SiteHeader() {
           >
             <UserIcon />
           </Link>
+
+          {/* Sign-out. The design draws no account menu at all, but a shop
+              that can be signed into must be signable out of — the old
+              AuthStatus component carried this, and replacing the header
+              would otherwise have silently dropped it. It moves into the
+              account area proper in E8. */}
+          {me.data && (
+            <button
+              type="button"
+              onClick={() => logout.mutate()}
+              className="font-display text-sm font-medium text-ink-muted transition hover:text-ink"
+            >
+              {t('account:signOut')}
+            </button>
+          )}
 
           <Link
             to={localePath('/cart')}

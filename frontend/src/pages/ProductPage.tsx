@@ -1,10 +1,14 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { useTranslation } from 'react-i18next'
 import { ApiError } from '../api/client'
 import { useCart, useMe, useProduct, useSetCartItem } from '../api/hooks'
+import { useLocale } from '../i18n/useLocale'
 import { formatPrice } from '../lib/format'
 
 export function ProductPage() {
+  const { t } = useTranslation()
+  const { localePath } = useLocale()
   // useParams reads the :slug segment from the URL /products/:slug
   const { slug } = useParams<{ slug: string }>()
   const product = useProduct(slug ?? '')
@@ -18,7 +22,7 @@ export function ProductPage() {
   const navigate = useNavigate()
 
   if (product.isPending) {
-    return <PageShell>Loading…</PageShell>
+    return <PageShell>{t('common:state.loading')}</PageShell>
   }
 
   if (product.isError) {
@@ -27,12 +31,10 @@ export function ProductPage() {
     return (
       <PageShell>
         <p className="rounded-lg bg-red-50 p-4 text-red-600">
-          {notFound
-            ? 'This product does not exist (anymore?).'
-            : `Failed to load product: ${product.error.message}`}
+          {notFound ? t('catalog:notFound') : t('common:state.loadFailed')}
         </p>
-        <Link to="/" className="mt-4 inline-block text-emerald-700 underline">
-          ← Back to the catalog
+        <Link to={localePath('/')} className="mt-4 inline-block text-emerald-700 underline">
+          {t('catalog:back')}
         </Link>
       </PageShell>
     )
@@ -44,8 +46,8 @@ export function ProductPage() {
 
   return (
     <PageShell>
-      <Link to="/" className="text-sm text-stone-400 hover:text-stone-600">
-        ← Back to the catalog
+      <Link to={localePath('/')} className="text-sm text-stone-400 hover:text-stone-600">
+        {t('catalog:back')}
       </Link>
 
       <div className="mt-4 rounded-xl border border-stone-200 bg-white p-6">
@@ -62,7 +64,7 @@ export function ProductPage() {
         {selected && (
           <>
             <div className="mt-6">
-              <p className="text-sm font-medium text-stone-600">Size</p>
+              <p className="text-sm font-medium text-stone-600">{t('catalog:size')}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {p.variants.map((v) => (
                   <button
@@ -89,8 +91,8 @@ export function ProductPage() {
                 </p>
                 <p className="mt-1 text-xs text-stone-400">
                   {selected.stock_qty > 0
-                    ? `${selected.stock_qty} in stock · ${selected.sku}`
-                    : 'out of stock'}
+                    ? `${t('catalog:inStock', { count: selected.stock_qty })} · ${selected.sku}`
+                    : t('catalog:outOfStock')}
                 </p>
               </div>
               <AddToCartButton
@@ -103,7 +105,7 @@ export function ProductPage() {
                 onAdd={() =>
                   me.data
                     ? addToCart.mutate({ variantId: selected.id, qty: 1 })
-                    : navigate('/login')
+                    : navigate(localePath('/login'))
                 }
               />
             </div>
@@ -127,6 +129,9 @@ function AddToCartButton({
   isPending: boolean
   onAdd: () => void
 }) {
+  const { t } = useTranslation()
+  const { localePath } = useLocale()
+
   if (outOfStock) {
     return (
       <button
@@ -134,7 +139,7 @@ function AddToCartButton({
         disabled
         className="cursor-not-allowed rounded-lg bg-stone-300 px-6 py-3 font-medium text-white"
       >
-        Out of stock
+        {t('catalog:outOfStock')}
       </button>
     )
   }
@@ -142,10 +147,10 @@ function AddToCartButton({
   if (inCartQty > 0) {
     return (
       <Link
-        to="/cart"
+        to={localePath('/cart')}
         className="rounded-lg bg-stone-800 px-6 py-3 font-medium text-white hover:bg-stone-700"
       >
-        In cart ({inCartQty}) → view
+        {t('catalog:inCart', { count: inCartQty })} →
       </Link>
     )
   }
@@ -157,7 +162,11 @@ function AddToCartButton({
       onClick={onAdd}
       className="rounded-lg bg-emerald-700 px-6 py-3 font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
     >
-      {loggedIn ? (isPending ? 'Adding…' : 'Add to cart') : 'Sign in to buy'}
+      {loggedIn
+        ? isPending
+          ? t('catalog:adding')
+          : t('catalog:addToCart')
+        : t('catalog:signInToBuy')}
     </button>
   )
 }
