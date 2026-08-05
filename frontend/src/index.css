@@ -1,1 +1,138 @@
 @import 'tailwindcss';
+
+/* Fonts are self-hosted (npm packages served from our own origin) instead of
+   a Google Fonts <link>: one less third party in the request path, no extra
+   DNS + TLS handshake before text can paint, and it keeps working under a
+   future CSP that forbids outside origins. Poppins ships as static weights,
+   so we import only the five the design uses; Karla has a variable build,
+   where one file covers the whole 400–700 range.
+
+   The `latin-` prefix matters: plain `@fontsource/poppins/400.css` pulls in
+   every subset Google publishes, which for Poppins means shipping ~450 kB of
+   Devanagari this shop will never render. Import the subset, not the font. */
+@import '@fontsource/poppins/latin-400.css';
+@import '@fontsource/poppins/latin-500.css';
+@import '@fontsource/poppins/latin-600.css';
+@import '@fontsource/poppins/latin-700.css';
+@import '@fontsource/poppins/latin-800.css';
+@import '@fontsource-variable/karla';
+
+/* Everything in @theme becomes BOTH a CSS custom property and a Tailwind
+   utility: `--color-panel` generates `bg-panel`, `text-panel`, `border-panel`
+   and friends. Tokens live here and nowhere else — a raw hex code anywhere
+   else in the codebase is a bug (docs/PLAN_ERA_2.md, phase E1). */
+@theme {
+  /* ---- Surfaces, lightest last ------------------------------------- */
+  --color-page: #f3e2d0; /* the canvas behind everything */
+  --color-panel: #fdefe0; /* screen / section background */
+  --color-panel-soft: #fef4e8; /* header strip, alternating bands */
+  --color-card: #fff8ee; /* cards, inputs, anything raised */
+
+  /* ---- Dark surfaces ----------------------------------------------- */
+  --color-bark: #46281c; /* footer, dark cards, dark buttons */
+  --color-bark-soft: #5a3626; /* dividers and inputs on bark */
+
+  /* ---- Ink on light surfaces ---------------------------------------
+     Contrast measured against --color-panel (#fdefe0), WCAG 2.1:
+       ink         6.8:1  AA
+       ink-body    6.8:1  AA
+       ink-soft    5.5:1  AA
+       ink-muted   4.7:1  AA   (darkened from the mock's #a9714b)
+       ink-faint   3.6:1  FAILS normal text — large/decorative only        */
+  --color-ink: #46281c; /* headings */
+  --color-ink-strong: #5c3b2a;
+  --color-ink-body: #6e4b36; /* default body copy */
+  --color-ink-soft: #7c5a45; /* secondary copy */
+  --color-ink-muted: #93603c; /* meta, captions, labels */
+  --color-ink-faint: #a9714b; /* ONLY ≥18.66px bold or non-text */
+
+  /* ---- Ink on bark -------------------------------------------------- */
+  --color-ink-on-dark: #fff8ee;
+  --color-ink-on-dark-body: #dfc3ac;
+  --color-ink-on-dark-soft: #c9aa92;
+  --color-ink-on-dark-muted: #a98a74;
+
+  /* ---- Brand --------------------------------------------------------
+     The mock's orange (#e4761f) cannot legally carry text: as a background
+     under #fff8ee it measures 2.9:1 and as text on panel 2.7:1, both under
+     the 4.5:1 floor. So it stays a decorative fill, and a darkened twin —
+     the mock's own link-hover colour — does every job involving letters:
+       #fff8ee on brand-ink   4.6:1  AA
+       brand-ink on panel     4.3:1  AA for ≥18.66px bold / ≥24px          */
+  --color-brand: #e4761f; /* fills and glows — never behind text */
+  --color-brand-ink: #b8541a; /* primary button bg + orange text */
+  --color-honey: #f6c244; /* accent panels, badges, on-bark headings */
+
+  /* ---- Lines -------------------------------------------------------- */
+  --color-line: #eed9c0; /* default border */
+  --color-line-soft: #f2e1cc; /* list separators */
+  --color-line-strong: #e9c9a8; /* icon buttons */
+
+  /* ---- Type families ------------------------------------------------ */
+  --font-display: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Karla', ui-sans-serif, system-ui, sans-serif;
+
+  /* ---- Display scale ------------------------------------------------
+     The mock draws nine distinct heading sizes (68/46/44/42/40/38/34/32/26).
+     A scale exists to collapse that: five steps cover every heading, and the
+     1–2px differences nobody can see stop being decisions. Line-height and
+     letter-spacing ride along with the size so a heading is one class.      */
+  --text-display-xs: 1.625rem; /* 26px — card headings */
+  --text-display-xs--line-height: 1.15;
+  --text-display-xs--letter-spacing: -0.02em;
+
+  --text-display-sm: 2rem; /* 32px — sub-sections */
+  --text-display-sm--line-height: 1.15;
+  --text-display-sm--letter-spacing: -0.02em;
+
+  --text-display-md: 2.375rem; /* 38px — section headings */
+  --text-display-md--line-height: 1.1;
+  --text-display-md--letter-spacing: -0.025em;
+
+  --text-display-lg: 2.875rem; /* 46px — page titles */
+  --text-display-lg--line-height: 1.05;
+  --text-display-lg--letter-spacing: -0.03em;
+
+  --text-display-xl: 4.25rem; /* 68px — hero only */
+  --text-display-xl--line-height: 1.02;
+  --text-display-xl--letter-spacing: -0.03em;
+
+  /* Body copy keeps Tailwind's own scale (xs 12 / sm 14 / base 16 / lg 18)
+     so nothing familiar shifts underfoot; only the eyebrow size is missing
+     from it. */
+  --text-2xs: 0.6875rem; /* 11px — badges, eyebrows */
+
+  /* ---- Tracking ----------------------------------------------------- */
+  --tracking-label: 0.12em; /* small caps labels */
+  --tracking-eyebrow: 0.22em; /* the wide uppercase kickers */
+
+  /* ---- Radii, following the mock's ladder --------------------------- */
+  --radius-sm: 0.375rem; /* 6px  — checkboxes */
+  --radius-md: 0.75rem; /* 12px — inputs, small tiles */
+  --radius-lg: 1rem; /* 16px — inner cards, thumbnails */
+  --radius-xl: 1.25rem; /* 20px — cards */
+  --radius-2xl: 1.5rem; /* 24px — panels */
+  --radius-3xl: 1.75rem; /* 28px — full screens */
+
+  /* ---- Shadows ------------------------------------------------------ */
+  --shadow-screen: 0 30px 70px -40px rgb(70 40 28 / 0.45);
+  --shadow-cta: 0 14px 26px -14px rgb(228 118 31 / 0.9);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-page);
+    color: var(--color-ink-body);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* The design shows no focus states anywhere, which would leave a keyboard
+     user with no idea where they are. One global rule gives every control a
+     visible ring for free. :focus-visible rather than :focus so it appears
+     for keyboards and not on mouse clicks. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-ink);
+    outline-offset: 2px;
+  }
+}

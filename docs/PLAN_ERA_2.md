@@ -17,6 +17,10 @@
 > changes, re-read it; when this plan and the canvas disagree, the canvas wins.
 >
 > Phases are numbered **E1–E10** so they never collide with Era I's 0–11.
+> **E1.5** is inserted between E1 and E2 (not a renumber — every "E2 depends
+> on this"-style cross-reference in this document stays correct) once
+> language support was added to scope: it has to land before E2 writes its
+> first translatable-content migration, not after.
 > Phase 11 (Idea Backlog) stays permanently open and feeds both eras.
 
 ---
@@ -44,11 +48,14 @@ gift — the copy is written:
 
 Two things fall out of this table:
 
-- **The current seed is wrong for the design.** `backend/seed/seed.sql` has
-  herbal tea, coffee and wildflower honey. Six new categories replace three.
-- **AMD prices are not computed.** 14.00 → 6,700 ֏ implies ≈478 ֏/$, but so do
-  9 → 4,300 (478) and 16 → 7,600 (475). They are *rounded per market*, not
-  converted at a live rate. That is evidence for how to model currency (E5).
+- [x] **The current seed is wrong for the design.** `backend/seed/seed.sql`
+      has herbal tea, coffee and wildflower honey — six new categories replace
+      three. Finding recorded here; the fix itself is E2's own seed-rewrite
+      checkbox, not duplicated as a second item.
+- [x] **AMD prices are not computed.** 14.00 → 6,700 ֏ implies ≈478 ֏/$, but
+      so do 9 → 4,300 (478) and 16 → 7,600 (475). They are *rounded per
+      market*, not converted at a live rate — the evidence E5's
+      `variant_prices` design leans on.
 
 The royal jelly page also shows **non-linear variant pricing** — 25 g $32,
 50 g $58, 100 g $105 — which the existing per-variant `price_minor` already
@@ -105,18 +112,19 @@ Everything the six screens show that the current schema and API cannot serve.
 
 Worth resolving before the copy is treated as canonical:
 
-- The cart line for **Raw Propolis Tincture reads $16.00 / 7,600 ֏**, which is
-  the Bee Pollen price; the shop card says $19.00 / 9,100 ֏.
-- The cart totals are internally consistent ($62 + $6 − $4 = $64), and
-  "$8 away from free shipping" on a $62 subtotal implies a **$70 threshold** —
-  but chilled shipping is still charged, so the threshold presumably applies to
-  standard shipping only. Confirm the rule.
-- "Prices include VAT" sits next to a separate discount line. Decide whether
-  VAT is contained in the displayed price (Armenian retail convention) and only
-  broken out on the invoice — E6 assumes yes.
+- [ ] The cart line for **Raw Propolis Tincture reads $16.00 / 7,600 ֏**,
+      which is the Bee Pollen price; the shop card says $19.00 / 9,100 ֏.
+      Confirm the correct price before it becomes E2 seed data.
+- [ ] The cart totals are internally consistent ($62 + $6 − $4 = $64), and
+      "$8 away from free shipping" on a $62 subtotal implies a **$70
+      threshold** — but chilled shipping is still charged, so the threshold
+      presumably applies to standard shipping only. Confirm the rule (E7).
+- [ ] "Prices include VAT" sits next to a separate discount line. Decide
+      whether VAT is contained in the displayed price (Armenian retail
+      convention) and only broken out on the invoice — E6 assumes yes.
 - The design shows `+374` phone, Yerevan address and **ArCa** card network:
   Armenia is the primary market, which supports the Idram / Ameriabank vPOS
-  research already parked in Phase 11.
+  research already parked in Phase 11. *(observation, not a decision to make)*
 
 ---
 
@@ -125,20 +133,37 @@ Worth resolving before the copy is treated as canonical:
 These are the user's calls, not technical defaults. Each gets a row in the
 [ARCHITECTURE.md](ARCHITECTURE.md) decisions log once made (RULES.md #13).
 
-1. **Catalog scope.** Does Mountain Breath become an apiary-only store (drop
-   tea and coffee), or does the hive line sit next to them? The design's nav,
-   hero and benefits copy assume apiary-only. Everything in E2 depends on this.
-2. **Currency.** Ship both USD and AMD (E5), or AMD only for an Armenian
-   launch and treat USD as later work? The design shows both on every price.
-3. **Content storage.** "Our hive"/"Benefits"/"Journal" as markdown in the repo
-   (versioned with the code, zero backend) or DB-backed so the family edits
-   without a deploy? E9 recommends markdown for v1.
-4. **Product editorial fields** (E3): explicit columns and child tables, or one
-   JSONB `content` column? Columns give constraints and clean admin forms;
-   JSONB avoids a migration per field but loses FK safety.
-5. **Social sign-in.** Google/Apple are two buttons in the mock and the most
-   third-party-dependent item in the plan. Confirm they are in scope, or drop
-   the buttons from the design.
+- [ ] **1. Catalog scope.** Does Mountain Breath become an apiary-only store
+      (drop tea and coffee), or does the hive line sit next to them? The
+      design's nav, hero and benefits copy assume apiary-only. Everything in
+      E2 depends on this.
+- [ ] **2. Currency.** Ship both USD and AMD (E5), or AMD only for an
+      Armenian launch and treat USD as later work? The design shows both on
+      every price.
+- [ ] **3. Content storage.** "Our hive"/"Benefits"/"Journal" as markdown in
+      the repo (versioned with the code, zero backend) or DB-backed so the
+      family edits without a deploy? E9 recommends markdown for v1. Now a
+      three-language question too: markdown means one file per locale
+      (`our-hive.en.md` / `.hy.md` / `.ru.md`) per page; DB-backed means a
+      `page_translations` table mirroring decision #6.
+- [ ] **4. Product editorial fields** (E3): explicit columns and child
+      tables, or one JSONB `content` column? Columns give constraints and
+      clean admin forms; JSONB avoids a migration per field but loses FK
+      safety.
+- [ ] **5. Social sign-in.** Google/Apple are two buttons in the mock and the
+      most third-party-dependent item in the plan. Confirm they are in scope,
+      or drop the buttons from the design.
+- [ ] **6. Translatable content strategy.** How do `name`/`description`-type
+      fields carry three languages: a `*_translations` child table per entity
+      (relational, FK-safe, one `LEFT JOIN … ON locale = ?`), or JSONB keyed
+      by locale (`{"en": "…", "hy": "…", "ru": "…"}`) on the existing column?
+      This is decision #4 one axis wider — answering the two together avoids
+      editorial content and translations fighting over incompatible storage.
+      E1.5 defaults to translation tables; revisit alongside #4 before E3.
+
+  *(Numbers are referenced by "decision #N" elsewhere in this document — keep
+  them stable; if a decision list item is ever removed, leave its number
+  retired rather than renumbering the rest.)*
 
 ---
 
@@ -161,11 +186,11 @@ WCAG contrast maths and why it belongs at token-definition time.
 **Backend:** none.
 
 **Frontend:**
-- [ ] Tokens in `src/index.css` via `@theme`: surfaces (`#F3E2D0` page,
+- [x] Tokens in `src/index.css` via `@theme`: surfaces (`#F3E2D0` page,
       `#FDEFE0` panel, `#FEF4E8` header, `#FFF8EE` card), ink (`#46281C` bark,
       `#5C3B2A`, `#6E4B36`, `#7C5A45`, `#A9714B` muted), brand (`#E4761F`
       orange, `#F6C244` honey), border `#EED9C0`.
-- [ ] **Fix the contrast failures while defining the tokens, not in E10.**
+- [x] **Fix the contrast failures while defining the tokens, not in E10.**
       Measured against the `#FDEFE0` panel:
 
       | Pair | Ratio | Verdict |
@@ -177,22 +202,31 @@ WCAG contrast maths and why it belongs at token-definition time.
       | `#FFF8EE` on `#E4761F` (primary CTA) | 2.9:1 | **fails** AA 4.5:1 |
       | `#FFF8EE` on `#B8541A` | 4.6:1 | passes AA |
 
-      Recommended fix: keep `#E4761F` as a decorative/large-display accent, and
-      add `--color-brand-ink: #B8541A` (the design's own link-hover colour) for
-      orange **text** and for the primary button background. Restrict
-      `#A9714B` to ≥18.66 px or bump it darker. Re-verify with axe in E10.
-- [ ] Fonts: Poppins (400–800, display) + Karla (400–700, body), self-hosted
-      with `font-display: swap` rather than the Google CDN link — the CSP-free
-      route and one less third party. Type scale from the mock: display
-      68/46/44/42/38/34/32/26, body 18/17/16/15/14/13, eyebrow 11–13 uppercase
-      at 0.18–0.24em tracking.
+      Implemented as recommended: `#E4761F` stays a decorative/large-display
+      accent (`--color-brand`); `--color-brand-ink: #B8541A` (the design's own
+      link-hover colour) carries orange **text** and the primary button
+      background. `#A9714B` survives only as `--color-ink-faint` for
+      large/bold use; body-size "muted" copy uses a darkened `--color-ink-muted:
+      #93603c` (4.7:1) instead. Re-verify with axe in E10.
+- [x] Fonts: Poppins (400–800, display) + Karla (400–700, body), self-hosted
+      via `@fontsource` **latin subset only** (the unscoped import pulls in
+      ~450 kB of unused Devanagari glyphs) — `font-display: swap` is the
+      package default, confirmed rather than assumed. Display scale collapses
+      the mock's nine headings into five steps (26/32/38/46/68, each with its
+      own line-height and tracking); body text uses Tailwind's own xs–lg scale
+      plus one added `text-2xs` (11px) for eyebrows, rather than replicating
+      the mock's six-step body scale literally — fewer near-duplicate sizes to
+      choose between later.
 - [ ] Primitives in `src/components/ui/`: `Button` (primary pill with the
       orange glow shadow, dark pill, outline, ghost-underline), `Badge`,
       `Card`, `Input`, `Select`, `Checkbox`, `QtyStepper`, `IconButton`
       (38 px circle, 1.5 px border), `Breadcrumbs`, `SectionHeading`
       (eyebrow + title + trailing link), `Stat`.
-- [ ] **Focus states**: the mock has none. Every interactive primitive gets a
-      visible `:focus-visible` ring in the honey token — decided here, once.
+- [x] **Focus states**: the mock has none. A global `:focus-visible` rule in
+      `@layer base` now rings every interactive element in `--color-brand-ink`
+      (not honey — `#F6C244` reads too pale as a 2px outline on the `#FFF8EE`
+      card surface). Decided once, here; primitives in the next bullet inherit
+      it for free and only need an override if a specific control asks for one.
 - [ ] `SiteHeader` (logo mark, wordmark + tagline, 5 nav links, search and
       wishlist icon buttons, cart pill with count) and `SiteFooter`
       (4 columns, newsletter form, bottom bar with the currency switcher slot).
@@ -207,6 +241,121 @@ and visibly focused by keyboard.
 
 ---
 
+### Phase E1.5 — Internationalization: Armenian, Russian, English (default)
+
+**Goal:** Armenian, Russian and English are real, switchable languages across
+the app chrome and every page built from here on — not a retrofit bolted on
+near launch. Inserted immediately after E1's inert token layer and before E2
+writes its first migration, because two upcoming schema decisions (§2 #4 and
+the new #6) need a translation strategy before they're written, and because
+`SiteHeader`/`SiteFooter` (E1's still-open primitives bullet) are the very
+first user-facing strings in the whole rebuild — the cheapest possible moment
+to make them translatable instead of hardcoding English into JSX that then
+has to be reopened.
+
+*(Not a gap from the design — the six-screen mock is English-only and shows
+no language switcher. This is a requirement added independently of the Claude
+Design canvas, and the mock gives no layout guidance for it; the switcher
+needs a slot of its own, most naturally beside E5's currency switcher in the
+footer.)*
+
+**You will learn:** `Accept-Language` negotiation, ICU message formatting
+(pluralization, interpolation) vs. hand-rolled string concatenation, why
+translated *content* and translated UI *chrome* are different problems with
+different storage answers, Postgres's per-language text-search
+configurations, font coverage per writing system.
+
+**Backend:**
+- [ ] Migration: `product_translations` / `category_translations` /
+      `benefit_translations` (parent_id, locale, name, description, …) — the
+      relational half of decision #6. Locale-invariant fields (slug, sku,
+      price, stock) stay on the parent row; only human-language text moves out.
+- [ ] Locale resolution: `?lang=` → cookie → `Accept-Language` → default
+      `en`, validated against `{en, hy, ru}` — the same shape as E5's planned
+      currency resolution. Worth merging into one "preferences" middleware
+      that resolves both instead of writing two near-identical ones.
+- [ ] `GET /categories`, `GET /products`, `GET /products/{slug}` resolve the
+      requested locale server-side and fall back to `en` per-field when a
+      translation row is missing, rather than 404ing or returning blank text.
+- [ ] Validation messages in `domain.ValidateProduct` (and the rest of the
+      `fields` envelope) become short keys (`"required"`, `"positive"`,
+      `"slug_format"`) instead of English prose — the frontend's i18n layer
+      renders them, and the backend stops hardcoding a language into its API
+      contract. Update every existing test that currently asserts on the
+      English prose.
+- [ ] Search: **verified against the running dev database — Postgres ships a
+      built-in `armenian` text search configuration**, alongside `english`
+      and `russian` ([source](https://www.postgresql.org/docs/current/textsearch-configuration.html)):
+
+      ```
+      SELECT cfgname FROM pg_ts_config ORDER BY cfgname;
+      -- arabic, armenian, basque, … english, … russian, … (29 total)
+      ```
+
+      So all three locales get a real `websearch_to_tsquery('<locale>', …)`
+      branch, not just `en`/`ru` with `hy` falling back to trigram-only as
+      first assumed — spot-check Armenian stemming/stopword quality when this
+      is implemented, since "the config exists" isn't the same as "it's
+      well-tuned for this catalog's vocabulary." The trigram layer Era I
+      already built stays as the fuzzy/typo-tolerant layer under all three,
+      exactly as it is for English today.
+- [ ] Admin: category/benefit/product forms grow one input set per locale
+      (tabs or stacked fields) so the family can leave a translation blank
+      and it falls back to English rather than the form blocking submission.
+- [ ] Tests: a request with no `Accept-Language` gets English; an
+      unsupported locale code falls back rather than 400s; a product missing
+      its Armenian translation still returns, with English fallback fields.
+- [ ] Update the Postman collection (RULES.md #15) with a `lang` variable.
+
+**Frontend:**
+- [ ] i18n library: `react-i18next` + `i18next-browser-languagedetector`.
+      The one deliberate exception to the project's "no dependency without a
+      reason" default — pluralization and interpolation edge cases across
+      three languages are exactly the bug class a mature library exists to
+      close off, unlike the hand-rolled form validation the project already
+      favors elsewhere.
+- [ ] Route structure: bare `/…` serves **English, the stated default** — no
+      prefix, no redirect, every link written in E2 onward keeps working
+      unchanged; `/hy/…` and `/ru/…` prefix the other two explicitly. One
+      extra routing rule versus prefixing all three uniformly, in exchange
+      for matching the stated default exactly.
+- [ ] **Font coverage gap found while building this — verified against the
+      installed packages' own `unicode-range`s, not assumed:** neither
+      Poppins nor Karla (chosen in E1) ships Cyrillic or Armenian glyphs.
+
+      ```
+      @fontsource/poppins subsets available: latin, latin-ext, devanagari
+      @fontsource-variable/karla unicode-range: U+0000-00FF, U+0100-02BA, … (Latin only)
+      ```
+
+      Without a fallback, `hy`/`ru` text silently drops to whatever system
+      font the OS substitutes mid-page, breaking the typographic design for
+      two of the three languages. Research and pick a per-script pairing (a
+      superfamily with full Latin+Cyrillic+Armenian coverage, e.g. a Noto
+      Sans variant, or a matched trio) and wire it as a `:lang(hy)` /
+      `:lang(ru)` CSS override feeding the *same* type-scale tokens from E1 —
+      not a new token system, just fallback stacks.
+- [ ] Translation namespaces per feature area (`common`, `catalog`, `cart`,
+      `checkout`, `account`) rather than one growing file — mirrors this
+      plan's page-per-phase structure, so each future phase adds one
+      namespace instead of editing a shared file.
+- [ ] `LanguageSwitcher` primitive, built into `SiteHeader`/`SiteFooter` from
+      the start — those components are not yet built (E1's bullet is still
+      open), so this lands before, not after, that work.
+- [ ] `useLocale()` hook wrapping `useParams()` + i18next, so every future
+      page reads the active locale one way instead of each poking
+      `i18next.language` directly.
+- [ ] Vitest: `LanguageSwitcher` changes the route prefix and persists the
+      choice; a missing translation key renders visibly in dev (so a gap is
+      caught, not silently blank) and falls back to English in production.
+
+**Done when:** the whole existing shell (header, footer, nav, auth forms,
+error toasts) reads correctly in all three languages with no hardcoded
+English string left in JSX, switching language never loses the current page,
+and Armenian and Russian render in a font that actually has their glyphs.
+
+---
+
 ### Phase E2 — Catalog model, faceted shop, home page
 
 **Goal:** the Shop screen's sidebar works for real, and the Home screen exists.
@@ -218,7 +367,8 @@ filters), keyset vs. offset pagination.
 **Backend:**
 - [ ] Migration: `benefits` (id, slug, name, sort_order) and `product_benefits`
       (product_id, benefit_id, PK on both) — Energy, Immunity, Skin, Recovery,
-      Sweetening.
+      Sweetening. `name` follows E1.5/decision #6's translation strategy, not
+      a single English column.
 - [ ] Migration: `products.badge` (nullable TEXT) + `badge_tone` — one badge
       per card in the design; a `product_badges` table only if that changes.
 - [ ] Extend `domain.ProductFilter`: `Benefits []string`, `PriceMinMinor`,
@@ -234,7 +384,9 @@ filters), keyset vs. offset pagination.
       bounds, respecting the *other* active filters. One round trip, CTEs +
       `count(*) FILTER (WHERE …)`.
 - [ ] Rewrite `seed/seed.sql` for the six hive products with the design's copy,
-      badges, benefits and both currencies' prices (or USD only until E5).
+      badges, benefits and both currencies' prices (or USD only until E5) —
+      seeded in all three languages from the start, not English-only with
+      translations bolted on later.
 - [ ] Tests: store tests for each filter and sort, a facet-count test that
       proves counts change with the active filter, domain test for sort
       whitelisting.
@@ -271,14 +423,18 @@ ordered child collections, the ARIA tabs pattern, image galleries without a
 library.
 
 **Backend:**
-- [ ] Decide decision #4 (columns vs JSONB) and log it.
+- [ ] Decide decision #4 (columns vs JSONB) and log it — together with
+      decision #6 (E1.5's translation storage), since the two overlap directly.
 - [ ] Migration: `product_images` (product_id, url, alt, sort_order,
       is_primary) with a partial unique index enforcing one primary per
-      product. Backfill from `products.image_url`, then drop the column in a
+      product. `alt` is translatable text (screen readers read it aloud in
+      the visitor's language) and follows decision #6 like every other field.
+      Backfill from `products.image_url`, then drop the column in a
       follow-up migration once the admin UI writes the new table.
 - [ ] Migration: `product_highlights` (product_id, sort_order, text) for the
       "What it does" bullets; `product_usage_cards` (kicker, title, body,
-      sort_order) for Morning / Course / Pairs with.
+      sort_order) for Morning / Course / Pairs with. Both carry translatable
+      text per decision #6.
 - [ ] Migration: `products.disclaimer`, `storage_note`, `harvest_note`
       ("June 2026, Hive 41"), `shipping_note` ("Chilled, 2–4 days"),
       `lab_batch` ("RJ-0626"), `is_cold_chain`.
@@ -546,7 +702,9 @@ is the legal default, build-time content indexing.
 **Frontend:**
 - [ ] Content pages: Our hive, Benefits, Harvest log, Shipping, Contact, Terms,
       Privacy. Recommended: markdown in `src/content/` compiled at build time —
-      versioned with the code, no runtime cost, no CMS to operate.
+      versioned with the code, no runtime cost, no CMS to operate. One file
+      per locale (`our-hive.en.md`, `.hy.md`, `.ru.md`) if decision #3 keeps
+      markdown, per the note added to that decision.
 - [ ] Journal: post list + detail, shared card component with the product grid.
 - [ ] Footer newsletter form wired with inline confirmation.
 
@@ -579,7 +737,8 @@ structured data.
       — the design has a hero, six cards and a five-image gallery per product.
 - [ ] SEO: per-product title/meta/OG, JSON-LD `Product` + `Offer` +
       `AggregateRating` (E4 and E5 make these truthful), `sitemap.xml`,
-      canonical URLs on filtered shop pages.
+      canonical URLs on filtered shop pages, `hreflang` alternates across the
+      three locales from E1.5.
 
 **Backend / CI:**
 - [ ] Lighthouse CI with budgets as a job; fail on regressions.
@@ -597,6 +756,7 @@ with a keyboard only, and CI blocks a Lighthouse or axe regression.
 
 | Phase | Migrations | New endpoints |
 |---|---|---|
+| E1.5 | `product_translations`, `category_translations`, `benefit_translations` | locale (`lang`) negotiation added to every existing read endpoint |
 | E2 | `benefits`, `product_benefits`, `products.badge`, `sales_count` | `GET /catalog/facets` |
 | E3 | `product_images`, `product_highlights`, `product_usage_cards`, product metadata, `product_related` | `GET /products/{slug}/related` |
 | E4 | `reviews`, `products.rating_avg/count` | `GET|POST /products/{slug}/reviews`, `GET|PATCH /admin/reviews` |
@@ -615,6 +775,7 @@ imports neither SQL nor HTTP; the server computes every total.
 | Phase | Routes | Components |
 |---|---|---|
 | E1 | layout wrapper | tokens, 11 primitives, `SiteHeader`, `SiteFooter` |
+| E1.5 | `/:locale/*` (bare `/` = English) | i18n provider, `LanguageSwitcher`, `useLocale` |
 | E2 | `/` home, `/shop` | `ProductCard` v2, filters, sort, pagination, search overlay |
 | E3 | `/products/:slug` v2 | `Gallery`, `VariantPicker`, `Tabs`, meta cards, related |
 | E4 | — | `Stars`, review list, review form, moderation table |
