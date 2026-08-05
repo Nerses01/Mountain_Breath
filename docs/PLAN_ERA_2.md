@@ -426,7 +426,7 @@ configurations, font coverage per writing system.
       The envelope's top-level `message` stays English on purpose: `code`
       exists precisely so a client can render its own text, leaving `message`
       as a developer-facing fallback.
-- [ ] Search: **verified against the running dev database — Postgres ships a
+- [x] Search: **verified against the running dev database — Postgres ships a
       built-in `armenian` text search configuration**, alongside `english`
       and `russian` ([source](https://www.postgresql.org/docs/current/textsearch-configuration.html)):
 
@@ -445,10 +445,22 @@ configurations, font coverage per writing system.
 - [ ] Admin: category/benefit/product forms grow one input set per locale
       (tabs or stacked fields) so the family can leave a translation blank
       and it falls back to English rather than the form blocking submission.
-- [ ] Tests: a request with no `Accept-Language` gets English; an
+- [x] Tests: a request with no `Accept-Language` gets English; an
       unsupported locale code falls back rather than 400s; a product missing
       its Armenian translation still returns, with English fallback fields.
-- [ ] Update the Postman collection (RULES.md #15) with a `lang` variable.
+      All three live in `internal/api/locale_test.go` (11 negotiation cases,
+      table-driven) and `internal/store/translations_test.go`, which exercises
+      the fallback against real Postgres rather than a fake.
+- [x] Update the Postman collection (RULES.md #15) with a `lang` variable.
+      New **Localization** folder (4 requests): Armenian via `?lang=`, Russian
+      via `Accept-Language` q-values, an unsupported tag proving it returns
+      **200 and not 400**, and per-locale search stemming. The three existing
+      catalog requests gained a disabled `?lang={{lang}}` param and a note on
+      the resolution order.
+      The admin validation request's tests were **wrong after E1.5** and are
+      fixed here: they now assert `fields.slug === "slug_format"` rather than
+      merely that the key exists, which is what pins the codes-not-prose
+      contract. 26 → 30 requests, no request lost.
 
 **Frontend:**
 - [x] i18n library: `i18next` + `react-i18next`. The one deliberate

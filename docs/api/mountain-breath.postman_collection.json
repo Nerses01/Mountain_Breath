@@ -25,6 +25,11 @@
 			"key": "adminPassword",
 			"value": "",
 			"type": "string"
+		},
+		{
+			"key": "lang",
+			"value": "en",
+			"type": "string"
 		}
 	],
 	"item": [
@@ -39,8 +44,12 @@
 						"header": [],
 						"url": {
 							"raw": "{{baseUrl}}/health",
-							"host": ["{{baseUrl}}"],
-							"path": ["health"]
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"health"
+							]
 						},
 						"description": "Liveness probe. Returns 200 with `{\"status\":\"ok\"}` while the server is up. Later used by Docker healthchecks (Phase 8) and the load balancer (Phase 9)."
 					},
@@ -74,8 +83,13 @@
 						"header": [],
 						"url": {
 							"raw": "{{baseUrl}}/debug/slow",
-							"host": ["{{baseUrl}}"],
-							"path": ["debug", "slow"]
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"debug",
+								"slow"
+							]
 						},
 						"description": "Sleeps 5 seconds, then responds. Registered only when `MB_ENV=dev`. For observing graceful shutdown and client cancellation."
 					},
@@ -125,8 +139,13 @@
 						},
 						"url": {
 							"raw": "{{apiV1}}/auth/register",
-							"host": ["{{apiV1}}"],
-							"path": ["auth", "register"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"auth",
+								"register"
+							]
 						},
 						"description": "Creates a customer account and starts a session. The pre-request script generates a unique email per run."
 					},
@@ -169,8 +188,13 @@
 						"header": [],
 						"url": {
 							"raw": "{{apiV1}}/auth/me",
-							"host": ["{{apiV1}}"],
-							"path": ["auth", "me"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"auth",
+								"me"
+							]
 						},
 						"description": "Returns the logged-in user, resolved from the session cookie. 401 without a valid session."
 					},
@@ -214,8 +238,13 @@
 						},
 						"url": {
 							"raw": "{{apiV1}}/auth/login",
-							"host": ["{{apiV1}}"],
-							"path": ["auth", "login"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
 						},
 						"description": "Wrong password and unknown email return the SAME error — the API must not reveal which accounts exist (user enumeration)."
 					},
@@ -245,8 +274,13 @@
 						"header": [],
 						"url": {
 							"raw": "{{apiV1}}/auth/logout",
-							"host": ["{{apiV1}}"],
-							"path": ["auth", "logout"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"auth",
+								"logout"
+							]
 						},
 						"description": "Deletes the session server-side and expires the cookie."
 					},
@@ -272,8 +306,13 @@
 						"header": [],
 						"url": {
 							"raw": "{{apiV1}}/auth/me",
-							"host": ["{{apiV1}}"],
-							"path": ["auth", "me"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"auth",
+								"me"
+							]
 						},
 						"description": "The session is gone server-side — the old cookie (if any survived) is worthless."
 					},
@@ -305,10 +344,22 @@
 						"header": [],
 						"url": {
 							"raw": "{{apiV1}}/categories",
-							"host": ["{{apiV1}}"],
-							"path": ["categories"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"categories"
+							],
+							"query": [
+								{
+									"key": "lang",
+									"value": "{{lang}}",
+									"description": "en | hy | ru. Disabled by default so the request shows the negotiated default.",
+									"disabled": true
+								}
+							]
 						},
-						"description": "Returns all categories ordered by sort_order, then name. Always an array — [] when empty, never null."
+						"description": "Returns all categories ordered by sort_order, then name. Always an array — [] when empty, never null.\n\nLanguage: resolved per request as ?lang= > mb_locale cookie > Accept-Language > en. An unknown value falls back rather than failing."
 					},
 					"event": [
 						{
@@ -336,8 +387,12 @@
 						"header": [],
 						"url": {
 							"raw": "{{apiV1}}/products?category=&q=&page=1&per_page=20",
-							"host": ["{{apiV1}}"],
-							"path": ["products"],
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"products"
+							],
 							"query": [
 								{
 									"key": "category",
@@ -357,10 +412,16 @@
 									"key": "per_page",
 									"value": "20",
 									"description": "1..100, default 20"
+								},
+								{
+									"key": "lang",
+									"value": "{{lang}}",
+									"description": "en | hy | ru. Disabled by default so the request shows the negotiated default.",
+									"disabled": true
 								}
 							]
 						},
-						"description": "Paginated list of active products with nested variants (sorted by price). Envelope: {items, page, per_page, total}."
+						"description": "Paginated list of active products with nested variants (sorted by price). Envelope: {items, page, per_page, total}.\n\nLanguage: resolved per request as ?lang= > mb_locale cookie > Accept-Language > en. An unknown value falls back rather than failing."
 					},
 					"event": [
 						{
@@ -395,10 +456,23 @@
 						"header": [],
 						"url": {
 							"raw": "{{apiV1}}/products/armenian-coffee",
-							"host": ["{{apiV1}}"],
-							"path": ["products", "armenian-coffee"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"products",
+								"armenian-coffee"
+							],
+							"query": [
+								{
+									"key": "lang",
+									"value": "{{lang}}",
+									"description": "en | hy | ru. Disabled by default so the request shows the negotiated default.",
+									"disabled": true
+								}
+							]
 						},
-						"description": "Product detail with variants. Slug comes from seed data."
+						"description": "Product detail with variants. Slug comes from seed data.\n\nLanguage: resolved per request as ?lang= > mb_locale cookie > Accept-Language > en. An unknown value falls back rather than failing."
 					},
 					"event": [
 						{
@@ -433,10 +507,23 @@
 						"header": [],
 						"url": {
 							"raw": "{{apiV1}}/products/no-such-product",
-							"host": ["{{apiV1}}"],
-							"path": ["products", "no-such-product"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"products",
+								"no-such-product"
+							],
+							"query": [
+								{
+									"key": "lang",
+									"value": "{{lang}}",
+									"description": "en | hy | ru. Disabled by default so the request shows the negotiated default.",
+									"disabled": true
+								}
+							]
 						},
-						"description": "Unknown slug returns 404 with the standard error envelope."
+						"description": "Unknown slug returns 404 with the standard error envelope.\n\nLanguage: resolved per request as ?lang= > mb_locale cookie > Accept-Language > en. An unknown value falls back rather than failing."
 					},
 					"event": [
 						{
@@ -450,6 +537,203 @@
 									"",
 									"pm.test(\"error code is not_found\", () => {",
 									"    pm.expect(pm.response.json().error.code).to.eql(\"not_found\");",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Localization (Phase E1.5)",
+			"description": "Three languages: English (default), Armenian, Russian. Translated text lives in *_translations tables and falls back per field to English, so a partially translated catalogue still reads.\n\nSet the collection variable `lang` to hy or ru to run the whole suite in another language.",
+			"item": [
+				{
+					"name": "Categories in Armenian",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/categories?lang=hy",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"categories"
+							],
+							"query": [
+								{
+									"key": "lang",
+									"value": "hy"
+								}
+							]
+						},
+						"description": "?lang=hy returns Armenian names where a translation row exists, and the English name where one does not - never a blank string."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"body is an array\", () => {",
+									"    pm.expect(pm.response.json()).to.be.an(\"array\");",
+									"});",
+									"",
+									"pm.test(\"every category has a non-empty name\", () => {",
+									"    // The fallback chain (requested locale -> en -> legacy",
+									"    // column) exists so a missing translation degrades to",
+									"    // readable English instead of an empty label.",
+									"    pm.response.json().forEach((c) => {",
+									"        pm.expect(c.name, `category ${c.slug}`).to.be.a(\"string\").and.not.empty;",
+									"    });",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Products via Accept-Language",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept-Language",
+								"value": "ru-RU,ru;q=0.9,en;q=0.4",
+								"description": "Russian outranks English by q-value."
+							}
+						],
+						"url": {
+							"raw": "{{apiV1}}/products",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"products"
+							]
+						},
+						"description": "No ?lang= here: the language comes from the Accept-Language header, which is what a browser sends. q-values are honoured, so the highest-weighted supported language wins regardless of the order tags appear in."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"paginated envelope\", () => {",
+									"    const b = pm.response.json();",
+									"    pm.expect(b).to.have.property(\"items\");",
+									"    pm.expect(b).to.have.property(\"total\");",
+									"});",
+									"",
+									"pm.test(\"names are never blank\", () => {",
+									"    pm.response.json().items.forEach((p) => {",
+									"        pm.expect(p.name, p.slug).to.be.a(\"string\").and.not.empty;",
+									"    });",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Unknown language falls back (200, not 400)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/products?lang=klingon",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"products"
+							],
+							"query": [
+								{
+									"key": "lang",
+									"value": "klingon",
+									"description": "Deliberately unsupported."
+								}
+							]
+						},
+						"description": "The contract: a language tag we do not serve is NOT an error. A shop that refuses to render because a header was odd is worse than one that renders in English."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"unknown locale still serves the catalogue\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"falls back rather than erroring\", () => {",
+									"    const b = pm.response.json();",
+									"    pm.expect(b).to.have.property(\"items\");",
+									"    pm.expect(b).to.not.have.property(\"error\");",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Search stems in the requested language",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/products?q=мед&lang=ru",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"products"
+							],
+							"query": [
+								{
+									"key": "q",
+									"value": "мед"
+								},
+								{
+									"key": "lang",
+									"value": "ru"
+								}
+							]
+						},
+						"description": "Full-text search stems the query with the locale's own Postgres configuration (english / armenian / russian), so Russian normalises ё to е and 'мед' matches 'мёд'. Requires the Russian seed translations to be loaded."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Not asserting a hit count: this depends on which",
+									"// translations are seeded. The store test",
+									"// TestSearchUsesPerLocaleStemming pins the behaviour itself.",
+									"pm.test(\"returns a well-formed page\", () => {",
+									"    pm.expect(pm.response.json()).to.have.property(\"items\");",
 									"});"
 								]
 							}
@@ -484,8 +768,13 @@
 						},
 						"url": {
 							"raw": "{{apiV1}}/auth/login",
-							"host": ["{{apiV1}}"],
-							"path": ["auth", "login"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
 						},
 						"description": "Fails (401) until adminEmail/adminPassword variables point to a promoted admin account."
 					},
@@ -529,8 +818,13 @@
 						},
 						"url": {
 							"raw": "{{apiV1}}/admin/categories",
-							"host": ["{{apiV1}}"],
-							"path": ["admin", "categories"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"categories"
+							]
 						},
 						"description": "Creates a category (admin only — 401 anonymous, 403 customer). The pre-request script generates a unique slug each run."
 					},
@@ -585,8 +879,13 @@
 						},
 						"url": {
 							"raw": "{{apiV1}}/admin/categories",
-							"host": ["{{apiV1}}"],
-							"path": ["admin", "categories"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"categories"
+							]
 						},
 						"description": "Reuses {{newCatSlug}} from the previous request. The UNIQUE constraint surfaces as 409 + code slug_taken."
 					},
@@ -616,8 +915,13 @@
 						"header": [],
 						"url": {
 							"raw": "{{apiV1}}/admin/orders",
-							"host": ["{{apiV1}}"],
-							"path": ["admin", "orders"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"orders"
+							]
 						},
 						"description": "Every order (latest 200), newest first, with customer emails. Admin only."
 					},
@@ -657,8 +961,15 @@
 						},
 						"url": {
 							"raw": "{{apiV1}}/admin/orders/1/status",
-							"host": ["{{apiV1}}"],
-							"path": ["admin", "orders", "1", "status"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"orders",
+								"1",
+								"status"
+							]
 						},
 						"description": "Drives the state machine: pending → confirmed → shipped → delivered; cancelled reachable from pending/confirmed (and restores stock). Illegal transition → 409 invalid_transition."
 					},
@@ -684,8 +995,13 @@
 						"header": [],
 						"url": {
 							"raw": "{{apiV1}}/admin/products",
-							"host": ["{{apiV1}}"],
-							"path": ["admin", "products"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"products"
+							]
 						},
 						"description": "Admin product list: same envelope as the public list, plus is_active, including deactivated products."
 					},
@@ -725,8 +1041,13 @@
 						},
 						"url": {
 							"raw": "{{apiV1}}/admin/products",
-							"host": ["{{apiV1}}"],
-							"path": ["admin", "products"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"products"
+							]
 						},
 						"description": "Creates a product with variants in one transaction. Pre-request script randomizes slug/sku so runs stay repeatable. category_id 1 exists in seeded databases."
 					},
@@ -782,8 +1103,15 @@
 						},
 						"url": {
 							"raw": "{{apiV1}}/admin/products/1/image",
-							"host": ["{{apiV1}}"],
-							"path": ["admin", "products", "1", "image"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"products",
+								"1",
+								"image"
+							]
 						},
 						"description": "Multipart upload, field name `image`. Content type is sniffed from magic bytes server-side (filename/headers ignored); wrong type → 400 unsupported_type, >5MB → 413. Select a file before sending — Postman cannot store file paths portably."
 					},
@@ -827,8 +1155,14 @@
 						},
 						"url": {
 							"raw": "{{apiV1}}/admin/variants/{{newVariantId}}",
-							"host": ["{{apiV1}}"],
-							"path": ["admin", "variants", "{{newVariantId}}"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"variants",
+								"{{newVariantId}}"
+							]
 						},
 						"description": "Updates the two daily-operations fields. Uses the variant id saved by 'Create product' — run that first."
 					},
@@ -868,10 +1202,15 @@
 						},
 						"url": {
 							"raw": "{{apiV1}}/admin/categories",
-							"host": ["{{apiV1}}"],
-							"path": ["admin", "categories"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"categories"
+							]
 						},
-						"description": "Empty name + malformed slug → 400 with the standard error envelope and a per-field breakdown."
+						"description": "Empty name + malformed slug -> 400 with the standard error envelope.\n\nSince E1.5 the `fields` map carries validation CODES (\"required\", \"slug_format\"), not English sentences, so one response renders in any of the three languages. The codes are part of the contract: renaming one is as breaking as renaming a JSON field."
 					},
 					"event": [
 						{
@@ -889,9 +1228,9 @@
 									"    pm.expect(err.code).to.eql(\"validation_failed\");",
 									"});",
 									"",
-									"pm.test(\"reports both bad fields\", () => {",
-									"    pm.expect(err.fields).to.have.property(\"name\");",
-									"    pm.expect(err.fields).to.have.property(\"slug\");",
+									"pm.test(\"fields carry CODES, not English prose\", () => {",
+									"    pm.expect(err.fields.name).to.eql(\"required\");",
+									"    pm.expect(err.fields.slug).to.eql(\"slug_format\");",
 									"});"
 								]
 							}
@@ -912,8 +1251,12 @@
 						"header": [],
 						"url": {
 							"raw": "{{apiV1}}/cart",
-							"host": ["{{apiV1}}"],
-							"path": ["cart"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"cart"
+							]
 						},
 						"description": "The logged-in user's cart with live prices/stock and computed totals. 401 anonymous."
 					},
@@ -959,8 +1302,13 @@
 						},
 						"url": {
 							"raw": "{{apiV1}}/cart/items",
-							"host": ["{{apiV1}}"],
-							"path": ["cart", "items"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"cart",
+								"items"
+							]
 						},
 						"description": "Sets the quantity for a variant (upsert). qty must be 1..99; unknown variant_id → 404. Returns the updated cart."
 					},
@@ -991,8 +1339,14 @@
 						"header": [],
 						"url": {
 							"raw": "{{apiV1}}/cart/items/5",
-							"host": ["{{apiV1}}"],
-							"path": ["cart", "items", "5"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"cart",
+								"items",
+								"5"
+							]
 						},
 						"description": "Removes one variant line from the cart. 204 regardless of whether it was present (idempotent delete)."
 					},
@@ -1018,8 +1372,12 @@
 						"header": [],
 						"url": {
 							"raw": "{{apiV1}}/orders",
-							"host": ["{{apiV1}}"],
-							"path": ["orders"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"orders"
+							]
 						},
 						"description": "Turns the cart into an order atomically: stock validated under row locks, decremented, prices snapshotted, cart cleared. 409 empty_cart / insufficient_stock. NOTE: run 'Set cart item' first so the cart is not empty."
 					},
@@ -1053,8 +1411,12 @@
 						"header": [],
 						"url": {
 							"raw": "{{apiV1}}/orders",
-							"host": ["{{apiV1}}"],
-							"path": ["orders"]
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"orders"
+							]
 						},
 						"description": "The logged-in user's orders, newest first, with item snapshots."
 					},
