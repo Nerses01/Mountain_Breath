@@ -49,4 +49,12 @@ How we (developer + Claude) collaborate on this project. Read at the start of ea
 <!-- Add your personal rules below. Examples: session structure, review style,
      how much code Claude writes vs you, homework between sessions, etc. -->
 
-- (to be added)
+16. **Claude never runs Git commands that change the repository.** No
+    `git add`, `commit`, `push`, `branch`, `merge` or `checkout` — **staging
+    included**. At each logical end of a piece of work, Claude states the
+    suggested commit message (Conventional Commits, rule #8) and stops there;
+    the developer stages and commits himself.
+    *Reading* state — `git status`, `git log`, `git diff` — is fine, and is
+    how Claude checks its own work.
+    *(Added 2026-08-05. Git is part of what this project exists to teach, and
+    every commit should be a deliberate act by the person learning it.)*

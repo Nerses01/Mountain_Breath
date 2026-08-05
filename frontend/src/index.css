@@ -63,6 +63,13 @@
   --color-brand-ink: #b8541a; /* primary button bg + orange text */
   --color-honey: #f6c244; /* accent panels, badges, on-bark headings */
 
+  /* ---- Feedback -----------------------------------------------------
+     The mock draws no error state anywhere — no invalid field, no failed
+     payment — so this one is ours rather than the designer's. Picked warm
+     enough to sit in the palette instead of shouting stock red, and checked
+     like every other pair: 6.3:1 on --color-card, comfortably AA.          */
+  --color-danger: #a33a22;
+
   /* ---- Lines -------------------------------------------------------- */
   --color-line: #eed9c0; /* default border */
   --color-line-soft: #f2e1cc; /* list separators */

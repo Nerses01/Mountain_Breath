@@ -114,5 +114,9 @@ frontend/
 | 10 | Checkout locks variant rows (`FOR UPDATE`, ordered) inside one transaction | overselling impossible under concurrency; proven with a live race test | 2026-07-29 |
 | 11 | Repo stays private; no enforced branch protection | business code privacy over free protection; CI status + discipline instead | 2026-07-29 |
 | 12 | Host on own hardware via classic port forwarding; Cloudflare Tunnel declined | keep TLS end-to-end (Caddy/Let's Encrypt), no third party in the traffic path; Phase 9 paused until ISP unlocks 80/443 | 2026-07-30 |
+| 13 | Brand orange `#e4761f` split into a decorative fill and a darker `#b8541a` "brand ink" for anything carrying text | the design's orange measures 2.9:1 under cream text and 2.7:1 as text — both below WCAG AA's 4.5:1; fixed at token-definition time so it is never baked into a component | 2026-08-04 |
+| 14 | Catalog becomes apiary-only; tea and coffee retired | the Era II design's nav, hero and benefits system assume bee products throughout — adapting the copy instead would have made half of it untrue | 2026-08-05 |
+| 15 | Three languages (en default, hy, ru) via per-entity `*_translations` tables, not JSONB columns | constraints and FK safety on translated text; per-field English fallback is a `COALESCE`. Costs one migration per translatable entity and a `LEFT JOIN … ON locale = ?` per read | 2026-08-05 |
+| 16 | Prices stored per market in `variant_prices` (USD + AMD), not converted from one base at a live FX rate | a shelf price is a business decision held steady, not a derived number that moves between page loads; FX kept only as fallback and for reporting | 2026-08-05 |
 
 Add a new row whenever we make a significant technical decision.

@@ -35,7 +35,9 @@ that: the nav says "Our hive", the benefits panel is about what bee products do
 in the body, and every product page carries a harvest hive number.
 
 The design ships its own seed content (in its `renderVals()` block), which is a
-gift — the copy is written:
+gift — the copy is written. **Prices excepted:** decision §1.4 confirmed every
+figure below is placeholder, so the names, categories, sizes, badges and
+benefits are usable as-is, and the two price columns are illustrative only.
 
 | # | Product | Category | Size | Badge | "Good for" | USD | AMD |
 |---|---|---|---|---|---|---|---|
@@ -53,9 +55,14 @@ Two things fall out of this table:
       three. Finding recorded here; the fix itself is E2's own seed-rewrite
       checkbox, not duplicated as a second item.
 - [x] **AMD prices are not computed.** 14.00 → 6,700 ֏ implies ≈478 ֏/$, but
-      so do 9 → 4,300 (478) and 16 → 7,600 (475). They are *rounded per
-      market*, not converted at a live rate — the evidence E5's
-      `variant_prices` design leans on.
+      so do 9 → 4,300 (478) and 16 → 7,600 (475) — rounded per market, not
+      converted at one live rate.
+      **Weakened 2026-08-05:** with the prices confirmed placeholder, this
+      shows only how the *mock's author* generated numbers, not how the
+      business prices. E5's per-market `variant_prices` model still stands,
+      but on the general argument — real shops set round shelf prices per
+      market and do not let a fluctuating rate move a price tag daily — not
+      on this table as evidence.
 
 The royal jelly page also shows **non-linear variant pricing** — 25 g $32,
 50 g $58, 100 g $105 — which the existing per-variant `price_minor` already
@@ -112,9 +119,13 @@ Everything the six screens show that the current schema and API cannot serve.
 
 Worth resolving before the copy is treated as canonical:
 
-- [ ] The cart line for **Raw Propolis Tincture reads $16.00 / 7,600 ֏**,
-      which is the Bee Pollen price; the shop card says $19.00 / 9,100 ֏.
-      Confirm the correct price before it becomes E2 seed data.
+- [x] ~~The cart line for **Raw Propolis Tincture reads $16.00 / 7,600 ֏**,
+      which is the Bee Pollen price; the shop card says $19.00 / 9,100 ֏.~~
+      **Resolved 2026-08-05: moot.** Every figure in the mock is placeholder;
+      real prices come from the business. E2 seeds whatever the family
+      supplies, so the contradiction never reaches the database — but it does
+      mean **no price in §1.1's table is authoritative**, only the product
+      names, categories, sizes, badges and benefits are.
 - [ ] The cart totals are internally consistent ($62 + $6 − $4 = $64), and
       "$8 away from free shipping" on a $62 subtotal implies a **$70
       threshold** — but chilled shipping is still charged, so the threshold
@@ -128,18 +139,40 @@ Worth resolving before the copy is treated as canonical:
 
 ---
 
-## 2. Decisions to make before E1
+## 2. Decisions to make before E1.5
 
 These are the user's calls, not technical defaults. Each gets a row in the
 [ARCHITECTURE.md](ARCHITECTURE.md) decisions log once made (RULES.md #13).
 
-- [ ] **1. Catalog scope.** Does Mountain Breath become an apiary-only store
-      (drop tea and coffee), or does the hive line sit next to them? The
-      design's nav, hero and benefits copy assume apiary-only. Everything in
-      E2 depends on this.
-- [ ] **2. Currency.** Ship both USD and AMD (E5), or AMD only for an
-      Armenian launch and treat USD as later work? The design shows both on
-      every price.
+**Originally headed "before E1", corrected once E1 was underway:** none of
+these actually gate E1. Tokens, primitives and the focus ring are identical
+whether the shop sells honey or tea, in one currency or three — so E1 was
+started with all of them still open, deliberately. They bite from **E1.5**
+onward, where the first migration has to commit to a storage shape. The
+column below records which phase each one genuinely blocks, so nothing is
+answered earlier than it needs to be.
+
+| # | Blocks | Cost of deciding late |
+|---|---|---|
+| 1 Catalog scope | E2 | every category, seed row and page string |
+| 6 Translation storage | E1.5 | the first translation migration |
+| 2 Currency | E5, and E2's seed prices | re-seeding, `formatMoney` signature |
+| 4 Editorial fields | E3 | product schema shape |
+| 3 Content storage | E9 | page pipeline only |
+| 5 Social sign-in | E8 | two buttons, one table |
+
+- [x] **1. Catalog scope — apiary-only.** Six bee products; tea and coffee are
+      dropped. The design's nav, hero and benefits copy are taken as literal,
+      not adapted. E2 replaces all three existing categories rather than
+      adding to them, and the tea/coffee seed rows go with them.
+      *(Decided 2026-08-05.)*
+- [x] **2. Currency — both USD and AMD.** The dual price in every mock screen
+      is real, so E5 ships in full: `currencies`, per-market `variant_prices`,
+      order currency snapshot. Note this lands *after* E2 seeds prices, so
+      E2 seeds USD only and E5 backfills AMD — or E2 seeds both against a
+      `variant_prices` table brought forward. Decide which when E2 starts;
+      seeding twice is the cheaper mistake than migrating a live price column.
+      *(Decided 2026-08-05.)*
 - [ ] **3. Content storage.** "Our hive"/"Benefits"/"Journal" as markdown in
       the repo (versioned with the code, zero backend) or DB-backed so the
       family edits without a deploy? E9 recommends markdown for v1. Now a
@@ -153,13 +186,18 @@ These are the user's calls, not technical defaults. Each gets a row in the
 - [ ] **5. Social sign-in.** Google/Apple are two buttons in the mock and the
       most third-party-dependent item in the plan. Confirm they are in scope,
       or drop the buttons from the design.
-- [ ] **6. Translatable content strategy.** How do `name`/`description`-type
-      fields carry three languages: a `*_translations` child table per entity
-      (relational, FK-safe, one `LEFT JOIN … ON locale = ?`), or JSONB keyed
-      by locale (`{"en": "…", "hy": "…", "ru": "…"}`) on the existing column?
-      This is decision #4 one axis wider — answering the two together avoids
-      editorial content and translations fighting over incompatible storage.
-      E1.5 defaults to translation tables; revisit alongside #4 before E3.
+- [x] **6. Translatable content strategy — translation tables.**
+      `product_translations` / `category_translations` / `benefit_translations`
+      (parent_id, locale, name, description, …), locale-invariant fields
+      (slug, sku, price, stock) staying on the parent row. Chosen over JSONB
+      for the constraints and FK safety, at the cost of one migration per
+      translatable entity and a `LEFT JOIN … ON locale = ?` on every read.
+      Per-field English fallback is a `COALESCE`, so a missing Armenian
+      description degrades to English rather than blanking.
+      **This also pre-commits decision #4** toward explicit columns — mixing
+      relational translations with a JSONB editorial blob would mean two
+      incompatible answers to "where does product text live".
+      *(Decided 2026-08-05.)*
 
   *(Numbers are referenced by "decision #N" elsewhere in this document — keep
   them stable; if a decision list item is ever removed, leave its number
@@ -217,11 +255,18 @@ WCAG contrast maths and why it belongs at token-definition time.
       plus one added `text-2xs` (11px) for eyebrows, rather than replicating
       the mock's six-step body scale literally — fewer near-duplicate sizes to
       choose between later.
-- [ ] Primitives in `src/components/ui/`: `Button` (primary pill with the
+- [x] Primitives in `src/components/ui/`: `Button` (primary pill with the
       orange glow shadow, dark pill, outline, ghost-underline), `Badge`,
       `Card`, `Input`, `Select`, `Checkbox`, `QtyStepper`, `IconButton`
       (38 px circle, 1.5 px border), `Breadcrumbs`, `SectionHeading`
-      (eyebrow + title + trailing link), `Stat`.
+      (eyebrow + title + trailing link), `Stat`. Plus `Field` + a `cx`
+      helper (nine lines, rather than depending on `clsx`), and one token
+      the mock never provided: `--color-danger`, since the design draws no
+      error state anywhere and form validation needs one. Accessibility
+      folded in at build time rather than deferred to E10 — `IconButton`
+      makes its `label` prop **required** so the type checker refuses an
+      unnamed icon button, `QtyStepper`'s −/+ carry real labels, and every
+      field wires `htmlFor` / `aria-describedby` / `aria-invalid`.
 - [x] **Focus states**: the mock has none. A global `:focus-visible` rule in
       `@layer base` now rings every interactive element in `--color-brand-ink`
       (not honey — `#F6C244` reads too pale as a 2px outline on the `#FFF8EE`
@@ -233,7 +278,10 @@ WCAG contrast maths and why it belongs at token-definition time.
 - [ ] `Layout` route wrapper in `App.tsx`; `/admin/*` keeps its own chrome.
 - [ ] Extend `public/icons.svg` with the sprite the design needs: search,
       heart, arrow-right, chevron-down, minus, plus, check, star.
-- [ ] Vitest: `Button` variants render, `QtyStepper` clamps at 1 and at stock.
+- [x] Vitest: `Button` variants render, `QtyStepper` clamps at 1 and at stock.
+      13 new tests (21 total). The Button suite pins the contrast decision in
+      place — it asserts `primary` resolves to `bg-brand-ink`, so restoring
+      the mock's failing orange breaks a test rather than shipping quietly.
 
 **Done when:** all eight existing routes render inside the new shell with the
 new palette, no raw hex outside the token block, and every control is reachable
@@ -520,9 +568,12 @@ rates for auditability.
       USD has 2 decimals, AMD is priced in whole drams. The existing
       `formatPrice` assumption that everything is `/100` breaks here.
 - [ ] Migration: `variant_prices` (variant_id, currency, price_minor,
-      PK(variant_id, currency)). **Recommended over live conversion**, and the
-      design proves why: 14.00 → 6,700 ֏ and 9.00 → 4,300 ֏ are rounded
-      shelf prices at ≈475–479 ֏/$, not one rate applied twice.
+      PK(variant_id, currency)). **Chosen over live FX conversion** because a
+      shelf price is a business decision, not a derived number: a shop sets a
+      round price per market and holds it, rather than letting a fluctuating
+      rate move the price tag between page loads. (The mock's own figures hint
+      at the same habit, but they are placeholder — see §1.1 — so they are an
+      illustration, not the argument.)
 - [ ] Migration: `fx_rates` (base, quote, rate, as_of) as the *fallback* for a
       currency with no explicit price, and for reporting.
 - [ ] Currency resolution per request: `?currency=` → cookie → `Accept-Language`
