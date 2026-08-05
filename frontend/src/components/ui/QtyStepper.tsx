@@ -1,4 +1,5 @@
 import { cx } from '../../lib/cx'
+import { MinusIcon, PlusIcon } from './icons'
 
 /**
  * The cart / product-page quantity control: − value +.
@@ -48,9 +49,9 @@ export function QtyStepper({
         aria-label={`Decrease ${label.toLowerCase()}`}
         disabled={atMin}
         onClick={() => onChange(clamp(value - 1))}
-        className="text-lg leading-none text-ink-muted disabled:opacity-40"
+        className="text-ink-muted disabled:opacity-40"
       >
-        −
+        <MinusIcon size={16} />
       </button>
 
       {/* aria-live: the number changes without the focus moving, so without
@@ -67,9 +68,9 @@ export function QtyStepper({
         aria-label={`Increase ${label.toLowerCase()}`}
         disabled={atMax}
         onClick={() => onChange(clamp(value + 1))}
-        className="text-lg leading-none text-ink disabled:opacity-40"
+        className="text-ink disabled:opacity-40"
       >
-        +
+        <PlusIcon size={16} />
       </button>
     </div>
   )

@@ -14,6 +14,16 @@ export { Checkbox } from './Checkbox'
 export { Field } from './Field'
 export { controlClasses, describedById } from './fieldStyles'
 export { IconButton } from './IconButton'
+export {
+  ArrowRightIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  HeartIcon,
+  MinusIcon,
+  PlusIcon,
+  SearchIcon,
+  StarIcon,
+} from './icons'
 export { Input } from './Input'
 export { QtyStepper } from './QtyStepper'
 export { SectionHeading } from './SectionHeading'

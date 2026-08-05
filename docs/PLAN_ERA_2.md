@@ -276,8 +276,20 @@ WCAG contrast maths and why it belongs at token-definition time.
       wishlist icon buttons, cart pill with count) and `SiteFooter`
       (4 columns, newsletter form, bottom bar with the currency switcher slot).
 - [ ] `Layout` route wrapper in `App.tsx`; `/admin/*` keeps its own chrome.
-- [ ] Extend `public/icons.svg` with the sprite the design needs: search,
-      heart, arrow-right, chevron-down, minus, plus, check, star.
+- [x] ~~Extend `public/icons.svg` with the sprite~~ → **inline React icon
+      components** in `src/components/ui/icons.tsx`: search, heart,
+      arrow-right, chevron-down, minus, plus, check, star.
+      **Deviation, 2026-08-05.** This bullet assumed `public/icons.svg` was
+      the project's icon system. It was not — it is untouched Vite scaffold
+      (bluesky/discord/github/X logos, hardcoded `#aa3bff` strokes) and
+      nothing in the codebase referenced it, so it has been deleted rather
+      than extended. Inline components win here on three counts: every icon
+      draws with `currentColor`, so the E1 colour tokens already on a parent
+      colour the glyph with no extra wiring; unused icons leave the bundle;
+      and there is no second request nor the cross-document styling quirks
+      external `<use>` sprites still carry. `QtyStepper` and `Checkbox` now
+      render real icons instead of the `−` / `+` / `✓` text characters they
+      were standing in with.
 - [x] Vitest: `Button` variants render, `QtyStepper` clamps at 1 and at stock.
       13 new tests (21 total). The Button suite pins the contrast decision in
       place — it asserts `primary` resolves to `bg-brand-ink`, so restoring

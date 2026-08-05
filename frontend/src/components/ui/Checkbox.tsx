@@ -1,5 +1,6 @@
 import { type InputHTMLAttributes } from 'react'
 import { cx } from '../../lib/cx'
+import { CheckIcon } from './icons'
 
 /**
  * The design draws a filled orange square with a check glyph. Rather than
@@ -33,14 +34,16 @@ export function Checkbox({
         className={cx(
           'flex size-5 shrink-0 items-center justify-center rounded-sm',
           'border-[1.5px] border-line-strong bg-card',
-          'text-2xs text-transparent',
+          // The tick is drawn with currentColor, so making the text
+          // transparent hides it without a second toggle to keep in sync.
+          'text-transparent',
           'peer-checked:border-brand-ink peer-checked:bg-brand-ink',
           'peer-checked:text-ink-on-dark',
           'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2',
           'peer-focus-visible:outline-brand-ink',
         )}
       >
-        ✓
+        <CheckIcon size={13} />
       </span>
       <span className="text-sm text-ink-body">{label}</span>
     </label>
