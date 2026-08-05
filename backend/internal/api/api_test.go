@@ -22,6 +22,10 @@ type fakeStore struct {
 	products   []domain.Product
 	// session token → user, simulating the sessions table
 	sessions map[string]domain.User
+	// lastLocale records what the handler passed down, so a test can prove
+	// the negotiated language actually reaches the store rather than being
+	// resolved and then dropped.
+	lastLocale domain.Locale
 }
 
 func newFakeStore() *fakeStore {
@@ -30,7 +34,8 @@ func newFakeStore() *fakeStore {
 
 // --- CategoryStore ---
 
-func (f *fakeStore) ListCategories(_ context.Context) ([]domain.Category, error) {
+func (f *fakeStore) ListCategories(_ context.Context, locale domain.Locale) ([]domain.Category, error) {
+	f.lastLocale = locale
 	return f.categories, nil
 }
 
@@ -48,11 +53,13 @@ func (f *fakeStore) CreateCategory(_ context.Context, c *domain.Category) error 
 
 // --- ProductStore ---
 
-func (f *fakeStore) ListProducts(_ context.Context, _ domain.ProductFilter) ([]domain.Product, int, error) {
+func (f *fakeStore) ListProducts(_ context.Context, filter domain.ProductFilter) ([]domain.Product, int, error) {
+	f.lastLocale = filter.EffectiveLocale()
 	return f.products, len(f.products), nil
 }
 
-func (f *fakeStore) GetProductBySlug(_ context.Context, slug string) (domain.Product, error) {
+func (f *fakeStore) GetProductBySlug(_ context.Context, slug string, locale domain.Locale) (domain.Product, error) {
+	f.lastLocale = locale
 	for _, p := range f.products {
 		if p.Slug == slug {
 			return p, nil

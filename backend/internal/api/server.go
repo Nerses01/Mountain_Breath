@@ -20,13 +20,16 @@ import (
 // test handlers without Postgres.
 
 type CategoryStore interface {
-	ListCategories(ctx context.Context) ([]domain.Category, error)
+	ListCategories(ctx context.Context, locale domain.Locale) ([]domain.Category, error)
 	CreateCategory(ctx context.Context, c *domain.Category) error
 }
 
 type ProductStore interface {
+	// The locale rides inside ProductFilter, which already carries every
+	// other "how should this list be shaped" option. GetProductBySlug takes
+	// it as a parameter, having no filter to put it in.
 	ListProducts(ctx context.Context, f domain.ProductFilter) ([]domain.Product, int, error)
-	GetProductBySlug(ctx context.Context, slug string) (domain.Product, error)
+	GetProductBySlug(ctx context.Context, slug string, locale domain.Locale) (domain.Product, error)
 	CreateProduct(ctx context.Context, p *domain.Product) error
 	UpdateProduct(ctx context.Context, p *domain.Product) error
 	UpdateVariant(ctx context.Context, variantID, priceMinor int64, stockQty int) error
@@ -112,6 +115,8 @@ func (s *Server) Routes() chi.Router {
 	r.Route("/api/v1", func(r chi.Router) {
 		// Resolve the session cookie (if any) for every API request.
 		r.Use(s.withUser)
+		// ...and the display language, so no handler re-derives it.
+		r.Use(s.withLocale)
 
 		r.Post("/auth/register", s.handleRegister)
 		r.Post("/auth/login", s.handleLogin)

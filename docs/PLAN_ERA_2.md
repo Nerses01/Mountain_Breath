@@ -387,13 +387,27 @@ configurations, font coverage per writing system.
       with the container moved into translatable product copy. The second is
       cleaner and probably right; decide it in E3 when variants are reworked,
       not silently here.
-- [ ] Locale resolution: `?lang=` → cookie → `Accept-Language` → default
+- [x] Locale resolution: `?lang=` → cookie → `Accept-Language` → default
       `en`, validated against `{en, hy, ru}` — the same shape as E5's planned
       currency resolution. Worth merging into one "preferences" middleware
       that resolves both instead of writing two near-identical ones.
-- [ ] `GET /categories`, `GET /products`, `GET /products/{slug}` resolve the
+      Accept-Language is parsed by hand (q-values, highest first, region
+      subtags cut) rather than pulling in `golang.org/x/text/language`: the
+      rule is ~30 lines and the spec's script/wildcard matching has no use
+      here. **Nothing in the chain can fail** — a malformed q or unknown tag
+      falls through to the next source instead of 400ing, because a shop that
+      refuses to render over an odd header is worse than one that renders in
+      English.
+- [x] `GET /categories`, `GET /products`, `GET /products/{slug}` resolve the
       requested locale server-side and fall back to `en` per-field when a
       translation row is missing, rather than 404ing or returning blank text.
+      The fallback is three levels — requested locale → English translation →
+      the legacy parent column — because `CreateCategory`/`CreateProduct`
+      still write only the parent row, so anything added through the admin
+      has no translation rows at all yet.
+      **Slugs are deliberately not translated:** the slug is the product's
+      identity, so `/products/wildflower-honey` resolves in every language
+      and a link shared between speakers still works.
 - [ ] Validation messages in `domain.ValidateProduct` (and the rest of the
       `fields` envelope) become short keys (`"required"`, `"positive"`,
       `"slug_format"`) instead of English prose — the frontend's i18n layer

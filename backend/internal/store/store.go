@@ -24,11 +24,30 @@ func New(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
 }
 
-func (s *Store) ListCategories(ctx context.Context) ([]domain.Category, error) {
+// ListCategories returns categories with their names in the requested
+// language.
+//
+// The name resolves through three levels: the requested locale, then
+// English, then the legacy categories.name column. That last step is not
+// belt-and-braces paranoia — CreateCategory still writes only the parent
+// column, so a category added since migration 000007 has no translation rows
+// at all and would otherwise come back blank. It disappears when the admin
+// write path learns to write translations, and the column is dropped with it.
+//
+// Ordering by the RESOLVED name means each language gets its own alphabetical
+// order, which is the point.
+func (s *Store) ListCategories(ctx context.Context, locale domain.Locale) ([]domain.Category, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, slug, name, sort_order, created_at
-		FROM categories
-		ORDER BY sort_order, name`)
+		SELECT c.id, c.slug,
+		       COALESCE(t.name, en.name, c.name) AS name,
+		       c.sort_order, c.created_at
+		FROM categories c
+		LEFT JOIN category_translations t
+		       ON t.category_id = c.id AND t.locale = $1
+		LEFT JOIN category_translations en
+		       ON en.category_id = c.id AND en.locale = 'en'
+		ORDER BY c.sort_order, COALESCE(t.name, en.name, c.name)`,
+		locale)
 	if err != nil {
 		return nil, fmt.Errorf("querying categories: %w", err)
 	}

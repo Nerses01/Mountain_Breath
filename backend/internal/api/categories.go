@@ -37,7 +37,7 @@ func toCategoryResponse(c domain.Category) categoryResponse {
 }
 
 func (s *Server) handleListCategories(w http.ResponseWriter, r *http.Request) {
-	cats, err := s.store.ListCategories(r.Context())
+	cats, err := s.store.ListCategories(r.Context(), localeFromContext(r.Context()))
 	if err != nil {
 		s.log.Error("listing categories", "error", err)
 		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")

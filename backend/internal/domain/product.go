@@ -46,10 +46,25 @@ type ProductFilter struct {
 	IncludeInactive bool   // admin listings see deactivated products too
 	Page            int    // 1-based
 	PerPage         int
+	// Locale selects which translation to display and which text search
+	// configuration to stem the query with. Zero value means unset, not
+	// invalid — see EffectiveLocale.
+	Locale Locale
 }
 
 func (f ProductFilter) Offset() int {
 	return (f.Page - 1) * f.PerPage
+}
+
+// EffectiveLocale is the language to actually query in. A zero-value filter
+// (a caller that predates translations, or a test that does not care) asks
+// for no locale at all, and gets English rather than an empty string that
+// would match no translation row and silently blank every name.
+func (f ProductFilter) EffectiveLocale() Locale {
+	if f.Locale == "" {
+		return DefaultLocale
+	}
+	return f.Locale
 }
 
 // ValidateProduct checks a product (with its variants) before creation.

@@ -62,6 +62,7 @@ func (s *Server) handleListProducts(w http.ResponseWriter, r *http.Request) {
 		Search:       q.Get("q"),
 		Page:         intQueryParam(q.Get("page"), 1),
 		PerPage:      intQueryParam(q.Get("per_page"), 20),
+		Locale:       localeFromContext(r.Context()),
 	}
 	if filter.Page < 1 {
 		filter.Page = 1
@@ -89,7 +90,7 @@ func (s *Server) handleListProducts(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetProduct(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 
-	p, err := s.store.GetProductBySlug(r.Context(), slug)
+	p, err := s.store.GetProductBySlug(r.Context(), slug, localeFromContext(r.Context()))
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			s.respondError(w, http.StatusNotFound, "not_found", "no such product")

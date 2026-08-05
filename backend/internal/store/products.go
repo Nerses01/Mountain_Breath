@@ -49,26 +49,50 @@ func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]dom
 	// closed entirely when cleaning leaves nothing (pure-exclusion query).
 	// Ranking sums FTS rank and name similarity: exact words float above
 	// fuzzy matches.
+	// $8 is the requested locale and $9 its text search configuration, cast
+	// to regconfig. The cast is safe from injection twice over: the value is
+	// a bound parameter, and Locale.SearchConfig returns one of three
+	// constants — Postgres would reject anything else outright.
+	//
+	// Text resolves through the same three-level fallback as categories, and
+	// search matches the resolved tsvector. The tsvector fallback must go
+	// all the way down to p.search_tsv, not stop at en.search_tsv: a product
+	// created through the admin has no translation rows at all yet, and
+	// stopping one level short silently removed such products from every
+	// full-text result. A regression test in search_test.go covers it.
+	//
+	// One imperfection worth naming: a product with no Armenian translation
+	// matches against an ENGLISH-stemmed tsvector, so an Armenian full-text
+	// query will not match it well. The trigram doors below are
+	// language-agnostic and still find it, so it degrades rather than
+	// disappearing.
 	const listQ = `
-		SELECT p.id, p.category_id, p.slug, p.name, p.description, p.image_url, p.is_active, p.created_at
+		SELECT p.id, p.category_id, p.slug,
+		       COALESCE(t.name, en.name, p.name),
+		       COALESCE(t.description, en.description, p.description),
+		       p.image_url, p.is_active, p.created_at
 		FROM products p
 		JOIN categories c ON c.id = p.category_id
+		LEFT JOIN product_translations t  ON t.product_id  = p.id AND t.locale  = $8
+		LEFT JOIN product_translations en ON en.product_id = p.id AND en.locale = 'en'
 		WHERE (p.is_active OR $2) AND ($1 = '' OR c.slug = $1)
 		  AND ($3 = ''
-		       OR p.search_tsv @@ websearch_to_tsquery('english', $3)
-		       OR ($4 <> '' AND (p.name ILIKE '%' || $5 || '%'
-		                         OR word_similarity($4, p.name) > 0.35)))
+		       OR COALESCE(t.search_tsv, en.search_tsv, p.search_tsv) @@ websearch_to_tsquery($9::regconfig, $3)
+		       OR ($4 <> '' AND (COALESCE(t.name, en.name, p.name) ILIKE '%' || $5 || '%'
+		                         OR word_similarity($4, COALESCE(t.name, en.name, p.name)) > 0.35)))
 		ORDER BY
 		  CASE WHEN $3 = '' THEN NULL
-		       ELSE ts_rank(p.search_tsv, websearch_to_tsquery('english', $3))
-		            + word_similarity($4, p.name)
+		       ELSE ts_rank(COALESCE(t.search_tsv, en.search_tsv, p.search_tsv), websearch_to_tsquery($9::regconfig, $3))
+		            + word_similarity($4, COALESCE(t.name, en.name, p.name))
 		  END DESC NULLS LAST,
-		  p.name
+		  COALESCE(t.name, en.name, p.name)
 		LIMIT $6 OFFSET $7`
 
 	fuzzy := fuzzyQuery(f.Search)
+	locale := f.EffectiveLocale()
 	rows, err := s.pool.Query(ctx, listQ,
-		f.CategorySlug, f.IncludeInactive, f.Search, fuzzy, escapeLike(fuzzy), f.PerPage, f.Offset())
+		f.CategorySlug, f.IncludeInactive, f.Search, fuzzy, escapeLike(fuzzy),
+		f.PerPage, f.Offset(), locale, locale.SearchConfig())
 	if err != nil {
 		return nil, 0, fmt.Errorf("querying products: %w", err)
 	}
@@ -91,31 +115,45 @@ func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]dom
 		return nil, 0, err
 	}
 
+	// The WHERE clause must stay identical to listQ's, or the total would
+	// describe a different result set than the page.
 	var total int
 	const countQ = `
 		SELECT count(*)
 		FROM products p
 		JOIN categories c ON c.id = p.category_id
+		LEFT JOIN product_translations t  ON t.product_id  = p.id AND t.locale  = $6
+		LEFT JOIN product_translations en ON en.product_id = p.id AND en.locale = 'en'
 		WHERE (p.is_active OR $2) AND ($1 = '' OR c.slug = $1)
 		  AND ($3 = ''
-		       OR p.search_tsv @@ websearch_to_tsquery('english', $3)
-		       OR ($4 <> '' AND (p.name ILIKE '%' || $5 || '%'
-		                         OR word_similarity($4, p.name) > 0.35)))`
+		       OR COALESCE(t.search_tsv, en.search_tsv, p.search_tsv) @@ websearch_to_tsquery($7::regconfig, $3)
+		       OR ($4 <> '' AND (COALESCE(t.name, en.name, p.name) ILIKE '%' || $5 || '%'
+		                         OR word_similarity($4, COALESCE(t.name, en.name, p.name)) > 0.35)))`
 	if err := s.pool.QueryRow(ctx, countQ,
-		f.CategorySlug, f.IncludeInactive, f.Search, fuzzy, escapeLike(fuzzy)).Scan(&total); err != nil {
+		f.CategorySlug, f.IncludeInactive, f.Search, fuzzy, escapeLike(fuzzy),
+		locale, locale.SearchConfig()).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("counting products: %w", err)
 	}
 
 	return products, total, nil
 }
 
-func (s *Store) GetProductBySlug(ctx context.Context, slug string) (domain.Product, error) {
+func (s *Store) GetProductBySlug(ctx context.Context, slug string, locale domain.Locale) (domain.Product, error) {
+	// The slug is deliberately NOT translated: it is the product's stable
+	// identity in the URL, so /products/wildflower-honey resolves to the same
+	// product in every language and a link shared between speakers still
+	// works. Only the display text changes.
 	var p domain.Product
 	err := s.pool.QueryRow(ctx, `
-		SELECT id, category_id, slug, name, description, image_url, is_active, created_at
-		FROM products
-		WHERE slug = $1 AND is_active`,
-		slug,
+		SELECT p.id, p.category_id, p.slug,
+		       COALESCE(t.name, en.name, p.name),
+		       COALESCE(t.description, en.description, p.description),
+		       p.image_url, p.is_active, p.created_at
+		FROM products p
+		LEFT JOIN product_translations t  ON t.product_id  = p.id AND t.locale  = $2
+		LEFT JOIN product_translations en ON en.product_id = p.id AND en.locale = 'en'
+		WHERE p.slug = $1 AND p.is_active`,
+		slug, locale,
 	).Scan(&p.ID, &p.CategoryID, &p.Slug, &p.Name, &p.Description,
 		&p.ImageURL, &p.IsActive, &p.CreatedAt)
 	if err != nil {
