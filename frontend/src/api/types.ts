@@ -47,10 +47,19 @@ export interface Credentials {
   password: string
 }
 
+// Per-locale text. `name`/`description` on the parent objects are the ENGLISH
+// copy and stay required — every other language falls back to them — so this
+// map carries only hy and ru. An "en" key is rejected by the API.
+export interface ProductText {
+  name: string
+  description: string
+}
+
 export interface NewCategory {
   slug: string
   name: string
   sort_order: number
+  translations?: Record<string, { name: string }>
 }
 
 export interface CartItem {
@@ -106,6 +115,7 @@ export interface NewProduct {
   description: string
   image_url: string
   variants: NewVariantInput[]
+  translations?: Record<string, ProductText>
 }
 
 export interface UpdateProduct {
@@ -114,6 +124,7 @@ export interface UpdateProduct {
   description: string
   image_url: string
   is_active: boolean
+  translations?: Record<string, ProductText>
 }
 
 // Shape of the backend's error envelope (docs/ARCHITECTURE.md).

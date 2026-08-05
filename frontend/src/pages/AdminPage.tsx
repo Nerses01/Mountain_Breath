@@ -3,6 +3,8 @@ import { Link } from 'react-router'
 import { useCategories, useCreateCategory, useMe } from '../api/hooks'
 import { AdminNav } from '../components/AdminNav'
 import { useFieldErrors } from '../i18n/useFieldErrors'
+import { PREFIXED_LOCALES } from '../i18n/locales'
+import { emptyTranslationDraft, localeLabel, translationPayload } from '../lib/translations'
 
 // NOTE: this guard is user experience, not security. The backend's
 // requireAdmin middleware is the real gate — anyone can bypass this page
@@ -42,17 +44,30 @@ function CategoryForm() {
   const [slug, setSlug] = useState('')
   const [name, setName] = useState('')
   const [sortOrder, setSortOrder] = useState('0')
+  // One draft entry per translatable language, kept even while empty so the
+  // inputs stay controlled. Blank languages are dropped at submit.
+  const [translations, setTranslations] = useState(() =>
+    emptyTranslationDraft({ name: '' }),
+  )
   const create = useCreateCategory()
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     create.mutate(
-      { slug, name, sort_order: Number(sortOrder) || 0 },
+      {
+        slug,
+        name,
+        sort_order: Number(sortOrder) || 0,
+        // undefined when every language is blank, so the key is omitted
+        // from the JSON rather than sent as an empty object.
+        translations: translationPayload(translations),
+      },
       {
         onSuccess: () => {
           setSlug('')
           setName('')
           setSortOrder('0')
+          setTranslations(emptyTranslationDraft({ name: '' }))
         },
       },
     )
@@ -69,9 +84,28 @@ function CategoryForm() {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Input placeholder="slug (e.g. herbal-tea)" value={slug} onChange={setSlug} error={fieldError('slug')} />
-        <Input placeholder="Name" value={name} onChange={setName} error={fieldError('name')} />
+        <Input placeholder="Name (English)" value={name} onChange={setName} error={fieldError('name')} />
         <Input placeholder="Sort order" value={sortOrder} onChange={setSortOrder} />
       </div>
+
+      <fieldset className="rounded-lg border border-stone-200 p-3">
+        <legend className="px-1 text-xs font-medium text-stone-500">
+          Translations — optional, blank falls back to English
+        </legend>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {PREFIXED_LOCALES.map((locale) => (
+            <Input
+              key={locale}
+              placeholder={`Name (${localeLabel(locale)})`}
+              value={translations[locale]?.name ?? ''}
+              onChange={(v) =>
+                setTranslations({ ...translations, [locale]: { name: v } })
+              }
+              error={fieldError(`translations.${locale}.name`)}
+            />
+          ))}
+        </div>
+      </fieldset>
 
       {formError && (
         <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{formError}</p>

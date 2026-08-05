@@ -442,7 +442,7 @@ configurations, font coverage per writing system.
       well-tuned for this catalog's vocabulary." The trigram layer Era I
       already built stays as the fuzzy/typo-tolerant layer under all three,
       exactly as it is for English today.
-- [~] Admin write path — **backend done, form pending.** `POST /admin/categories`,
+- [x] Admin per-locale write path and forms. `POST /admin/categories`,
       `POST /admin/products` and `PUT /admin/products/{id}` now accept an
       optional `translations` map alongside the existing fields, so
       translations can be written through the API instead of raw SQL.
@@ -460,7 +460,17 @@ configurations, font coverage per writing system.
       and asserts no orphan translation rows survive.
       Also fixed here: two literal `"required"` strings in the update handler
       that the earlier codes change had missed.
-      *Remaining:* the admin **forms** themselves —
+      **Forms:** both admin forms grew a `Translations` fieldset, one input
+      set per non-default language, with the English fields relabelled so it
+      is obvious which language the required copy is. The rule the form has to
+      honour is that **blank means omit** — `translationPayload` drops any
+      language whose name is empty, because an ABSENT language falls back to
+      English while a PRESENT-but-empty one is a validation error that would
+      block the submit. Six tests pin that distinction.
+      **Found while updating Postman:** `PUT /admin/products/{id}` has existed
+      in the router since Era I Phase 10 and was **never in the collection** —
+      a standing rule #15 violation, now documented along with a negative case
+      asserting an `"en"` key returns `locale_is_default`.
       (tabs or stacked fields) so the family can leave a translation blank
       and it falls back to English rather than the form blocking submission.
 - [x] Tests: a request with no `Accept-Language` gets English; an
@@ -616,6 +626,11 @@ filters), keyset vs. offset pagination.
       badges, benefits and both currencies' prices (or USD only until E5) —
       seeded in all three languages from the start, not English-only with
       translations bolted on later.
+      **Also update the Postman collection in the same commit:** three
+      requests hardcode seed slugs that decision #14 deletes
+      (`/products/armenian-coffee`, and the category/product create bodies
+      still say herbal-tea). They will 404 the moment the seed changes, which
+      is the collection-and-code disagreement rule #15 exists to prevent.
 - [ ] Tests: store tests for each filter and sort, a facet-count test that
       proves counts change with the active filter, domain test for sort
       whitelisting.

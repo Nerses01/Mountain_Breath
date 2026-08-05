@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
 import { useFieldErrors } from '../i18n/useFieldErrors'
+import { PREFIXED_LOCALES } from '../i18n/locales'
+import { emptyTranslationDraft, localeLabel, translationPayload } from '../lib/translations'
 import {
   useAdminProducts,
   useCategories,
@@ -67,6 +69,9 @@ function CreateProductForm() {
   // Array state: the form's variant rows live in one array; every row edit
   // replaces the array (immutably), same rule as all React state.
   const [variants, setVariants] = useState<VariantDraft[]>([{ ...emptyVariant }])
+  const [translations, setTranslations] = useState(() =>
+    emptyTranslationDraft({ name: '', description: '' }),
+  )
 
   // fieldErr keeps its name so the JSON-path call sites below
   // (`fieldErr('variants[0].sku')`) are untouched; it now resolves the
@@ -93,6 +98,9 @@ function CreateProductForm() {
           stock_qty: Number(v.stock) || 0,
         }),
       ),
+      // Languages left blank are dropped entirely — absent means "fall back
+      // to English", whereas present-but-empty is a validation error.
+      translations: translationPayload(translations),
     }
     create.mutate(payload, {
       onSuccess: () => {
@@ -100,6 +108,7 @@ function CreateProductForm() {
         setSlug('')
         setDescription('')
         setVariants([{ ...emptyVariant }])
+        setTranslations(emptyTranslationDraft({ name: '', description: '' }))
       },
     })
   }
@@ -112,7 +121,7 @@ function CreateProductForm() {
       <h3 className="font-medium text-stone-700">New product</h3>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Input placeholder="Name" value={name} onChange={setName} error={fieldErr('name')} />
+        <Input placeholder="Name (English)" value={name} onChange={setName} error={fieldErr('name')} />
         <Input placeholder="slug (e.g. berry-jam)" value={slug} onChange={setSlug} error={fieldErr('slug')} />
         <div>
           <select
@@ -130,7 +139,40 @@ function CreateProductForm() {
           <FieldError message={fieldErr('category_id')} />
         </div>
       </div>
-      <Input placeholder="Description" value={description} onChange={setDescription} />
+      <Input placeholder="Description (English)" value={description} onChange={setDescription} />
+
+      <fieldset className="rounded-lg border border-stone-200 p-3">
+        <legend className="px-1 text-xs font-medium text-stone-500">
+          Translations — optional, blank falls back to English
+        </legend>
+        <div className="space-y-3">
+          {PREFIXED_LOCALES.map((locale) => (
+            <div key={locale} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Input
+                placeholder={`Name (${localeLabel(locale)})`}
+                value={translations[locale]?.name ?? ''}
+                onChange={(v) =>
+                  setTranslations({
+                    ...translations,
+                    [locale]: { ...translations[locale], name: v },
+                  })
+                }
+                error={fieldErr(`translations.${locale}.name`)}
+              />
+              <Input
+                placeholder={`Description (${localeLabel(locale)})`}
+                value={translations[locale]?.description ?? ''}
+                onChange={(v) =>
+                  setTranslations({
+                    ...translations,
+                    [locale]: { ...translations[locale], description: v },
+                  })
+                }
+              />
+            </div>
+          ))}
+        </div>
+      </fieldset>
 
       <div className="space-y-2">
         <p className="text-sm font-medium text-stone-600">Variants</p>

@@ -809,7 +809,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"slug\": \"{{newCatSlug}}\",\n    \"name\": \"Test Category\",\n    \"sort_order\": 100\n}",
+							"raw": "{\n    \"slug\": \"royal-jelly\",\n    \"name\": \"Royal jelly\",\n    \"sort_order\": 4,\n    \"translations\": {\n        \"hy\": {\n            \"name\": \"Մեղրի կաթ\"\n        },\n        \"ru\": {\n            \"name\": \"Маточное молочко\"\n        }\n    }\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -826,7 +826,7 @@
 								"categories"
 							]
 						},
-						"description": "Creates a category (admin only — 401 anonymous, 403 customer). The pre-request script generates a unique slug each run."
+						"description": "Creates a category (admin only — 401 anonymous, 403 customer). The pre-request script generates a unique slug each run.\n\nSince E1.5 an optional `translations` map may accompany the request. `name`/`description` stay required and mean ENGLISH - every other language falls back to them. The map holds NON-DEFAULT locales only: an \"en\" key is rejected with locale_is_default, and an unknown language with locale_unsupported. Omitting a language is normal and means \"show English there\"."
 					},
 					"event": [
 						{
@@ -1032,7 +1032,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"category_id\": 1,\n    \"slug\": \"{{newProductSlug}}\",\n    \"name\": \"Test Product\",\n    \"description\": \"Created from Postman.\",\n    \"variants\": [\n        {\"sku\": \"{{newProductSku}}\", \"label\": \"100 g\", \"price_minor\": 150000, \"stock_qty\": 20}\n    ]\n}",
+							"raw": "{\n    \"category_id\": 1,\n    \"slug\": \"{{newProductSlug}}\",\n    \"name\": \"Test Product\",\n    \"description\": \"Created from Postman.\",\n    \"variants\": [\n        {\n            \"sku\": \"{{newProductSku}}\",\n            \"label\": \"100 g\",\n            \"price_minor\": 150000,\n            \"stock_qty\": 20\n        }\n    ],\n    \"translations\": {\n        \"hy\": {\n            \"name\": \"Հայերեն անուն\",\n            \"description\": \"\"\n        },\n        \"ru\": {\n            \"name\": \"Русское название\",\n            \"description\": \"\"\n        }\n    }\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -1049,7 +1049,7 @@
 								"products"
 							]
 						},
-						"description": "Creates a product with variants in one transaction. Pre-request script randomizes slug/sku so runs stay repeatable. category_id 1 exists in seeded databases."
+						"description": "Creates a product with variants in one transaction. Pre-request script randomizes slug/sku so runs stay repeatable. category_id 1 exists in seeded databases.\n\nSince E1.5 an optional `translations` map may accompany the request. `name`/`description` stay required and mean ENGLISH - every other language falls back to them. The map holds NON-DEFAULT locales only: an \"en\" key is rejected with locale_is_default, and an unknown language with locale_unsupported. Omitting a language is normal and means \"show English there\"."
 					},
 					"event": [
 						{
@@ -1078,6 +1078,65 @@
 									"    pm.expect(body.is_active).to.be.true;",
 									"    pm.expect(body.variants).to.have.lengthOf(1);",
 									"    pm.collectionVariables.set(\"newVariantId\", body.variants[0].id);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Update product",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"category_id\": 1,\n    \"name\": \"Updated product name\",\n    \"description\": \"Updated English description\",\n    \"image_url\": \"\",\n    \"is_active\": true,\n    \"translations\": {\n        \"hy\": {\n            \"name\": \"Թարմացված անուն\",\n            \"description\": \"\"\n        },\n        \"ru\": {\n            \"name\": \"Обновлённое название\",\n            \"description\": \"\"\n        }\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{apiV1}}/admin/products/{{newProductId}}",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"products",
+								"{{newProductId}}"
+							]
+						},
+						"description": "Updates the mutable fields. The SLUG is deliberately absent and immutable - it is a public URL and the product's identity across all three languages.\n\nTranslations are UPSERTED: the map replaces each named locale's row and leaves the others alone, so editing Russian never disturbs Armenian. `name`/`description` are the English copy.\n\nThis request documents a route that existed since Era I Phase 10 but was never in this collection - found and fixed in E1.5."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"returns the updated English copy\", () => {",
+									"    const p = pm.response.json();",
+									"    pm.expect(p.name).to.eql(\"Updated product name\");",
+									"});",
+									"",
+									"pm.test(\"slug is unchanged - it is immutable\", () => {",
+									"    // Nothing in the body could have changed it; this",
+									"    // pins that the API does not accept one either.",
+									"    const p = pm.response.json();",
+									"    pm.expect(p).to.have.property(\"slug\");",
 									"});"
 								]
 							}
@@ -1231,6 +1290,58 @@
 									"pm.test(\"fields carry CODES, not English prose\", () => {",
 									"    pm.expect(err.fields.name).to.eql(\"required\");",
 									"    pm.expect(err.fields.slug).to.eql(\"slug_format\");",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Create category — 'en' in translations (400)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"slug\": \"bee-venom\",\n    \"name\": \"Bee venom\",\n    \"translations\": {\n        \"en\": {\n            \"name\": \"Bee venom\"\n        }\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{apiV1}}/admin/categories",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"categories"
+							]
+						},
+						"description": "English belongs in `name`, not in `translations`. Accepting both would mean two places to write one value and no rule for which wins when they disagree, so the API rejects it rather than silently picking one."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 400\", () => {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"pm.test(\"names the offending key and why\", () => {",
+									"    const err = pm.response.json().error;",
+									"    pm.expect(err.code).to.eql(\"validation_failed\");",
+									"    pm.expect(err.fields[\"translations.en\"]).to.eql(\"locale_is_default\");",
 									"});"
 								]
 							}
