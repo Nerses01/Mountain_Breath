@@ -10,11 +10,22 @@
 >
 > **Design source.** claude.ai/design project `Mountain Breath E-commerce Store`,
 > id `70fac810-0193-46d2-979e-d1c281beeae2`
-> ([open](https://claude.ai/design/p/70fac810-0193-46d2-979e-d1c281beeae2?file=Mountain+Breath+Store.dc.html)).
-> The design is **not** copied into this repo on purpose — it is read live with
-> the `DesignSync` tool (`get_project` / `list_files` / `get_file` by that id),
-> so a stale duplicate can never disagree with the canvas. When the design
-> changes, re-read it; when this plan and the canvas disagree, the canvas wins.
+> ([open](https://claude.ai/design/p/70fac810-0193-46d2-979e-d1c281beeae2?file=Mountain+Breath+Store.dc.html)),
+> with a working copy at `docs/design/mountain-breath-store.dc.html`.
+>
+> **Revised 2026-08-05.** This originally said the design was deliberately
+> *not* copied into the repo, and was read live via `DesignSync` so no stale
+> duplicate could contradict it. That traded the wrong way: `get_file` pulls
+> the whole ~50 kB file into context on every look, while a local copy can be
+> grepped for one section or one value at near-zero cost — and the mock is a
+> delivered artifact, not a document changing daily. The canvas stays
+> authoritative and the local file is a cache: refresh it from `DesignSync`
+> when the design moves, never hand-edit it.
+>
+> "The canvas wins" was also too strong, and E1 disproved it three times over
+> — see §6 for the rule that replaced it: the canvas is the default source
+> for every UI decision, overridden only by accessibility, by states it never
+> draws, and by requirements added after it was made.
 >
 > Phases are numbered **E1–E10** so they never collide with Era I's 0–11.
 > **E1.5** is inserted between E1 and E2 (not a renumber — every "E2 depends
@@ -326,10 +337,15 @@ different storage answers, Postgres's per-language text-search
 configurations, font coverage per writing system.
 
 **Backend:**
-- [ ] Migration: `product_translations` / `category_translations` /
-      `benefit_translations` (parent_id, locale, name, description, …) — the
-      relational half of decision #6. Locale-invariant fields (slug, sku,
-      price, stock) stay on the parent row; only human-language text moves out.
+- [ ] Migration: `product_translations` / `category_translations`
+      (parent_id, locale, name, description, …) — the relational half of
+      decision #6. Locale-invariant fields (slug, sku, price, stock) stay on
+      the parent row; only human-language text moves out.
+      **Corrected 2026-08-05:** this bullet originally also listed
+      `benefit_translations`, which cannot exist yet — the `benefits` table
+      it would reference is not created until E2, so the FK has no parent.
+      `benefit_translations` moves to E2, created in the same migration as
+      `benefits` itself.
 - [ ] Locale resolution: `?lang=` → cookie → `Accept-Language` → default
       `en`, validated against `{en, hy, ru}` — the same shape as E5's planned
       currency resolution. Worth merging into one "preferences" middleware
@@ -368,18 +384,29 @@ configurations, font coverage per writing system.
 - [ ] Update the Postman collection (RULES.md #15) with a `lang` variable.
 
 **Frontend:**
-- [ ] i18n library: `react-i18next` + `i18next-browser-languagedetector`.
-      The one deliberate exception to the project's "no dependency without a
-      reason" default — pluralization and interpolation edge cases across
-      three languages are exactly the bug class a mature library exists to
-      close off, unlike the hand-rolled form validation the project already
-      favors elsewhere.
+- [x] i18n library: `i18next` + `react-i18next`. The one deliberate
+      exception to the project's "no dependency without a reason" default —
+      Russian selects between three plural forms by rules that depend on the
+      last digit *and* the tens (21 товар, 22 товара, 25 товаров), which no
+      `count === 1 ? a : b` can express. Tests pin exactly those cases.
+      **`i18next-browser-languagedetector` installed but NOT wired in:** the
+      URL is the single source of truth for locale, and a detector reading
+      `navigator.language` or a cookie would be a second, competing opinion —
+      the failure mode being a page whose URL says Armenian while its text
+      says English. `useLocale` syncs i18next *from* the route, one direction
+      only. Remove the package if E1.5 ends without a use for it.
+- [x] Message catalogues (`common`, `footer`) in all three languages, with
+      English as the reference and per-key fallback to it, so a partially
+      translated page still reads. **Armenian and Russian copy is
+      machine-assisted and flagged for native review** — the apiary
+      vocabulary in particular (propolis, royal jelly, beeswax) is specialist
+      and easy to get subtly wrong.
 - [ ] Route structure: bare `/…` serves **English, the stated default** — no
       prefix, no redirect, every link written in E2 onward keeps working
       unchanged; `/hy/…` and `/ru/…` prefix the other two explicitly. One
       extra routing rule versus prefixing all three uniformly, in exchange
       for matching the stated default exactly.
-- [ ] **Font coverage gap found while building this — verified against the
+- [x] **Font coverage gap found while building this — verified against the
       installed packages' own `unicode-range`s, not assumed:** neither
       Poppins nor Karla (chosen in E1) ships Cyrillic or Armenian glyphs.
 
@@ -388,23 +415,35 @@ configurations, font coverage per writing system.
       @fontsource-variable/karla unicode-range: U+0000-00FF, U+0100-02BA, … (Latin only)
       ```
 
-      Without a fallback, `hy`/`ru` text silently drops to whatever system
-      font the OS substitutes mid-page, breaking the typographic design for
-      two of the three languages. Research and pick a per-script pairing (a
-      superfamily with full Latin+Cyrillic+Armenian coverage, e.g. a Noto
-      Sans variant, or a matched trio) and wire it as a `:lang(hy)` /
-      `:lang(ru)` CSS override feeding the *same* type-scale tokens from E1 —
-      not a new token system, just fallback stacks.
-- [ ] Translation namespaces per feature area (`common`, `catalog`, `cart`,
+      Fixed with two hand-written `@font-face` rules (Noto Sans Cyrillic
+      20 kB, Noto Sans Armenian 27 kB) appended to the existing
+      `--font-display` / `--font-body` stacks.
+
+      **Better than the `:lang()` approach this bullet originally proposed.**
+      CSS resolves font-family *per character*, not per element, so an
+      Armenian product name inside an English page picks up the Armenian face
+      with no wrapper or language attribute — which `:lang(hy)` could not do.
+      And because `unicode-range` gates the download, an English visitor
+      fetches neither file: the cost of supporting two more scripts is zero
+      bytes for anyone not reading them.
+      Declared by hand rather than imported because
+      `@fontsource-variable/noto-sans` ships eight subsets in one stylesheet
+      (greek, devanagari, vietnamese…) and Vite would bundle all of them —
+      the same trap as the Poppins Devanagari import in E1.
+- [x] Translation namespaces per feature area (`common`, `catalog`, `cart`,
       `checkout`, `account`) rather than one growing file — mirrors this
       plan's page-per-phase structure, so each future phase adds one
-      namespace instead of editing a shared file.
+      namespace instead of editing a shared file. `common` and `footer` exist
+      now; the rest arrive with the phases that need them.
 - [ ] `LanguageSwitcher` primitive, built into `SiteHeader`/`SiteFooter` from
       the start — those components are not yet built (E1's bullet is still
       open), so this lands before, not after, that work.
-- [ ] `useLocale()` hook wrapping `useParams()` + i18next, so every future
+- [x] `useLocale()` hook wrapping `useParams()` + i18next, so every future
       page reads the active locale one way instead of each poking
-      `i18next.language` directly.
+      `i18next.language` directly. Also owns the `<html lang>` attribute
+      (screen-reader pronunciation, browser translation offers) and exposes
+      `hrefFor(locale)` so switching language keeps you on the same page
+      rather than bouncing to the home page.
 - [ ] Vitest: `LanguageSwitcher` changes the route prefix and persists the
       choice; a missing translation key renders visibly in dev (so a gap is
       caught, not silently blank) and falls back to English in production.
@@ -425,10 +464,11 @@ queries with `FILTER`, many-to-many taxonomies, URL as state (deep-linkable
 filters), keyset vs. offset pagination.
 
 **Backend:**
-- [ ] Migration: `benefits` (id, slug, name, sort_order) and `product_benefits`
-      (product_id, benefit_id, PK on both) — Energy, Immunity, Skin, Recovery,
-      Sweetening. `name` follows E1.5/decision #6's translation strategy, not
-      a single English column.
+- [ ] Migration: `benefits` (id, slug, sort_order), `product_benefits`
+      (product_id, benefit_id, PK on both) and `benefit_translations`
+      (benefit_id, locale, name) in one migration — Energy, Immunity, Skin,
+      Recovery, Sweetening. The translations table lands here, not in E1.5,
+      because its FK parent is created here.
 - [ ] Migration: `products.badge` (nullable TEXT) + `badge_tone` — one badge
       per card in the design; a `product_badges` table only if that changes.
 - [ ] Extend `domain.ProductFilter`: `Benefits []string`, `PriceMinMinor`,
@@ -854,6 +894,29 @@ imports neither SQL nor HTTP; the server computes every total.
 Unchanged from [RULES.md](RULES.md), repeated because Era II is where they get
 tested:
 
+- **The design canvas is the source of UI truth.** Colours, spacing, type,
+  copy, layout and component structure come from
+  `docs/design/mountain-breath-store.dc.html` — read it rather than inventing
+  a value or guessing a shade. It is a working *copy* of the claude.ai/design
+  project named in the header above: refresh it with `DesignSync` when the
+  canvas moves, and never hand-edit it, or the two silently diverge.
+
+  **Three standing exceptions**, because a static mock cannot express
+  everything a running site needs:
+
+  1. **Accessibility overrides the design.** Where a design value fails WCAG
+     AA, the accessible value wins. E1 has already done this to the brand
+     orange (2.9:1 as a button fill → `#b8541a` at 4.6:1) and to the muted
+     ink.
+  2. **States the mock never draws are ours to design.** It shows the resting
+     state of six screens and nothing else — no focus ring, no error, no
+     loading, empty, disabled or hover state appears anywhere in it.
+  3. **Requirements added after the mock** have no canvas guidance and are
+     designed to fit it — the three languages being the first, since the
+     design shows no language switcher at all.
+
+  Anything taken from the canvas needs no justification. Anything that
+  departs from it gets a line saying why, in the phase bullet that did it.
 - Every route change updates `docs/api/mountain-breath.postman_collection.json`
   in the same commit (#15).
 - New code comes with tests (#11) — and each phase above names which.

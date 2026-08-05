@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #F3E2D0; font-family: Karla, system-ui, sans-serif; }
+  a { color: #E4761F; text-decoration: none; }
+  a:hover { color: #B8541A; }
+  * { box-sizing: border-box; }
+</style>
+</helmet>
+
+<div style="display: flex; flex-direction: column; gap: 64px; padding: 56px 40px 96px; background: #F3E2D0;">
+
+  <div style="width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px;">
+    <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; color: #A9714B;">Mountain Breath — Apiary Store</div>
+    <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 40px; color: #46281C; letter-spacing: -0.02em;">Six screens, desktop</div>
+    <div style="font-size: 17px; color: #7C5A45; max-width: 620px;">Home, Shop, Product, Cart, Checkout and Account, stacked in order. Image areas are labeled placeholders — drop real photography in later.</div>
+  </div>
+
+  <!-- ══════════ 01 HOME ══════════ -->
+  <div style="width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 13px; color: #FFF8EE; background: #46281C; padding: 6px 12px; border-radius: 999px; letter-spacing: 0.12em;">01</div>
+      <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Home</div>
+    </div>
+
+    <div data-screen-label="01 Home" style="background: #FDEFE0; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 70px -40px rgba(70,40,28,0.45);">
+
+      <!-- header -->
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 24px 56px; background: linear-gradient(180deg, #FEF4E8, #FDEFE0);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 40px; height: 40px; border-radius: 12px; background: #F6C244; display: flex; align-items: center; justify-content: center; font-family: Poppins, sans-serif; font-weight: 800; color: #46281C; font-size: 18px;">M</div>
+          <div style="display: flex; flex-direction: column; line-height: 1.05;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 19px; color: #46281C; letter-spacing: 0.04em;">MOUNTAIN BREATH</div>
+            <div style="font-size: 11px; color: #A9714B; letter-spacing: 0.18em; text-transform: uppercase;">Family apiary since 1974</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 34px; font-family: Poppins, sans-serif; font-weight: 500; font-size: 15px; color: #5C3B2A;">
+          <span style="color: #E4761F; font-weight: 600;">Home</span>
+          <span>Shop</span>
+          <span>Our hive</span>
+          <span>Benefits</span>
+          <span>Journal</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 20px;">
+          <div style="width: 38px; height: 38px; border-radius: 999px; border: 1.5px solid #E9C9A8; display: flex; align-items: center; justify-content: center; color: #8A5E42; font-size: 15px;">⌕</div>
+          <div style="width: 38px; height: 38px; border-radius: 999px; border: 1.5px solid #E9C9A8; display: flex; align-items: center; justify-content: center; color: #8A5E42; font-size: 15px;">♡</div>
+          <div style="display: flex; align-items: center; gap: 9px; background: #46281C; color: #FFF8EE; padding: 10px 18px; border-radius: 999px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px;">Cart · 3</div>
+        </div>
+      </div>
+
+      <!-- hero -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; padding: 48px 56px 56px; align-items: center;">
+        <div style="display: flex; flex-direction: column; gap: 22px;">
+          <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 0.24em; text-transform: uppercase; color: #A9714B;">Keep on buzzing</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 68px; line-height: 1.02; letter-spacing: -0.03em; color: #46281C;">
+            <span style="color: #E4761F;">Everything</span><br>the hive gives
+          </div>
+          <div style="font-size: 18px; line-height: 1.65; color: #6E4B36; max-width: 480px; text-wrap: pretty;">Honey, beeswax, propolis, royal jelly, pollen and venom — harvested by our family on the high meadows, and nothing else added on the way to you.</div>
+          <div style="display: flex; align-items: center; gap: 16px; padding-top: 6px;">
+            <div style="background: #E4761F; color: #FFF8EE; padding: 16px 30px; border-radius: 999px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 10px; box-shadow: 0 14px 26px -14px rgba(228,118,31,0.9);">Shop the hive <span>→</span></div>
+            <div style="color: #46281C; font-family: Poppins, sans-serif; font-weight: 600; font-size: 16px; border-bottom: 2px solid #F6C244; padding-bottom: 3px;">Meet the beekeepers</div>
+          </div>
+          <div style="display: flex; gap: 36px; padding-top: 18px; border-top: 1px solid #EED9C0; margin-top: 10px;">
+            <div style="display: flex; flex-direction: column; gap: 2px;"><div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 26px; color: #46281C;">1,400 m</div><div style="font-size: 13px; color: #A9714B;">Meadow altitude</div></div>
+            <div style="display: flex; flex-direction: column; gap: 2px;"><div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 26px; color: #46281C;">210</div><div style="font-size: 13px; color: #A9714B;">Hives in the family</div></div>
+            <div style="display: flex; flex-direction: column; gap: 2px;"><div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 26px; color: #46281C;">3 gen.</div><div style="font-size: 13px; color: #A9714B;">Of beekeeping</div></div>
+          </div>
+        </div>
+        <div style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 480px;">
+          <div style="position: absolute; width: 430px; height: 430px; border-radius: 999px; background: radial-gradient(circle at 35% 30%, #FBD46A, #F6B324);"></div>
+          <div style="position: relative; width: 470px; height: 440px; border-radius: 24px; background: repeating-linear-gradient(135deg, rgba(255,255,255,0.55) 0 12px, rgba(255,255,255,0.25) 12px 24px); display: flex; align-items: center; justify-content: center; text-align: center;">
+            <div style="font-family: ui-monospace, monospace; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #7A4E2C; line-height: 1.8;">hero image<br>honey jar + comb, cut out</div>
+          </div>
+          <div style="position: absolute; right: 6px; top: 30px; width: 116px; height: 116px; border-radius: 999px; background: #FFF8EE; border: 1.5px dashed #E4761F; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 14px; color: #46281C;">Raw</div>
+            <div style="font-size: 11px; color: #A9714B; letter-spacing: 0.1em;">unfiltered</div>
+            <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 17px; color: #E4761F;">100%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- production + benefits strip -->
+      <div style="display: grid; grid-template-columns: 340px 1fr; gap: 32px; padding: 0 56px 56px;">
+        <div style="background: #46281C; border-radius: 24px; padding: 34px 30px; display: flex; flex-direction: column; gap: 16px;">
+          <div style="width: 52px; height: 52px; border-radius: 14px; background: rgba(246,194,68,0.18); display: flex; align-items: center; justify-content: center; font-size: 22px;">🍯</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 26px; color: #FFF8EE; line-height: 1.15;">How we<br>harvest</div>
+          <div style="font-size: 15px; line-height: 1.7; color: #DFC3AC;">We take only the surplus comb, spin it cold, and jar it the same week. No heating above hive temperature, no filtering out the pollen, no blending across seasons.</div>
+          <div style="margin-top: auto; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px; color: #F6C244;">Read the harvest log →</div>
+        </div>
+        <div style="background: #FFF8EE; border-radius: 24px; padding: 34px 38px; display: grid; grid-template-columns: 1fr 1fr; gap: 34px;">
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 26px; color: #46281C;">What the hive <span style="color: #E4761F;">does for you</span></div>
+            <div style="font-size: 15px; line-height: 1.7; color: #6E4B36;">Every jar and tincture on this shelf earns its place by what it does in the body. Here is the short version, with sources on each product page.</div>
+            <div style="margin-top: auto; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px; color: #E4761F;">See all benefits →</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; gap: 12px; align-items: flex-start;"><div style="width: 22px; height: 22px; border-radius: 999px; background: #F6C244; color: #46281C; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700;">✓</div><div style="font-size: 15px; color: #5C3B2A;">Honey and pollen for <strong style="color: #46281C;">steady natural energy</strong></div></div>
+            <div style="display: flex; gap: 12px; align-items: flex-start;"><div style="width: 22px; height: 22px; border-radius: 999px; background: #F6C244; color: #46281C; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700;">✓</div><div style="font-size: 15px; color: #5C3B2A;">Propolis for <strong style="color: #46281C;">antimicrobial defense</strong></div></div>
+            <div style="display: flex; gap: 12px; align-items: flex-start;"><div style="width: 22px; height: 22px; border-radius: 999px; background: #F6C244; color: #46281C; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700;">✓</div><div style="font-size: 15px; color: #5C3B2A;">Royal jelly for <strong style="color: #46281C;">vitality and skin</strong></div></div>
+            <div style="display: flex; gap: 12px; align-items: flex-start;"><div style="width: 22px; height: 22px; border-radius: 999px; background: #F6C244; color: #46281C; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700;">✓</div><div style="font-size: 15px; color: #5C3B2A;">Beeswax for <strong style="color: #46281C;">balms, creams and candles</strong></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- six products -->
+      <div style="padding: 0 56px 60px; display: flex; flex-direction: column; gap: 26px;">
+        <div style="display: flex; align-items: flex-end; justify-content: space-between;">
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; color: #A9714B;">The shelf</div>
+            <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 38px; color: #46281C; letter-spacing: -0.02em;">Six gifts of the hive</div>
+          </div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px; color: #E4761F;">Shop all →</div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;">
+          <sc-for list="{{ products }}" as="p" hint-placeholder-count="6">
+            <div style="background: #FFF8EE; border-radius: 22px; padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+              <div style="position: relative; height: 210px; border-radius: 16px; background: repeating-linear-gradient(135deg, #F7DCBC 0 10px, #FBE9D4 10px 20px); display: flex; align-items: center; justify-content: center;">
+                <div style="font-family: ui-monospace, monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #9A6944; text-align: center;">{{ p.slot }}</div>
+                <div style="position: absolute; top: 12px; left: 12px; background: #F6C244; color: #46281C; font-family: Poppins, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.1em; padding: 5px 10px; border-radius: 999px; text-transform: uppercase;">{{ p.tag }}</div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 19px; color: #46281C;">{{ p.name }}</div>
+                <div style="font-size: 14px; line-height: 1.6; color: #7C5A45;">{{ p.desc }}</div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 6px;">
+                <div style="display: flex; flex-direction: column;">
+                  <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 20px; color: #E4761F;">{{ p.usd }}</div>
+                  <div style="font-size: 13px; color: #A9714B;">{{ p.amd }}</div>
+                </div>
+                <div style="background: #46281C; color: #FFF8EE; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; padding: 11px 18px; border-radius: 999px;">Add to cart</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- story band -->
+      <div style="margin: 0 56px 56px; border-radius: 24px; background: #F6C244; padding: 44px 46px; display: grid; grid-template-columns: 1fr 380px; gap: 40px; align-items: center;">
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; color: #8A5E12;">Our family</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 34px; line-height: 1.15; color: #46281C; letter-spacing: -0.02em;">My grandfather kept nine hives. We keep two hundred and ten.</div>
+          <div style="font-size: 16px; line-height: 1.7; color: #5C3B2A; max-width: 560px;">Same meadow, same slow method, a lot more jars. If you ever come up the valley in July, we will put you in a veil and let you lift a frame yourself.</div>
+          <div style="display: flex; align-items: center; gap: 10px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px; color: #46281C; padding-top: 4px;">Visit the apiary <span>→</span></div>
+        </div>
+        <div style="height: 240px; border-radius: 18px; background: repeating-linear-gradient(135deg, rgba(255,255,255,0.5) 0 10px, rgba(255,255,255,0.22) 10px 20px); display: flex; align-items: center; justify-content: center; font-family: ui-monospace, monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #7A5410; text-align: center;">photo — beekeeper<br>holding a frame</div>
+      </div>
+
+      <!-- footer -->
+      <div style="background: #46281C; padding: 46px 56px 34px; display: flex; flex-direction: column; gap: 34px;">
+        <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.2fr; gap: 40px;">
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 19px; color: #FFF8EE; letter-spacing: 0.04em;">MOUNTAIN BREATH</div>
+            <div style="font-size: 14px; line-height: 1.7; color: #C9AA92; max-width: 300px;">A family apiary on the high meadows. Honey, beeswax, propolis, royal jelly, pollen and venom, harvested by hand.</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 14px; color: #F6C244; letter-spacing: 0.1em; text-transform: uppercase;">Shop</div>
+            <div style="font-size: 14px; color: #C9AA92;">Honey</div>
+            <div style="font-size: 14px; color: #C9AA92;">Beeswax</div>
+            <div style="font-size: 14px; color: #C9AA92;">Propolis</div>
+            <div style="font-size: 14px; color: #C9AA92;">Royal jelly</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 14px; color: #F6C244; letter-spacing: 0.1em; text-transform: uppercase;">Company</div>
+            <div style="font-size: 14px; color: #C9AA92;">Our hive</div>
+            <div style="font-size: 14px; color: #C9AA92;">Harvest log</div>
+            <div style="font-size: 14px; color: #C9AA92;">Shipping</div>
+            <div style="font-size: 14px; color: #C9AA92;">Contact</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 14px; color: #F6C244; letter-spacing: 0.1em; text-transform: uppercase;">Harvest notes</div>
+            <div style="font-size: 14px; line-height: 1.6; color: #C9AA92;">What is flowering, what we are jarring. Once a month.</div>
+            <div style="display: flex; gap: 8px; margin-top: 4px;">
+              <div style="flex: 1; background: #5A3626; border-radius: 999px; padding: 12px 16px; font-size: 14px; color: #A98A74;">you@email.com</div>
+              <div style="background: #F6C244; color: #46281C; font-family: Poppins, sans-serif; font-weight: 700; font-size: 14px; padding: 12px 20px; border-radius: 999px;">Join</div>
+            </div>
+          </div>
+        </div>
+        <div style="border-top: 1px solid #5A3626; padding-top: 20px; display: flex; justify-content: space-between; font-size: 13px; color: #A98A74;">
+          <div>© 2026 Mountain Breath Apiary</div>
+          <div style="display: flex; gap: 24px;"><span>Terms</span><span>Privacy</span><span>USD / AMD</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 02 SHOP ══════════ -->
+  <div style="width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 13px; color: #FFF8EE; background: #46281C; padding: 6px 12px; border-radius: 999px; letter-spacing: 0.12em;">02</div>
+      <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Shop — product listing</div>
+    </div>
+    <div data-screen-label="02 Shop" style="background: #FDEFE0; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 70px -40px rgba(70,40,28,0.45);">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 24px 56px; background: #FEF4E8;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 11px; background: #F6C244; display: flex; align-items: center; justify-content: center; font-family: Poppins, sans-serif; font-weight: 800; color: #46281C;">M</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 17px; color: #46281C; letter-spacing: 0.04em;">MOUNTAIN BREATH</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 34px; font-family: Poppins, sans-serif; font-weight: 500; font-size: 15px; color: #5C3B2A;">
+          <span>Home</span><span style="color: #E4761F; font-weight: 600;">Shop</span><span>Our hive</span><span>Benefits</span><span>Journal</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 20px;">
+          <div style="width: 36px; height: 36px; border-radius: 999px; border: 1.5px solid #E9C9A8; display: flex; align-items: center; justify-content: center; color: #8A5E42;">⌕</div>
+          <div style="display: flex; align-items: center; gap: 9px; background: #46281C; color: #FFF8EE; padding: 9px 17px; border-radius: 999px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px;">Cart · 3</div>
+        </div>
+      </div>
+
+      <div style="padding: 36px 56px 20px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 13px; color: #A9714B;">Home / <span style="color: #46281C;">Shop</span></div>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between;">
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 44px; color: #46281C; letter-spacing: -0.025em;">The whole shelf</div>
+            <div style="font-size: 16px; color: #6E4B36; max-width: 560px;">Six products, one meadow. Everything here was taken from our own hives this season.</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="font-size: 14px; color: #A9714B;">6 products</div>
+            <div style="background: #FFF8EE; border: 1.5px solid #EED9C0; border-radius: 999px; padding: 11px 20px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; color: #46281C;">Sort: Most loved ▾</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 260px 1fr; gap: 32px; padding: 24px 56px 56px;">
+        <div style="display: flex; flex-direction: column; gap: 22px;">
+          <div style="background: #FFF8EE; border-radius: 20px; padding: 24px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; margin-bottom: 14px; letter-spacing: 0.06em; text-transform: uppercase;">Category</div>
+            <div style="display: flex; flex-direction: column; gap: 11px; font-size: 15px; color: #5C3B2A;">
+              <div style="display: flex; justify-content: space-between; color: #E4761F; font-weight: 700;"><span>All hive products</span><span>6</span></div>
+              <div style="display: flex; justify-content: space-between;"><span>Honey</span><span style="color: #A9714B;">1</span></div>
+              <div style="display: flex; justify-content: space-between;"><span>Beeswax</span><span style="color: #A9714B;">1</span></div>
+              <div style="display: flex; justify-content: space-between;"><span>Propolis</span><span style="color: #A9714B;">1</span></div>
+              <div style="display: flex; justify-content: space-between;"><span>Royal jelly</span><span style="color: #A9714B;">1</span></div>
+              <div style="display: flex; justify-content: space-between;"><span>Bee pollen</span><span style="color: #A9714B;">1</span></div>
+              <div style="display: flex; justify-content: space-between;"><span>Bee venom</span><span style="color: #A9714B;">1</span></div>
+            </div>
+          </div>
+          <div style="background: #FFF8EE; border-radius: 20px; padding: 24px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; margin-bottom: 14px; letter-spacing: 0.06em; text-transform: uppercase;">Good for</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <div style="border: 1.5px solid #EED9C0; border-radius: 999px; padding: 8px 14px; font-size: 13px; color: #5C3B2A;">Energy</div>
+              <div style="background: #F6C244; border: 1.5px solid #F6C244; border-radius: 999px; padding: 8px 14px; font-size: 13px; color: #46281C; font-weight: 600;">Immunity</div>
+              <div style="border: 1.5px solid #EED9C0; border-radius: 999px; padding: 8px 14px; font-size: 13px; color: #5C3B2A;">Skin</div>
+              <div style="border: 1.5px solid #EED9C0; border-radius: 999px; padding: 8px 14px; font-size: 13px; color: #5C3B2A;">Recovery</div>
+              <div style="border: 1.5px solid #EED9C0; border-radius: 999px; padding: 8px 14px; font-size: 13px; color: #5C3B2A;">Sweetening</div>
+            </div>
+          </div>
+          <div style="background: #FFF8EE; border-radius: 20px; padding: 24px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; margin-bottom: 14px; letter-spacing: 0.06em; text-transform: uppercase;">Price</div>
+            <div style="height: 4px; background: #EED9C0; border-radius: 999px; position: relative; margin: 16px 0 14px;">
+              <div style="position: absolute; left: 8%; right: 22%; top: 0; bottom: 0; background: #E4761F; border-radius: 999px;"></div>
+              <div style="position: absolute; left: 8%; top: -6px; width: 16px; height: 16px; border-radius: 999px; background: #FFF8EE; border: 3px solid #E4761F;"></div>
+              <div style="position: absolute; right: 22%; top: -6px; width: 16px; height: 16px; border-radius: 999px; background: #FFF8EE; border: 3px solid #E4761F;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 14px; color: #6E4B36;"><span>$9</span><span>$32</span></div>
+          </div>
+          <div style="background: #46281C; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 18px; color: #FFF8EE;">Not sure where to start?</div>
+            <div style="font-size: 14px; line-height: 1.65; color: #C9AA92;">Tell us what you want to feel better about and we will point at one jar.</div>
+            <div style="background: #F6C244; color: #46281C; text-align: center; font-family: Poppins, sans-serif; font-weight: 700; font-size: 14px; padding: 12px; border-radius: 999px; margin-top: 4px;">Ask a beekeeper</div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 26px;">
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px;">
+            <sc-for list="{{ products }}" as="p" hint-placeholder-count="6">
+              <div style="background: #FFF8EE; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+                <div style="position: relative; height: 200px; border-radius: 16px; background: repeating-linear-gradient(135deg, #F7DCBC 0 10px, #FBE9D4 10px 20px); display: flex; align-items: center; justify-content: center;">
+                  <div style="font-family: ui-monospace, monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #9A6944; text-align: center;">{{ p.slot }}</div>
+                  <div style="position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border-radius: 999px; background: #FDEFE0; display: flex; align-items: center; justify-content: center; color: #C08A5E; font-size: 13px;">♡</div>
+                </div>
+                <div style="font-size: 12px; color: #A9714B; letter-spacing: 0.14em; text-transform: uppercase; font-family: Poppins, sans-serif; font-weight: 600;">{{ p.category }}</div>
+                <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 18px; color: #46281C;">{{ p.name }}</div>
+                <div style="font-size: 13px; color: #7C5A45;">{{ p.size }} · {{ p.benefit }}</div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 8px;">
+                  <div style="display: flex; flex-direction: column;">
+                    <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 19px; color: #E4761F;">{{ p.usd }}</div>
+                    <div style="font-size: 12px; color: #A9714B;">{{ p.amd }}</div>
+                  </div>
+                  <div style="border: 1.5px solid #46281C; color: #46281C; font-family: Poppins, sans-serif; font-weight: 600; font-size: 13px; padding: 10px 16px; border-radius: 999px;">Add</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: center; gap: 10px; padding-top: 8px;">
+            <div style="width: 38px; height: 38px; border-radius: 999px; background: #E4761F; color: #FFF8EE; display: flex; align-items: center; justify-content: center; font-family: Poppins, sans-serif; font-weight: 700; font-size: 14px;">1</div>
+            <div style="width: 38px; height: 38px; border-radius: 999px; border: 1.5px solid #EED9C0; color: #6E4B36; display: flex; align-items: center; justify-content: center; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px;">2</div>
+            <div style="width: 38px; height: 38px; border-radius: 999px; border: 1.5px solid #EED9C0; color: #6E4B36; display: flex; align-items: center; justify-content: center; font-size: 14px;">→</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 03 PRODUCT ══════════ -->
+  <div style="width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 13px; color: #FFF8EE; background: #46281C; padding: 6px 12px; border-radius: 999px; letter-spacing: 0.12em;">03</div>
+      <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Product detail</div>
+    </div>
+    <div data-screen-label="03 Product" style="background: #FDEFE0; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 70px -40px rgba(70,40,28,0.45);">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 24px 56px; background: #FEF4E8;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 11px; background: #F6C244; display: flex; align-items: center; justify-content: center; font-family: Poppins, sans-serif; font-weight: 800; color: #46281C;">M</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 17px; color: #46281C; letter-spacing: 0.04em;">MOUNTAIN BREATH</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 34px; font-family: Poppins, sans-serif; font-weight: 500; font-size: 15px; color: #5C3B2A;">
+          <span>Home</span><span style="color: #E4761F; font-weight: 600;">Shop</span><span>Our hive</span><span>Benefits</span><span>Journal</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 9px; background: #46281C; color: #FFF8EE; padding: 9px 17px; border-radius: 999px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px;">Cart · 3</div>
+      </div>
+
+      <div style="padding: 32px 56px 12px; font-size: 13px; color: #A9714B;">Home / Shop / Royal jelly / <span style="color: #46281C;">Fresh Royal Jelly</span></div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 48px; padding: 16px 56px 56px;">
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div style="position: relative; height: 520px; border-radius: 24px; background: repeating-linear-gradient(135deg, #F7DCBC 0 12px, #FBE9D4 12px 24px); display: flex; align-items: center; justify-content: center;">
+            <div style="font-family: ui-monospace, monospace; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #9A6944; text-align: center; line-height: 1.8;">product hero<br>royal jelly jar, spoon</div>
+            <div style="position: absolute; top: 18px; left: 18px; background: #46281C; color: #F6C244; font-family: Poppins, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.12em; padding: 7px 13px; border-radius: 999px; text-transform: uppercase;">Cold chain</div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;">
+            <div style="height: 96px; border-radius: 14px; background: repeating-linear-gradient(135deg, #F2CFA9 0 8px, #F9E3CB 8px 16px); border: 2px solid #E4761F; display: flex; align-items: center; justify-content: center; font-family: ui-monospace, monospace; font-size: 10px; color: #8A5E42; text-align: center;">jar</div>
+            <div style="height: 96px; border-radius: 14px; background: repeating-linear-gradient(135deg, #F2CFA9 0 8px, #F9E3CB 8px 16px); display: flex; align-items: center; justify-content: center; font-family: ui-monospace, monospace; font-size: 10px; color: #8A5E42; text-align: center;">texture</div>
+            <div style="height: 96px; border-radius: 14px; background: repeating-linear-gradient(135deg, #F2CFA9 0 8px, #F9E3CB 8px 16px); display: flex; align-items: center; justify-content: center; font-family: ui-monospace, monospace; font-size: 10px; color: #8A5E42; text-align: center;">in hand</div>
+            <div style="height: 96px; border-radius: 14px; background: repeating-linear-gradient(135deg, #F2CFA9 0 8px, #F9E3CB 8px 16px); display: flex; align-items: center; justify-content: center; font-family: ui-monospace, monospace; font-size: 10px; color: #8A5E42; text-align: center;">hive</div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 600; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #A9714B;">Royal jelly</div>
+            <div style="font-size: 14px; color: #46281C;">★★★★★ <span style="color: #A9714B;">(64 reviews)</span></div>
+          </div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 46px; line-height: 1.05; letter-spacing: -0.03em; color: #46281C;">Fresh Royal Jelly</div>
+          <div style="font-size: 17px; line-height: 1.7; color: #6E4B36;">Milky fluid fed to queen larvae, used in health supplements and cosmetics. Ours is collected from queen cells within 72 hours and kept cold from the meadow to your door.</div>
+          <div style="display: flex; align-items: baseline; gap: 14px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 38px; color: #E4761F;">$32.00</div>
+            <div style="font-size: 17px; color: #A9714B;">15,300 ֏</div>
+            <div style="font-size: 14px; color: #7C5A45;">· 25 g jar</div>
+          </div>
+
+          <div style="background: #FFF8EE; border-radius: 20px; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">What it does</div>
+            <div style="display: flex; gap: 11px;"><div style="width: 20px; height: 20px; border-radius: 999px; background: #F6C244; color: #46281C; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">✓</div><div style="font-size: 15px; color: #5C3B2A;">Supports <strong style="color: #46281C;">energy and stamina</strong> through the season change</div></div>
+            <div style="display: flex; gap: 11px;"><div style="width: 20px; height: 20px; border-radius: 999px; background: #F6C244; color: #46281C; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">✓</div><div style="font-size: 15px; color: #5C3B2A;">Used in <strong style="color: #46281C;">cosmetics</strong> for skin elasticity and repair</div></div>
+            <div style="display: flex; gap: 11px;"><div style="width: 20px; height: 20px; border-radius: 999px; background: #F6C244; color: #46281C; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">✓</div><div style="font-size: 15px; color: #5C3B2A;">Rich in <strong style="color: #46281C;">B vitamins, amino acids and proteins</strong></div></div>
+            <div style="font-size: 13px; color: #A9714B; padding-top: 4px;">Not a medicine. Avoid if you are allergic to bee products.</div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 14px; color: #46281C;">Jar size</div>
+            <div style="display: flex; gap: 10px;">
+              <div style="border: 2px solid #E4761F; background: #FFF8EE; border-radius: 14px; padding: 12px 20px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; color: #46281C;">25 g · $32</div>
+              <div style="border: 1.5px solid #EED9C0; border-radius: 14px; padding: 12px 20px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; color: #6E4B36;">50 g · $58</div>
+              <div style="border: 1.5px solid #EED9C0; border-radius: 14px; padding: 12px 20px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; color: #6E4B36;">100 g · $105</div>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="display: flex; align-items: center; gap: 18px; border: 1.5px solid #EED9C0; border-radius: 999px; padding: 13px 20px; background: #FFF8EE;">
+              <span style="color: #A9714B; font-size: 18px;">−</span>
+              <span style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 16px; color: #46281C;">1</span>
+              <span style="color: #46281C; font-size: 18px;">+</span>
+            </div>
+            <div style="flex: 1; background: #E4761F; color: #FFF8EE; text-align: center; padding: 17px; border-radius: 999px; font-family: Poppins, sans-serif; font-weight: 700; font-size: 16px; box-shadow: 0 14px 26px -14px rgba(228,118,31,0.9);">Add to cart — $32.00</div>
+            <div style="width: 54px; height: 54px; border-radius: 999px; border: 1.5px solid #EED9C0; display: flex; align-items: center; justify-content: center; color: #8A5E42; font-size: 17px;">♡</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding-top: 6px;">
+            <div style="background: #FFF8EE; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px;"><div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 14px; color: #46281C;">Harvest</div><div style="font-size: 13px; color: #7C5A45;">June 2026, Hive 41</div></div>
+            <div style="background: #FFF8EE; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px;"><div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 14px; color: #46281C;">Shipping</div><div style="font-size: 13px; color: #7C5A45;">Chilled, 2–4 days</div></div>
+            <div style="background: #FFF8EE; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px;"><div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 14px; color: #46281C;">Lab report</div><div style="font-size: 13px; color: #7C5A45;">Batch RJ-0626</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding: 0 56px 56px; display: flex; flex-direction: column; gap: 22px;">
+        <div style="display: flex; gap: 30px; border-bottom: 1.5px solid #EED9C0; padding-bottom: 14px;">
+          <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 16px; color: #46281C; border-bottom: 3px solid #E4761F; padding-bottom: 12px; margin-bottom: -15px;">How to take it</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 500; font-size: 16px; color: #A9714B;">Storage</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 500; font-size: 16px; color: #A9714B;">Reviews (64)</div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;">
+          <div style="background: #FFF8EE; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 8px;"><div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 15px; color: #E4761F;">Morning</div><div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 19px; color: #46281C;">A grain of rice</div><div style="font-size: 15px; line-height: 1.65; color: #6E4B36;">Under the tongue before breakfast, on an empty stomach. Let it dissolve rather than swallowing.</div></div>
+          <div style="background: #FFF8EE; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 8px;"><div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 15px; color: #E4761F;">Course</div><div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 19px; color: #46281C;">Three weeks on</div><div style="font-size: 15px; line-height: 1.65; color: #6E4B36;">Then a week off. Most people run a course at the turn of autumn and again in early spring.</div></div>
+          <div style="background: #FFF8EE; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 8px;"><div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 15px; color: #E4761F;">Pairs with</div><div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 19px; color: #46281C;">Honey and pollen</div><div style="font-size: 15px; line-height: 1.65; color: #6E4B36;">Stir the day's dose into a spoon of wildflower honey if the taste is too sharp on its own.</div></div>
+        </div>
+      </div>
+
+      <div style="background: #FEF4E8; padding: 46px 56px; display: flex; flex-direction: column; gap: 24px;">
+        <div style="display: flex; align-items: flex-end; justify-content: space-between;">
+          <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 32px; color: #46281C; letter-spacing: -0.02em;">Often taken together</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px; color: #E4761F;">Shop all →</div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px;">
+          <sc-for list="{{ related }}" as="p" hint-placeholder-count="4">
+            <div style="background: #FDEFE0; border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+              <div style="height: 170px; border-radius: 14px; background: repeating-linear-gradient(135deg, #F7DCBC 0 10px, #FBE9D4 10px 20px); display: flex; align-items: center; justify-content: center; font-family: ui-monospace, monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #9A6944; text-align: center;">{{ p.slot }}</div>
+              <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 17px; color: #46281C;">{{ p.name }}</div>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 17px; color: #E4761F;">{{ p.usd }}</div>
+                <div style="font-size: 13px; color: #A9714B;">{{ p.amd }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 04 CART ══════════ -->
+  <div style="width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 13px; color: #FFF8EE; background: #46281C; padding: 6px 12px; border-radius: 999px; letter-spacing: 0.12em;">04</div>
+      <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Cart</div>
+    </div>
+    <div data-screen-label="04 Cart" style="background: #FDEFE0; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 70px -40px rgba(70,40,28,0.45);">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 24px 56px; background: #FEF4E8;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 11px; background: #F6C244; display: flex; align-items: center; justify-content: center; font-family: Poppins, sans-serif; font-weight: 800; color: #46281C;">M</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 17px; color: #46281C; letter-spacing: 0.04em;">MOUNTAIN BREATH</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 34px; font-family: Poppins, sans-serif; font-weight: 500; font-size: 15px; color: #5C3B2A;">
+          <span>Home</span><span>Shop</span><span>Our hive</span><span>Benefits</span><span>Journal</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 9px; background: #E4761F; color: #FFF8EE; padding: 9px 17px; border-radius: 999px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px;">Cart · 3</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 380px; gap: 32px; padding: 44px 56px 56px;">
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 42px; color: #46281C; letter-spacing: -0.025em;">Your basket</div>
+            <div style="font-size: 16px; color: #6E4B36;">Three items from the meadow. Everything ships together in a padded box.</div>
+          </div>
+
+          <div style="background: #FFF8EE; border-radius: 22px; padding: 8px 24px;">
+            <sc-for list="{{ cart }}" as="c" hint-placeholder-count="3">
+              <div style="display: grid; grid-template-columns: 108px 1fr auto auto; gap: 22px; align-items: center; padding: 22px 0; border-bottom: 1px solid #F2E1CC;">
+                <div style="height: 108px; border-radius: 16px; background: repeating-linear-gradient(135deg, #F7DCBC 0 10px, #FBE9D4 10px 20px); display: flex; align-items: center; justify-content: center; font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #9A6944; text-align: center;">{{ c.slot }}</div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                  <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 19px; color: #46281C;">{{ c.name }}</div>
+                  <div style="font-size: 14px; color: #7C5A45;">{{ c.variant }}</div>
+                  <div style="font-size: 13px; color: #A9714B;">Remove · Save for later</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 16px; border: 1.5px solid #EED9C0; border-radius: 999px; padding: 10px 16px;">
+                  <span style="color: #A9714B;">−</span>
+                  <span style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C;">{{ c.qty }}</span>
+                  <span style="color: #46281C;">+</span>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: flex-end; min-width: 110px;">
+                  <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 20px; color: #46281C;">{{ c.usd }}</div>
+                  <div style="font-size: 13px; color: #A9714B;">{{ c.amd }}</div>
+                </div>
+              </div>
+            </sc-for>
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 20px 0;">
+              <div style="font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px; color: #E4761F;">← Keep shopping</div>
+              <div style="font-size: 14px; color: #A9714B;">Prices include VAT</div>
+            </div>
+          </div>
+
+          <div style="background: #F6C244; border-radius: 20px; padding: 24px 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 19px; color: #46281C;">$8 away from free shipping</div>
+              <div style="font-size: 14px; color: #5C3B2A;">Add a beeswax block or a bag of pollen and we cover the courier.</div>
+            </div>
+            <div style="background: #46281C; color: #FFF8EE; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; padding: 13px 22px; border-radius: 999px; white-space: nowrap;">Add pollen · $16</div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 18px;">
+          <div style="background: #46281C; border-radius: 22px; padding: 30px; display: flex; flex-direction: column; gap: 16px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 22px; color: #FFF8EE;">Order summary</div>
+            <div style="display: flex; justify-content: space-between; font-size: 15px; color: #DFC3AC;"><span>Subtotal</span><span style="color: #FFF8EE;">$62.00</span></div>
+            <div style="display: flex; justify-content: space-between; font-size: 15px; color: #DFC3AC;"><span>Chilled shipping</span><span style="color: #FFF8EE;">$6.00</span></div>
+            <div style="display: flex; justify-content: space-between; font-size: 15px; color: #DFC3AC;"><span>Hive club discount</span><span style="color: #F6C244;">− $4.00</span></div>
+            <div style="border-top: 1px solid #5A3626; padding-top: 16px; display: flex; justify-content: space-between; align-items: flex-end;">
+              <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 17px; color: #FFF8EE;">Total</div>
+              <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 30px; color: #F6C244;">$64.00</div>
+                <div style="font-size: 14px; color: #C9AA92;">30,600 ֏</div>
+              </div>
+            </div>
+            <div style="background: #E4761F; color: #FFF8EE; text-align: center; padding: 16px; border-radius: 999px; font-family: Poppins, sans-serif; font-weight: 700; font-size: 16px;">Go to checkout</div>
+            <div style="font-size: 13px; color: #A98A74; text-align: center;">Card, bank transfer or cash on delivery</div>
+          </div>
+          <div style="background: #FFF8EE; border-radius: 22px; padding: 24px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Promo code</div>
+            <div style="display: flex; gap: 8px;">
+              <div style="flex: 1; border: 1.5px solid #EED9C0; border-radius: 999px; padding: 13px 18px; font-size: 14px; color: #A9714B;">Enter code</div>
+              <div style="background: #46281C; color: #FFF8EE; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; padding: 13px 20px; border-radius: 999px;">Apply</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 05 CHECKOUT ══════════ -->
+  <div style="width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 13px; color: #FFF8EE; background: #46281C; padding: 6px 12px; border-radius: 999px; letter-spacing: 0.12em;">05</div>
+      <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Checkout</div>
+    </div>
+    <div data-screen-label="05 Checkout" style="background: #FDEFE0; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 70px -40px rgba(70,40,28,0.45);">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 24px 56px; background: #FEF4E8; border-bottom: 1px solid #F2E1CC;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 11px; background: #F6C244; display: flex; align-items: center; justify-content: center; font-family: Poppins, sans-serif; font-weight: 800; color: #46281C;">M</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 17px; color: #46281C; letter-spacing: 0.04em;">MOUNTAIN BREATH</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 20px; font-family: Poppins, sans-serif; font-size: 14px;">
+          <div style="display: flex; align-items: center; gap: 8px; color: #46281C; font-weight: 600;"><span style="width: 24px; height: 24px; border-radius: 999px; background: #E4761F; color: #FFF8EE; display: flex; align-items: center; justify-content: center; font-size: 12px;">1</span> Details</div>
+          <span style="color: #D8B99A;">—</span>
+          <div style="display: flex; align-items: center; gap: 8px; color: #46281C; font-weight: 600;"><span style="width: 24px; height: 24px; border-radius: 999px; background: #E4761F; color: #FFF8EE; display: flex; align-items: center; justify-content: center; font-size: 12px;">2</span> Payment</div>
+          <span style="color: #D8B99A;">—</span>
+          <div style="display: flex; align-items: center; gap: 8px; color: #A9714B;"><span style="width: 24px; height: 24px; border-radius: 999px; border: 1.5px solid #D8B99A; display: flex; align-items: center; justify-content: center; font-size: 12px;">3</span> Done</div>
+        </div>
+        <div style="font-size: 14px; color: #A9714B;">Secure · SSL</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 400px; gap: 36px; padding: 44px 56px 56px;">
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+          <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 38px; color: #46281C; letter-spacing: -0.025em;">Where should the jars go?</div>
+
+          <div style="background: #FFF8EE; border-radius: 22px; padding: 28px; display: flex; flex-direction: column; gap: 18px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 16px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Contact</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+              <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">First name</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 14px 16px; font-size: 15px; color: #46281C; background: #FDEFE0;">Anahit</div></div>
+              <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Last name</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 14px 16px; font-size: 15px; color: #46281C; background: #FDEFE0;">Sargsyan</div></div>
+              <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Email</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 14px 16px; font-size: 15px; color: #46281C; background: #FDEFE0;">anahit@email.com</div></div>
+              <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Phone</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 14px 16px; font-size: 15px; color: #46281C; background: #FDEFE0;">+374 __ ______</div></div>
+            </div>
+          </div>
+
+          <div style="background: #FFF8EE; border-radius: 22px; padding: 28px; display: flex; flex-direction: column; gap: 18px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 16px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Delivery address</div>
+            <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Street and number</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 14px 16px; font-size: 15px; color: #46281C; background: #FDEFE0;">14 Abovyan St, apt 6</div></div>
+            <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 14px;">
+              <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">City</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 14px 16px; font-size: 15px; color: #46281C; background: #FDEFE0;">Yerevan</div></div>
+              <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Postal code</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 14px 16px; font-size: 15px; color: #46281C; background: #FDEFE0;">0009</div></div>
+              <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Country</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 14px 16px; font-size: 15px; color: #46281C; background: #FDEFE0;">Armenia ▾</div></div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; font-size: 14px; color: #6E4B36;"><span style="width: 20px; height: 20px; border-radius: 6px; background: #E4761F; color: #FFF8EE; display: flex; align-items: center; justify-content: center; font-size: 12px;">✓</span> Leave with the neighbour if I am out</div>
+          </div>
+
+          <div style="background: #FFF8EE; border-radius: 22px; padding: 28px; display: flex; flex-direction: column; gap: 16px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 16px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Payment</div>
+            <div style="display: flex; gap: 12px;">
+              <div style="flex: 1; border: 2px solid #E4761F; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 3px; background: #FDEFE0;"><div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C;">Card</div><div style="font-size: 13px; color: #7C5A45;">Visa, Mastercard, ArCa</div></div>
+              <div style="flex: 1; border: 1.5px solid #EED9C0; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 3px;"><div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C;">Bank transfer</div><div style="font-size: 13px; color: #7C5A45;">Ships on clearing</div></div>
+              <div style="flex: 1; border: 1.5px solid #EED9C0; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 3px;"><div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C;">Cash</div><div style="font-size: 13px; color: #7C5A45;">On delivery, AMD only</div></div>
+            </div>
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px;">
+              <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Card number</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 14px 16px; font-size: 15px; color: #A9714B; background: #FDEFE0;">•••• •••• •••• ••••</div></div>
+              <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Expiry</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 14px 16px; font-size: 15px; color: #A9714B; background: #FDEFE0;">MM / YY</div></div>
+              <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">CVC</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 14px 16px; font-size: 15px; color: #A9714B; background: #FDEFE0;">•••</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 18px;">
+          <div style="background: #46281C; border-radius: 22px; padding: 28px; display: flex; flex-direction: column; gap: 16px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 20px; color: #FFF8EE;">3 items</div>
+            <sc-for list="{{ cart }}" as="c" hint-placeholder-count="3">
+              <div style="display: flex; gap: 14px; align-items: center;">
+                <div style="width: 56px; height: 56px; border-radius: 12px; background: repeating-linear-gradient(135deg, rgba(255,248,238,0.24) 0 7px, rgba(255,248,238,0.1) 7px 14px); flex-shrink: 0;"></div>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+                  <div style="font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px; color: #FFF8EE;">{{ c.name }}</div>
+                  <div style="font-size: 13px; color: #A98A74;">{{ c.variant }} · ×{{ c.qty }}</div>
+                </div>
+                <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #F6C244;">{{ c.usd }}</div>
+              </div>
+            </sc-for>
+            <div style="border-top: 1px solid #5A3626; padding-top: 16px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; justify-content: space-between; font-size: 15px; color: #DFC3AC;"><span>Subtotal</span><span style="color: #FFF8EE;">$62.00</span></div>
+              <div style="display: flex; justify-content: space-between; font-size: 15px; color: #DFC3AC;"><span>Chilled shipping</span><span style="color: #FFF8EE;">$6.00</span></div>
+              <div style="display: flex; justify-content: space-between; font-size: 15px; color: #DFC3AC;"><span>Hive club discount</span><span style="color: #F6C244;">− $4.00</span></div>
+            </div>
+            <div style="border-top: 1px solid #5A3626; padding-top: 16px; display: flex; justify-content: space-between; align-items: flex-end;">
+              <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 17px; color: #FFF8EE;">Pay today</div>
+              <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 30px; color: #F6C244;">$64.00</div>
+                <div style="font-size: 14px; color: #C9AA92;">30,600 ֏</div>
+              </div>
+            </div>
+            <div style="background: #E4761F; color: #FFF8EE; text-align: center; padding: 17px; border-radius: 999px; font-family: Poppins, sans-serif; font-weight: 700; font-size: 16px;">Place the order</div>
+          </div>
+          <div style="background: #FFF8EE; border-radius: 22px; padding: 24px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; gap: 11px; align-items: flex-start;"><div style="width: 20px; height: 20px; border-radius: 999px; background: #F6C244; color: #46281C; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">✓</div><div style="font-size: 14px; color: #5C3B2A;">Packed within one working day</div></div>
+            <div style="display: flex; gap: 11px; align-items: flex-start;"><div style="width: 20px; height: 20px; border-radius: 999px; background: #F6C244; color: #46281C; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">✓</div><div style="font-size: 14px; color: #5C3B2A;">Broken jar replaced, no questions</div></div>
+            <div style="display: flex; gap: 11px; align-items: flex-start;"><div style="width: 20px; height: 20px; border-radius: 999px; background: #F6C244; color: #46281C; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">✓</div><div style="font-size: 14px; color: #5C3B2A;">Lab report in every parcel</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 06 ACCOUNT ══════════ -->
+  <div style="width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 13px; color: #FFF8EE; background: #46281C; padding: 6px 12px; border-radius: 999px; letter-spacing: 0.12em;">06</div>
+      <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Account — sign in</div>
+    </div>
+    <div data-screen-label="06 Account" style="background: #FDEFE0; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 70px -40px rgba(70,40,28,0.45); display: grid; grid-template-columns: 1fr 1fr; min-height: 700px;">
+      <div style="padding: 48px 56px; display: flex; flex-direction: column; gap: 30px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 11px; background: #F6C244; display: flex; align-items: center; justify-content: center; font-family: Poppins, sans-serif; font-weight: 800; color: #46281C;">M</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 17px; color: #46281C; letter-spacing: 0.04em;">MOUNTAIN BREATH</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: auto;">
+          <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; color: #A9714B;">Hive club</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 44px; line-height: 1.05; letter-spacing: -0.03em; color: #46281C;">Welcome back</div>
+          <div style="font-size: 16px; color: #6E4B36; max-width: 420px;">Sign in to reorder in one tap, follow your parcel, and see which hive your last jar came from.</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 16px; max-width: 440px;">
+          <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Email</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 15px 17px; font-size: 15px; color: #46281C; background: #FFF8EE;">anahit@email.com</div></div>
+          <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Password</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 15px 17px; font-size: 15px; color: #A9714B; background: #FFF8EE; display: flex; justify-content: space-between;"><span>••••••••••</span><span style="font-size: 13px; color: #E4761F; font-weight: 600;">Show</span></div></div>
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px; font-size: 14px; color: #6E4B36;"><span style="width: 20px; height: 20px; border-radius: 6px; background: #E4761F; color: #FFF8EE; display: flex; align-items: center; justify-content: center; font-size: 12px;">✓</span> Keep me signed in</div>
+            <div style="font-size: 14px; color: #E4761F; font-weight: 600;">Forgot password?</div>
+          </div>
+          <div style="background: #E4761F; color: #FFF8EE; text-align: center; padding: 17px; border-radius: 999px; font-family: Poppins, sans-serif; font-weight: 700; font-size: 16px; box-shadow: 0 14px 26px -14px rgba(228,118,31,0.9);">Sign in</div>
+          <div style="display: flex; align-items: center; gap: 14px; color: #C9A483; font-size: 13px;"><div style="flex: 1; height: 1px; background: #EED9C0;"></div>or<div style="flex: 1; height: 1px; background: #EED9C0;"></div></div>
+          <div style="display: flex; gap: 12px;">
+            <div style="flex: 1; border: 1.5px solid #EED9C0; border-radius: 999px; padding: 14px; text-align: center; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; color: #46281C; background: #FFF8EE;">Continue with Google</div>
+            <div style="flex: 1; border: 1.5px solid #EED9C0; border-radius: 999px; padding: 14px; text-align: center; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; color: #46281C; background: #FFF8EE;">Continue with Apple</div>
+          </div>
+          <div style="font-size: 14px; color: #6E4B36; padding-top: 4px;">New here? <span style="color: #E4761F; font-weight: 600;">Create an account</span> — first order ships free.</div>
+        </div>
+      </div>
+
+      <div style="background: #46281C; padding: 48px; display: flex; flex-direction: column; gap: 24px; justify-content: center;">
+        <div style="height: 260px; border-radius: 20px; background: repeating-linear-gradient(135deg, rgba(246,194,68,0.28) 0 11px, rgba(246,194,68,0.12) 11px 22px); display: flex; align-items: center; justify-content: center; font-family: ui-monospace, monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #F0D9A8; text-align: center; line-height: 1.8;">photo — hives on<br>the meadow at dusk</div>
+        <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 26px; line-height: 1.25; color: #FFF8EE;">Members get the first jars of every harvest.</div>
+        <div style="font-size: 15px; line-height: 1.7; color: #C9AA92;">Royal jelly and fresh comb sell out in days. Club members are told the morning we jar it, and pay 8% less on every order after the first.</div>
+        <div style="display: flex; gap: 12px;">
+          <div style="background: rgba(255,248,238,0.08); border-radius: 16px; padding: 18px; flex: 1;"><div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 24px; color: #F6C244;">8%</div><div style="font-size: 13px; color: #C9AA92;">Member price</div></div>
+          <div style="background: rgba(255,248,238,0.08); border-radius: 16px; padding: 18px; flex: 1;"><div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 24px; color: #F6C244;">First</div><div style="font-size: 13px; color: #C9AA92;">Pick of harvest</div></div>
+          <div style="background: rgba(255,248,238,0.08); border-radius: 16px; padding: 18px; flex: 1;"><div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 24px; color: #F6C244;">Free</div><div style="font-size: 13px; color: #C9AA92;">First delivery</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1540,&quot;height&quot;:1000}}">
+class Component extends DCLogic {
+  renderVals() {
+    const products = [
+      { name: "Mountain Wildflower Honey", category: "Honey", size: "500 g jar", tag: "Best seller", benefit: "Natural energy", usd: "$14.00", amd: "6,700 ֏", slot: "honey jar", desc: "Sweet liquid made from flower nectar, used as food and a natural sweetener." },
+      { name: "Pure Beeswax Blocks", category: "Beeswax", size: "4 × 100 g", tag: "For makers", benefit: "Balms & candles", usd: "$9.00", amd: "4,300 ֏", slot: "beeswax blocks", desc: "Oily wax secreted from bee glands to build honeycombs, used in candles and skin creams." },
+      { name: "Raw Propolis Tincture", category: "Propolis", size: "30 ml dropper", tag: "Immunity", benefit: "Antimicrobial", usd: "$19.00", amd: "9,100 ֏", slot: "propolis dropper", desc: "Resinous bee glue collected from plants to seal and protect the hive, known for antimicrobial properties." },
+      { name: "Fresh Royal Jelly", category: "Royal jelly", size: "25 g jar", tag: "Cold chain", benefit: "Vitality & skin", usd: "$32.00", amd: "15,300 ֏", slot: "royal jelly jar", desc: "Milky fluid fed to queen larvae, used in health supplements and cosmetics." },
+      { name: "Bee Pollen Granules", category: "Bee pollen", size: "250 g pouch", tag: "Protein", benefit: "Protein & minerals", usd: "$16.00", amd: "7,600 ֏", slot: "pollen granules", desc: "Flower pollen packed by bees, rich in protein and nutrients." },
+      { name: "Bee Venom Serum", category: "Bee venom", size: "15 ml bottle", tag: "New", benefit: "Apitherapy", usd: "$28.00", amd: "13,400 ֏", slot: "venom serum", desc: "Secreted defense fluid sometimes used in alternative therapies." }
+    ];
+    return {
+      products,
+      related: [products[0], products[4], products[2], products[5]],
+      cart: [
+        { name: "Fresh Royal Jelly", variant: "25 g jar", qty: 1, usd: "$32.00", amd: "15,300 ֏", slot: "royal jelly" },
+        { name: "Mountain Wildflower Honey", variant: "500 g jar", qty: 1, usd: "$14.00", amd: "6,700 ֏", slot: "honey jar" },
+        { name: "Raw Propolis Tincture", variant: "30 ml dropper", qty: 1, usd: "$16.00", amd: "7,600 ֏", slot: "propolis" }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
