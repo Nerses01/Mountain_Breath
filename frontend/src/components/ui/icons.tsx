@@ -64,6 +64,21 @@ export function HeartIcon({ filled = false, ...props }: IconProps & { filled?: b
   )
 }
 
+/**
+ * Not in the design — the mock's header carries search, wishlist and cart
+ * but no account control, because it never draws a signed-in state. The app
+ * has auth, so users need a way to reach it (§6 exception 2: states the mock
+ * does not draw are ours to design).
+ */
+export function UserIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20a8 8 0 0 1 16 0" />
+    </IconBase>
+  )
+}
+
 export function ArrowRightIcon(props: IconProps) {
   return (
     <IconBase {...props}>

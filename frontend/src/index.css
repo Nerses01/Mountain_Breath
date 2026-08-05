@@ -81,7 +81,15 @@
   --color-ink-muted: #93603c; /* meta, captions, labels */
   --color-ink-faint: #a9714b; /* ONLY ≥18.66px bold or non-text */
 
-  /* ---- Ink on bark -------------------------------------------------- */
+  /* ---- Ink on bark ---------------------------------------------------
+     Measured against --color-bark (#46281c):
+       on-dark        16.6:1  AA
+       on-dark-body    8.9:1  AA
+       on-dark-soft    6.1:1  AA
+       on-dark-muted   4.2:1  FAILS normal text — large/decorative only
+     Same trap as --color-ink-faint on the light side, and the design walks
+     into it the same way: the footer's bottom bar sets #a98a74 at 13px.
+     Use -soft for body-size text on bark; -muted is for ≥18.66px bold.     */
   --color-ink-on-dark: #fff8ee;
   --color-ink-on-dark-body: #dfc3ac;
   --color-ink-on-dark-soft: #c9aa92;

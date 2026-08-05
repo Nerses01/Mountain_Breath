@@ -29,6 +29,19 @@ export function isLocale(value: string | undefined): value is Locale {
 }
 
 /**
+ * The locale a path is in, from its first segment. Anything that is not a
+ * known locale — `/cart`, `/de/x` — means English, since English is the
+ * unprefixed default rather than an error case.
+ */
+export function localeFromPath(pathname: string): Locale {
+  const first = pathname.split('/').filter(Boolean)[0]
+  return isLocale(first) ? first : DEFAULT_LOCALE
+}
+
+/** Every locale except the default, i.e. the ones that carry a URL prefix. */
+export const PREFIXED_LOCALES = LOCALES.filter((l) => l !== DEFAULT_LOCALE)
+
+/**
  * The path prefix for a locale: '' for English, '/hy' and '/ru' otherwise.
  * Keeping this one function means the "English has no prefix" rule is stated
  * once rather than re-derived at every call site.

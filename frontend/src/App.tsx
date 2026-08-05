@@ -1,6 +1,6 @@
-import { Link, Route, Routes } from 'react-router'
-import { AuthStatus } from './components/AuthStatus'
-import { CartLink } from './components/CartLink'
+import { Route, Routes } from 'react-router'
+import { Layout } from './components/layout/Layout'
+import { PREFIXED_LOCALES } from './i18n/locales'
 import { AdminOrdersPage } from './pages/AdminOrdersPage'
 import { AdminPage } from './pages/AdminPage'
 import { AdminProductsPage } from './pages/AdminProductsPage'
@@ -10,36 +10,46 @@ import { LoginPage } from './pages/LoginPage'
 import { OrdersPage } from './pages/OrdersPage'
 import { ProductPage } from './pages/ProductPage'
 
+/**
+ * The storefront pages, defined once and mounted under every locale prefix.
+ * Paths are RELATIVE (no leading slash) so the same list works at `/` and
+ * at `/hy`.
+ */
+function storefrontRoutes() {
+  return [
+    <Route key="index" index element={<CatalogPage />} />,
+    <Route key="shop" path="shop" element={<CatalogPage />} />,
+    <Route key="product" path="products/:slug" element={<ProductPage />} />,
+    <Route key="login" path="login" element={<LoginPage />} />,
+    <Route key="cart" path="cart" element={<CartPage />} />,
+    <Route key="orders" path="orders" element={<OrdersPage />} />,
+  ]
+}
+
 function App() {
   return (
-    <div className="min-h-screen bg-stone-100">
-      <header className="border-b border-stone-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-4">
-          <span className="text-2xl">🏔️</span>
-          <Link to="/" className="flex-1">
-            <h1 className="text-xl font-bold text-stone-800">Mountain Breath</h1>
-            <p className="text-xs text-stone-400">
-              tea · coffee · honey from the mountains
-            </p>
-          </Link>
-          <CartLink />
-          <AuthStatus />
-        </div>
-      </header>
+    <Routes>
+      {/* English lives at the root with no prefix — the stated default, so
+          every link written elsewhere keeps working unprefixed. */}
+      <Route path="/" element={<Layout />}>
+        {storefrontRoutes()}
+      </Route>
 
-      {/* The router swaps the page component based on the URL — no server
-          round-trip, just React rendering a different component. */}
-      <Routes>
-        <Route path="/" element={<CatalogPage />} />
-        <Route path="/products/:slug" element={<ProductPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/orders" element={<OrdersPage />} />
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="/admin/products" element={<AdminProductsPage />} />
-        <Route path="/admin/orders" element={<AdminOrdersPage />} />
-      </Routes>
-    </div>
+      {/* The other languages are enumerated rather than matched with a
+          `/:locale` param. A param would happily match `/cart` and treat
+          "cart" as a language, silently rendering the home page there. */}
+      {PREFIXED_LOCALES.map((code) => (
+        <Route key={code} path={`/${code}`} element={<Layout />}>
+          {storefrontRoutes()}
+        </Route>
+      ))}
+
+      {/* Admin keeps its own chrome: no storefront header or footer, and no
+          locale prefix — it is a back office, not a shopfront. */}
+      <Route path="/admin" element={<AdminPage />} />
+      <Route path="/admin/products" element={<AdminProductsPage />} />
+      <Route path="/admin/orders" element={<AdminOrdersPage />} />
+    </Routes>
   )
 }
 

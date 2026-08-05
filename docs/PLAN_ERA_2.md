@@ -418,11 +418,15 @@ configurations, font coverage per writing system.
       machine-assisted and flagged for native review** — the apiary
       vocabulary in particular (propolis, royal jelly, beeswax) is specialist
       and easy to get subtly wrong.
-- [ ] Route structure: bare `/…` serves **English, the stated default** — no
+- [x] Route structure: bare `/…` serves **English, the stated default** — no
       prefix, no redirect, every link written in E2 onward keeps working
-      unchanged; `/hy/…` and `/ru/…` prefix the other two explicitly. One
-      extra routing rule versus prefixing all three uniformly, in exchange
-      for matching the stated default exactly.
+      unchanged; `/hy/…` and `/ru/…` prefix the other two explicitly.
+      The prefixes are **enumerated** (`PREFIXED_LOCALES.map`), not matched
+      with a `/:locale` param: a param binds greedily, so `/cart` would set
+      locale="cart" and silently render the home page there. A regression
+      test pins exactly that case. `useLocale` therefore parses
+      `useLocation().pathname` rather than reading a route param, which also
+      makes it independent of how the route tree is shaped.
 - [x] **Font coverage gap found while building this — verified against the
       installed packages' own `unicode-range`s, not assumed:** neither
       Poppins nor Karla (chosen in E1) ships Cyrillic or Armenian glyphs.
@@ -452,28 +456,44 @@ configurations, font coverage per writing system.
       plan's page-per-phase structure, so each future phase adds one
       namespace instead of editing a shared file. `common` and `footer` exist
       now; the rest arrive with the phases that need them.
-- [ ] `LanguageSwitcher` primitive, built into `SiteHeader`/`SiteFooter` from
-      the start rather than retrofitted.
-- [ ] **`SiteHeader` / `SiteFooter` (moved here from E1, 2026-08-05.)**
+- [x] `LanguageSwitcher` primitive, built into `SiteFooter` from the start
+      rather than retrofitted. Rendered as **links, not buttons** — each
+      language is a real URL, so middle-click and "open in new tab" work and
+      the choice survives a reload without any persistence code. Placed in
+      the footer bottom bar beside the slot E5's currency switcher will take,
+      following the design's own habit of putting locale-shaped controls
+      there ("USD / AMD") rather than inventing a header position the mock
+      gives no guidance for. Revisit in E10 if it proves too buried.
+- [x] **`SiteHeader` / `SiteFooter` (moved here from E1, 2026-08-05.)**
       Header: logo mark, wordmark + tagline, 5 nav links, search and wishlist
-      icon buttons, cart pill with count. Footer: 4 columns, newsletter form,
-      bottom bar with the language switcher and a slot for E5's currency
-      switcher. Every string comes from the `common` / `footer` namespaces —
-      these are the first components in the rebuild to contain user-facing
-      text, which is the whole reason they wait for this phase.
-- [ ] **`Layout` route wrapper (moved here from E1.)** Wraps the routes in
-      header + footer; `/admin/*` keeps its own chrome. This is also where
-      `App.tsx` grows the `/hy` and `/ru` route prefixes, so the routing and
-      the shell change in one edit instead of touching the file twice.
+      icon buttons, cart pill with count. Footer: 4 columns, newsletter form
+      (inert until E9), bottom bar. Every string comes from the `common` /
+      `footer` namespaces.
+      Two departures from the mock, both §6 exception 2 (states it never
+      draws): an **account control** — the design's header has none, because
+      it never shows a signed-in state, but the app has auth and users need
+      to reach it — and body-size footer text using `ink-on-dark-soft`
+      instead of the design's `#a98a74`, which measures **4.2:1 on bark at
+      the 13px the mock uses it at** and fails AA.
+      Three nav destinations (Our hive, Benefits, Journal) render as plain
+      text, not links, until E9 builds them — the header keeps the design's
+      shape without shipping links to a blank page.
+- [x] **`Layout` route wrapper (moved here from E1.)** Wraps the routes in
+      header + footer; `/admin/*` stays outside with its own chrome. `App.tsx`
+      grew the locale prefixes in the same edit, so the file was touched once
+      rather than twice.
 - [x] `useLocale()` hook wrapping `useParams()` + i18next, so every future
       page reads the active locale one way instead of each poking
       `i18next.language` directly. Also owns the `<html lang>` attribute
       (screen-reader pronunciation, browser translation offers) and exposes
       `hrefFor(locale)` so switching language keeps you on the same page
       rather than bouncing to the home page.
-- [ ] Vitest: `LanguageSwitcher` changes the route prefix and persists the
-      choice; a missing translation key renders visibly in dev (so a gap is
-      caught, not silently blank) and falls back to English in production.
+- [x] Vitest: `LanguageSwitcher` changes the route prefix and persists the
+      choice; a missing translation key falls back to English rather than
+      rendering blank. 22 new tests (43 total), including a routing smoke
+      suite over `App` — the locale prefixes mount the same route list three
+      times from an array of `<Route>` elements, and a passing typecheck says
+      nothing about whether the router actually walks that shape.
 
 **Done when:** the whole shell (header, footer, nav, auth forms, error toasts)
 reads correctly in all three languages with no hardcoded English string left
