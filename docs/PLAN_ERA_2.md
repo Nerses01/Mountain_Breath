@@ -354,15 +354,39 @@ different storage answers, Postgres's per-language text-search
 configurations, font coverage per writing system.
 
 **Backend:**
-- [ ] Migration: `product_translations` / `category_translations`
-      (parent_id, locale, name, description, …) — the relational half of
-      decision #6. Locale-invariant fields (slug, sku, price, stock) stay on
-      the parent row; only human-language text moves out.
+- [x] Migration `000007_translations`: `product_translations` /
+      `category_translations` (parent_id, locale, name, description) — the
+      relational half of decision #6. Locale-invariant fields (slug, sku,
+      price, stock) stay on the parent row; only human-language text moves
+      out. Verified up → down → up against the dev database.
       **Corrected 2026-08-05:** this bullet originally also listed
       `benefit_translations`, which cannot exist yet — the `benefits` table
       it would reference is not created until E2, so the FK has no parent.
       `benefit_translations` moves to E2, created in the same migration as
       `benefits` itself.
+      **Search had to come along, and it constrained the design.**
+      `products.search_tsv` (000005) is a GENERATED column reading
+      `name`/`description`, and `idx_products_name_trgm` (000006) indexes
+      `name` — so moving product text drags Era I's whole search
+      implementation with it. The per-locale tsvector cannot use the obvious
+      `to_tsvector(locale::regconfig, name)`, because a generated column must
+      be IMMUTABLE and casting text to `regconfig` reads the catalog (only
+      STABLE). A **CASE over literal config names** is immutable and does
+      work — confirmed against the real database before the migration was
+      written, with genuine per-language stemming:
+      `Wildflower→wildflow`, `цветочный→цветочн` (and `мёд→мед`),
+      `Լեռնային→լեռնայ`.
+      The old columns are deliberately **not dropped yet**: the store still
+      reads them, so they go in a follow-up once it reads translations —
+      the same add-backfill-then-drop sequence this plan uses for
+      `products.image_url`.
+- [ ] **Variant labels are translatable text too, and are not covered here.**
+      The design's sizes read "500 g jar", "30 ml dropper", "250 g pouch" —
+      a measurement plus an English noun. Either `product_variants.label`
+      gains a translation table, or labels become pure measurements ("500 g")
+      with the container moved into translatable product copy. The second is
+      cleaner and probably right; decide it in E3 when variants are reworked,
+      not silently here.
 - [ ] Locale resolution: `?lang=` → cookie → `Accept-Language` → default
       `en`, validated against `{en, hy, ru}` — the same shape as E5's planned
       currency resolution. Worth merging into one "preferences" middleware
