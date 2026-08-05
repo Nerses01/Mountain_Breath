@@ -74,33 +74,33 @@ func ValidateProduct(p Product) map[string]string {
 	fields := make(map[string]string)
 
 	if strings.TrimSpace(p.Name) == "" {
-		fields["name"] = "required"
+		fields["name"] = ValidationRequired
 	}
 	switch {
 	case p.Slug == "":
-		fields["slug"] = "required"
+		fields["slug"] = ValidationRequired
 	case !slugRe.MatchString(p.Slug):
-		fields["slug"] = "must be lowercase letters/digits separated by dashes"
+		fields["slug"] = ValidationSlugFormat
 	}
 	if p.CategoryID <= 0 {
-		fields["category_id"] = "required"
+		fields["category_id"] = ValidationRequired
 	}
 	if len(p.Variants) == 0 {
-		fields["variants"] = "at least one variant is required"
+		fields["variants"] = ValidationVariantsRequired
 	}
 
 	for i, v := range p.Variants {
 		if strings.TrimSpace(v.SKU) == "" {
-			fields[fmt.Sprintf("variants[%d].sku", i)] = "required"
+			fields[fmt.Sprintf("variants[%d].sku", i)] = ValidationRequired
 		}
 		if strings.TrimSpace(v.Label) == "" {
-			fields[fmt.Sprintf("variants[%d].label", i)] = "required"
+			fields[fmt.Sprintf("variants[%d].label", i)] = ValidationRequired
 		}
 		if v.PriceMinor <= 0 {
-			fields[fmt.Sprintf("variants[%d].price_minor", i)] = "must be positive"
+			fields[fmt.Sprintf("variants[%d].price_minor", i)] = ValidationPositive
 		}
 		if v.StockQty < 0 {
-			fields[fmt.Sprintf("variants[%d].stock_qty", i)] = "must not be negative"
+			fields[fmt.Sprintf("variants[%d].stock_qty", i)] = ValidationNotNegative
 		}
 	}
 	return fields

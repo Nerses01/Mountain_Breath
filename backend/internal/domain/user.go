@@ -38,10 +38,10 @@ func NormalizeEmail(email string) string {
 func ValidateRegistration(email, password string) map[string]string {
 	fields := make(map[string]string)
 	if _, err := mail.ParseAddress(email); err != nil {
-		fields["email"] = "must be a valid email address"
+		fields["email"] = ValidationEmailFormat
 	}
-	if len(password) < 8 {
-		fields["password"] = "must be at least 8 characters"
+	if len(password) < PasswordMinLength {
+		fields["password"] = ValidationPasswordTooShort
 	}
 	return fields
 }

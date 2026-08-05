@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { ApiError } from '../api/client'
 import { useCategories, useCreateCategory, useMe } from '../api/hooks'
 import { AdminNav } from '../components/AdminNav'
+import { useFieldErrors } from '../i18n/useFieldErrors'
 
 // NOTE: this guard is user experience, not security. The backend's
 // requireAdmin middleware is the real gate — anyone can bypass this page
@@ -58,7 +58,7 @@ function CategoryForm() {
     )
   }
 
-  const err = create.error instanceof ApiError ? create.error : null
+  const { fieldError, formError } = useFieldErrors(create.error)
 
   return (
     <form
@@ -68,13 +68,13 @@ function CategoryForm() {
       <h3 className="font-medium text-stone-700">New category</h3>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Input placeholder="slug (e.g. herbal-tea)" value={slug} onChange={setSlug} error={err?.fields?.slug} />
-        <Input placeholder="Name" value={name} onChange={setName} error={err?.fields?.name} />
+        <Input placeholder="slug (e.g. herbal-tea)" value={slug} onChange={setSlug} error={fieldError('slug')} />
+        <Input placeholder="Name" value={name} onChange={setName} error={fieldError('name')} />
         <Input placeholder="Sort order" value={sortOrder} onChange={setSortOrder} />
       </div>
 
-      {err && !err.fields && (
-        <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{err.message}</p>
+      {formError && (
+        <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{formError}</p>
       )}
       {create.isSuccess && (
         <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">Category created.</p>

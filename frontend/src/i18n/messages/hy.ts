@@ -38,6 +38,17 @@ export const hy = {
     productCount_one: '{{count}} ապրանք',
     productCount_other: '{{count}} ապրանք',
   },
+  validation: {
+    required: 'Պարտադիր է',
+    slug_format:
+      'Օգտագործեք փոքրատառեր, թվեր և գծիկներ — օրինակ՝ «wildflower-honey»',
+    email_format: 'Մուտքագրեք վավեր էլ. հասցե',
+    password_too_short: 'Օգտագործեք առնվազն {{min}} նիշ',
+    positive: 'Պետք է մեծ լինի զրոյից',
+    not_negative: 'Չի կարող բացասական լինել',
+    variants_required: 'Ավելացրեք առնվազն մեկ չափս',
+    unknown: 'Այս արժեքը վավեր չէ',
+  },
   footer: {
     blurb:
       'Ընտանեկան մեղվանոց բարձր լեռների մարգագետիններում։ Մեղր, մեղրամոմ, պրոպոլիս, մեղվի կաթ, ծաղկափոշի և մեղվի թույն՝ ձեռքով հավաքված։',

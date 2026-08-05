@@ -220,7 +220,7 @@ answered earlier than it needs to be.
 ## 3. The phases
 
 Same shape as Era I: **Goal**, **You will learn**, **Backend**, **Frontend**,
-**Done when**. One phase at a time (RULES.md #6).
+**Done when**. One phase at a time (RULES.md #5).
 
 ---
 
@@ -295,7 +295,7 @@ WCAG contrast maths and why it belongs at token-definition time.
       components in the rebuild that contain user-facing strings — building
       them in this phase means writing English into JSX and reopening both
       files a day later to extract every string into translation keys.
-      Interleaving E1 and E1.5 to avoid that would have broken RULES.md #6
+      Interleaving E1 and E1.5 to avoid that would have broken RULES.md #5
       ("finish a phase's definition of done before moving on"), so the
       bullets move to the phase that owns their dependency instead. E1 is now
       exactly the layer that has no strings in it.
@@ -408,12 +408,24 @@ configurations, font coverage per writing system.
       **Slugs are deliberately not translated:** the slug is the product's
       identity, so `/products/wildflower-honey` resolves in every language
       and a link shared between speakers still works.
-- [ ] Validation messages in `domain.ValidateProduct` (and the rest of the
+- [x] Validation messages in `domain.ValidateProduct` (and the rest of the
       `fields` envelope) become short keys (`"required"`, `"positive"`,
       `"slug_format"`) instead of English prose — the frontend's i18n layer
       renders them, and the backend stops hardcoding a language into its API
-      contract. Update every existing test that currently asserts on the
-      English prose.
+      contract. Codes live as constants in `domain/validation.go`, so a typo
+      is a compile error and the vocabulary is greppable from one place;
+      they are part of the public contract, and renaming one is as breaking
+      as renaming a JSON field.
+      No existing test asserted on the prose, so none needed updating — but
+      the **frontend did**, and it had to change in the same commit: all
+      three forms rendered `err.fields[x]` straight to the screen, so keys
+      alone would have shown readers "slug_format". `useFieldErrors` is now
+      the single place a code becomes a sentence, with an `unknown` fallback
+      so a code the catalogue has not learned yet looks imprecise rather
+      than leaking a raw identifier.
+      The envelope's top-level `message` stays English on purpose: `code`
+      exists precisely so a client can render its own text, leaving `message`
+      as a developer-facing fallback.
 - [ ] Search: **verified against the running dev database — Postgres ships a
       built-in `armenian` text search configuration**, alongside `english`
       and `russian` ([source](https://www.postgresql.org/docs/current/textsearch-configuration.html)):
@@ -978,36 +990,18 @@ imports neither SQL nor HTTP; the server computes every total.
 
 ## 6. Rules that apply to every phase
 
-Unchanged from [RULES.md](RULES.md), repeated because Era II is where they get
-tested:
+**[RULES.md](RULES.md) is the single copy.** This section used to restate five
+of its rules and additionally *held* one — the design canvas as source of UI
+truth — that existed nowhere else, which is how a rule gets missed by anyone
+not reading this particular plan. That rule now lives in RULES.md as **#16**,
+and the restated ones are gone rather than kept in two places to drift apart.
 
-- **The design canvas is the source of UI truth.** Colours, spacing, type,
-  copy, layout and component structure come from
-  `docs/design/mountain-breath-store.dc.html` — read it rather than inventing
-  a value or guessing a shade. It is a working *copy* of the claude.ai/design
-  project named in the header above: refresh it with `DesignSync` when the
-  canvas moves, and never hand-edit it, or the two silently diverge.
+The ones Era II leans on hardest, by number:
 
-  **Three standing exceptions**, because a static mock cannot express
-  everything a running site needs:
-
-  1. **Accessibility overrides the design.** Where a design value fails WCAG
-     AA, the accessible value wins. E1 has already done this to the brand
-     orange (2.9:1 as a button fill → `#b8541a` at 4.6:1) and to the muted
-     ink.
-  2. **States the mock never draws are ours to design.** It shows the resting
-     state of six screens and nothing else — no focus ring, no error, no
-     loading, empty, disabled or hover state appears anywhere in it.
-  3. **Requirements added after the mock** have no canvas guidance and are
-     designed to fit it — the three languages being the first, since the
-     design shows no language switcher at all.
-
-  Anything taken from the canvas needs no justification. Anything that
-  departs from it gets a line saying why, in the phase bullet that did it.
-- Every route change updates `docs/api/mountain-breath.postman_collection.json`
-  in the same commit (#15).
-- New code comes with tests (#11) — and each phase above names which.
-- Significant choices get a Decisions Log row in
-  [ARCHITECTURE.md](ARCHITECTURE.md) (#13); §2 of this document is the queue.
-- A learning-log entry per session (#7).
-- Work lands on `dev`; batch PRs merge to `master` (#9).
+| Rule | Why it bites here |
+|---|---|
+| **#16** design canvas is UI truth | every phase from E1 on renders something the mock drew |
+| **#15** Postman is the API contract | E1.5, E2, E3, E4, E6, E7 and E9 all add or change routes |
+| **#11** new code comes with tests | each phase above names which tests it owes |
+| **#13** decisions get logged | §2 of this document is the queue feeding that log |
+| **#5** one phase at a time | E1.5 exists *because* interleaving E1 with it would have broken this |

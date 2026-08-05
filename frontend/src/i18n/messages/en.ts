@@ -40,6 +40,23 @@ export const en = {
     productCount_one: '{{count}} product',
     productCount_other: '{{count}} products',
   },
+  // Validation codes from the API's `fields` envelope. The backend answers
+  // with a code ("slug_format"), never a sentence, so the same 400 response
+  // renders in whatever language the reader is using — see
+  // backend/internal/domain/validation.go.
+  //
+  // `unknown` is the safety net: a code this catalogue has not learned yet
+  // must still produce a sentence, not a raw identifier leaking into the UI.
+  validation: {
+    required: 'Required',
+    slug_format: 'Use lowercase letters, digits and dashes — like "wildflower-honey"',
+    email_format: 'Enter a valid email address',
+    password_too_short: 'Use at least {{min}} characters',
+    positive: 'Must be greater than zero',
+    not_negative: 'Cannot be negative',
+    variants_required: 'Add at least one size',
+    unknown: 'This value is not valid',
+  },
   footer: {
     blurb:
       'A family apiary on the high meadows. Honey, beeswax, propolis, royal jelly, pollen and venom, harvested by hand.',

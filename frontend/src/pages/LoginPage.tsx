@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { ApiError } from '../api/client'
 import { useLogin, useRegister } from '../api/hooks'
+import { useFieldErrors } from '../i18n/useFieldErrors'
 
 export function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -23,7 +23,9 @@ export function LoginPage() {
     )
   }
 
-  const err = active.error instanceof ApiError ? active.error : null
+  // The API answers with validation CODES, not sentences — this turns them
+  // into readable text in the reader's language.
+  const { fieldError, formError } = useFieldErrors(active.error)
 
   return (
     <div className="mx-auto max-w-sm px-4 py-12">
@@ -39,18 +41,18 @@ export function LoginPage() {
             type="email"
             value={email}
             onChange={setEmail}
-            error={err?.fields?.email}
+            error={fieldError('email')}
           />
           <Field
             label="Password"
             type="password"
             value={password}
             onChange={setPassword}
-            error={err?.fields?.password}
+            error={fieldError('password')}
           />
 
-          {err && !err.fields && (
-            <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{err.message}</p>
+          {formError && (
+            <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{formError}</p>
           )}
 
           <button

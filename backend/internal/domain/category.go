@@ -24,17 +24,19 @@ var ErrSlugTaken = errors.New("slug already taken")
 // e.g. "herbal-tea", "coffee", "gift-sets-2026".
 var slugRe = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
-// ValidateCategory returns a field->problem map; empty map means valid.
+// ValidateCategory returns a field->code map; empty map means valid.
+// The values are validation CODES the client translates, not sentences —
+// see validation.go.
 func ValidateCategory(slug, name string) map[string]string {
 	fields := make(map[string]string)
 	if strings.TrimSpace(name) == "" {
-		fields["name"] = "required"
+		fields["name"] = ValidationRequired
 	}
 	switch {
 	case slug == "":
-		fields["slug"] = "required"
+		fields["slug"] = ValidationRequired
 	case !slugRe.MatchString(slug):
-		fields["slug"] = "must be lowercase letters/digits separated by dashes, e.g. \"herbal-tea\""
+		fields["slug"] = ValidationSlugFormat
 	}
 	return fields
 }

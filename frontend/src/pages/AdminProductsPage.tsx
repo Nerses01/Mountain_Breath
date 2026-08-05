@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { ApiError } from '../api/client'
+import { useFieldErrors } from '../i18n/useFieldErrors'
 import {
   useAdminProducts,
   useCategories,
@@ -68,8 +68,10 @@ function CreateProductForm() {
   // replaces the array (immutably), same rule as all React state.
   const [variants, setVariants] = useState<VariantDraft[]>([{ ...emptyVariant }])
 
-  const err = create.error instanceof ApiError ? create.error : null
-  const fieldErr = (key: string) => err?.fields?.[key]
+  // fieldErr keeps its name so the JSON-path call sites below
+  // (`fieldErr('variants[0].sku')`) are untouched; it now resolves the
+  // API's validation code into the reader's language.
+  const { fieldError: fieldErr, formError } = useFieldErrors(create.error)
 
   function setVariant(i: number, patch: Partial<VariantDraft>) {
     setVariants(variants.map((v, idx) => (idx === i ? { ...v, ...patch } : v)))
@@ -159,8 +161,8 @@ function CreateProductForm() {
         </button>
       </div>
 
-      {err && !err.fields && (
-        <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{err.message}</p>
+      {formError && (
+        <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{formError}</p>
       )}
       {create.isSuccess && (
         <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">Product created.</p>
@@ -295,7 +297,9 @@ function ImageSlot({ product }: { product: AdminProduct }) {
   const upload = useUploadProductImage()
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const err = upload.error instanceof ApiError ? upload.error : null
+  // Upload failures (too large, wrong type) are whole-request errors rather
+  // than per-field ones, so only formError applies here.
+  const { formError } = useFieldErrors(upload.error)
 
   return (
     <div className="flex flex-col items-center">
@@ -325,7 +329,9 @@ function ImageSlot({ product }: { product: AdminProduct }) {
           e.target.value = '' // same file can be re-picked later
         }}
       />
-      {err && <span className="mt-1 max-w-24 text-center text-xs text-red-600">{err.message}</span>}
+      {formError && (
+        <span className="mt-1 max-w-24 text-center text-xs text-red-600">{formError}</span>
+      )}
     </div>
   )
 }
