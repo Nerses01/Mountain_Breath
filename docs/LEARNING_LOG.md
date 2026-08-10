@@ -17,6 +17,93 @@ Template for an entry:
 
 ---
 
+## 2026-08-10 — Phase E2: faceted shop, home page, and a bug only running found
+
+**Worked on:** migrations 000008–000010 (benefit taxonomy + join table +
+translations; `products.badge`/`badge_tone`; denormalized `sales_count` with a
+backfill); `ProductFilter` extended with benefits, a price band and a sort
+whitelist; `GET /catalog/facets` answering the whole sidebar in one round
+trip; `sales_count` maintained inside the checkout transaction; seed rewritten
+to the design's six hive products in three languages; `ShopPage` with
+URL-driven filters, `HomePage`, redesigned `ProductCard`, `PriceRange` dual
+slider, header search overlay; Postman gains a "Faceted catalog" folder.
+
+**Learned:**
+
+- **Many-to-many needs a table; one-to-many needs a column.** A product has
+  one category (`category_id`, an FK) and any number of benefits
+  (`product_benefits`, PK on the pair). The composite PK is what makes the
+  relationship a *set* — no amount of double-clicking can make one product
+  count twice in a facet total.
+- **A composite index only helps queries that constrain its LEADING column.**
+  The PK `(product_id, benefit_id)` answers "which benefits does this product
+  have" but not "which products have this benefit", so the facet query needs
+  the mirror index. Same rule as ordering fields in a C++ struct for lookup,
+  except the database will silently do a sequential scan instead of telling
+  you.
+- **`count(*) FILTER (WHERE …)` is a per-aggregate WHERE.** Several
+  differently-filtered aggregates share one scan, which is what lets one
+  LATERAL subquery return a product's min price, max price and
+  "how many variants are inside the requested band" together.
+- **`LEFT JOIN` + `count(column)` ≠ `count(*)`.** On an unmatched row the
+  joined column is NULL and `count(col)` ignores it, while `count(*)` counts
+  the row itself and would report 1 for every empty category. The difference
+  is the whole reason zero-count facets can be rendered at all.
+- **`ORDER BY` cannot be a bound parameter.** Postgres plans the sort at parse
+  time, so `ORDER BY $1` sorts by the constant string `$1`. That single fact
+  is why the sort whitelist is a security boundary and lives in `domain`.
+- **The rule against concatenating SQL is about user input, not about `+`.**
+  Sharing the WHERE clause between the list, count and facet queries as Go
+  constants is safe — the string is fixed before `main` runs, like a
+  `constexpr` — and it removes the "these two must stay identical" comment
+  that was the actual hazard.
+- **Denormalizing is a trade with a named cost.** `sales_count` buys a cheap
+  sort and pays with derived data that can drift; it is worth it only because
+  exactly one write path touches it and that path already holds the locks.
+- **Deadlocks come from lock ORDER, not lock count.** Adding a second
+  `UPDATE` to checkout meant products could be locked in cart order; two
+  carts holding the same two products in opposite orders would deadlock. Fix
+  is the same rule the variant lock already used — sort the ids ascending.
+  Go randomises map iteration order deliberately, so `slices.Sort` is not
+  tidiness here, it is the fix.
+- **Faceted search has one governing rule**: a facet group's own filter must
+  not narrow its own counts. Everything else about the CTE follows from it.
+- **The URL is a place to put state.** Filters in `useState` would have
+  broken the back button, shared links, reload and open-in-new-tab — and
+  would have passed every "does clicking work" test while doing so.
+- **A percentage height resolves against the parent's HEIGHT.** `h-full`
+  inside a container that only has `min-height` collapses; an aspect ratio
+  derives the height from the width instead. Found by looking at a
+  screenshot, not by typechecking.
+
+**The one that matters most: a passing test suite is not a working app.**
+E1.5 finished with 43 green tests, a Postman collection proving the API
+answers in three languages, and a `Done when` that said the shell "reads
+correctly in all three languages". Opening `/hy/shop` in a browser showed an
+Armenian header wrapped around an entirely English catalog — the frontend had
+never sent `?lang=`, a cookie, or `Accept-Language` to anything. Nothing
+failed, because the backend's fallback chain returns perfectly valid English.
+Two smaller versions of the same shape turned up beside it: `GetCart` had no
+locale at all, and the footer's link columns were hardcoded English literals.
+The lesson is not "write more tests" — it is that tests assert what you
+thought to assert, and *running the thing* is a different question. The fix
+now has a test that asserts on the request URL, which is the thing that was
+actually wrong.
+
+**Questions / to revisit:**
+
+- Facet counts are recomputed on every filter change. Six products makes that
+  free; at a few thousand it is the page's cost centre. Where does caching
+  belong — HTTP headers, a materialised view, or the client's query cache?
+- `sales_count` is not decremented on cancellation, on purpose. If the shop
+  ever wants "most loved" to mean *kept*, that becomes a second write path
+  and the counter needs the same care twice.
+- The card shows a benefit from the taxonomy where the mock wrote a
+  per-product phrase. If E3 adds editorial fields anyway, is a `tagline`
+  worth it, or is one vocabulary better than two?
+
+---
+
 ## 2026-08-05 — Phase E1.5: three languages, front to back
 
 **Worked on:** i18next + react-i18next with the URL as the only source of

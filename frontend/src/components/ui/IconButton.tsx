@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ComponentPropsWithRef, ReactNode } from 'react'
 import { cx } from '../../lib/cx'
 
 /**
@@ -18,11 +18,16 @@ export function IconButton({
   children,
   type = 'button',
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
+}: ComponentPropsWithRef<'button'> & {
   label: string
   tone?: 'outline' | 'bare'
   children: ReactNode
 }) {
+  // ComponentPropsWithRef rather than ButtonHTMLAttributes so `ref` is part
+  // of the props. In React 19 a function component takes ref as an ordinary
+  // prop — forwardRef is no longer needed — but the TYPE still has to admit
+  // it, and ButtonHTMLAttributes does not. The header needs one: closing the
+  // search overlay puts focus back on the button that opened it.
   return (
     <button
       type={type}

@@ -29,6 +29,9 @@ type ProductStore interface {
 	// other "how should this list be shaped" option. GetProductBySlug takes
 	// it as a parameter, having no filter to put it in.
 	ListProducts(ctx context.Context, f domain.ProductFilter) ([]domain.Product, int, error)
+	// CatalogFacets takes the same filter as the listing — the sidebar
+	// counts describe the same query the grid runs, minus paging.
+	CatalogFacets(ctx context.Context, f domain.ProductFilter) (domain.CatalogFacets, error)
 	GetProductBySlug(ctx context.Context, slug string, locale domain.Locale) (domain.Product, error)
 	CreateProduct(ctx context.Context, p *domain.Product) error
 	UpdateProduct(ctx context.Context, p *domain.Product) error
@@ -48,7 +51,10 @@ type SessionStore interface {
 }
 
 type CartStore interface {
-	GetCart(ctx context.Context, userID int64) ([]domain.CartItem, error)
+	// The locale is a parameter here for the same reason it is on
+	// GetProductBySlug: the cart shows product NAMES, and a basket in the
+	// wrong language is as wrong as a catalog in the wrong language.
+	GetCart(ctx context.Context, userID int64, locale domain.Locale) ([]domain.CartItem, error)
 	SetCartItem(ctx context.Context, userID, variantID int64, qty int) error
 	DeleteCartItem(ctx context.Context, userID, variantID int64) error
 }
@@ -124,6 +130,7 @@ func (s *Server) Routes() chi.Router {
 		r.Get("/auth/me", s.handleMe)
 
 		r.Get("/categories", s.handleListCategories)
+		r.Get("/catalog/facets", s.handleCatalogFacets)
 		r.Get("/products", s.handleListProducts)
 		r.Get("/products/{slug}", s.handleGetProduct)
 

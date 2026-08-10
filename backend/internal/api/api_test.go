@@ -26,6 +26,11 @@ type fakeStore struct {
 	// the negotiated language actually reaches the store rather than being
 	// resolved and then dropped.
 	lastLocale domain.Locale
+	// lastFilter does the same job for the whole catalog filter: parsing a
+	// query string into a ProductFilter is API-layer logic, and this is what
+	// lets it be tested without a database behind it.
+	lastFilter domain.ProductFilter
+	facets     domain.CatalogFacets
 }
 
 func newFakeStore() *fakeStore {
@@ -55,7 +60,14 @@ func (f *fakeStore) CreateCategory(_ context.Context, c *domain.Category) error 
 
 func (f *fakeStore) ListProducts(_ context.Context, filter domain.ProductFilter) ([]domain.Product, int, error) {
 	f.lastLocale = filter.EffectiveLocale()
+	f.lastFilter = filter
 	return f.products, len(f.products), nil
+}
+
+func (f *fakeStore) CatalogFacets(_ context.Context, filter domain.ProductFilter) (domain.CatalogFacets, error) {
+	f.lastLocale = filter.EffectiveLocale()
+	f.lastFilter = filter
+	return f.facets, nil
 }
 
 func (f *fakeStore) GetProductBySlug(_ context.Context, slug string, locale domain.Locale) (domain.Product, error) {
@@ -149,7 +161,7 @@ func (f *fakeStore) DeleteSession(_ context.Context, token string) error {
 
 // --- CartStore / OrderStore (unused by these tests) ---
 
-func (f *fakeStore) GetCart(_ context.Context, _ int64) ([]domain.CartItem, error) {
+func (f *fakeStore) GetCart(_ context.Context, _ int64, _ domain.Locale) ([]domain.CartItem, error) {
 	return nil, nil
 }
 func (f *fakeStore) SetCartItem(_ context.Context, _, _ int64, _ int) error   { return nil }

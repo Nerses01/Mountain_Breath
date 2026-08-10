@@ -5,10 +5,11 @@ import { AdminOrdersPage } from './pages/AdminOrdersPage'
 import { AdminPage } from './pages/AdminPage'
 import { AdminProductsPage } from './pages/AdminProductsPage'
 import { CartPage } from './pages/CartPage'
-import { CatalogPage } from './pages/CatalogPage'
+import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { OrdersPage } from './pages/OrdersPage'
 import { ProductPage } from './pages/ProductPage'
+import { ShopPage } from './pages/ShopPage'
 
 /**
  * The storefront pages, defined once and mounted under every locale prefix.
@@ -17,8 +18,12 @@ import { ProductPage } from './pages/ProductPage'
  */
 function storefrontRoutes() {
   return [
-    <Route key="index" index element={<CatalogPage />} />,
-    <Route key="shop" path="shop" element={<CatalogPage />} />,
+    // E2 splits the two apart: `/` was the catalog because there was no home
+    // page to put there. Now `/` is the designed Home and `/shop` is the
+    // faceted listing — which is also why the filter state can live in the
+    // query string, since `/shop` is the only page that has any.
+    <Route key="index" index element={<HomePage />} />,
+    <Route key="shop" path="shop" element={<ShopPage />} />,
     <Route key="product" path="products/:slug" element={<ProductPage />} />,
     <Route key="login" path="login" element={<LoginPage />} />,
     <Route key="cart" path="cart" element={<CartPage />} />,

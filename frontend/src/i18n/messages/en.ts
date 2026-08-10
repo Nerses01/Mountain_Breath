@@ -26,6 +26,7 @@ export const en = {
       account: 'Account',
       signIn: 'Sign in',
       signOut: 'Sign out',
+      close: 'Close',
     },
     language: {
       label: 'Language',
@@ -74,6 +75,7 @@ export const en = {
     outOfStock: 'Out of stock',
     stockLeft: '{{count}} left',
     addToCart: 'Add to cart',
+    add: 'Add',
     all: 'All',
     back: '← Back to the catalogue',
     notFound: 'This product does not exist (anymore?).',
@@ -82,6 +84,106 @@ export const en = {
     inCart: 'In cart: {{count}}',
     signInToBuy: 'Sign in to buy',
     adding: 'Adding…',
+
+    // ---- Shop page (E2) ------------------------------------------------
+    shopTitle: 'The whole shelf',
+    shopBlurb:
+      'Six products, one meadow. Everything here was taken from our own hives this season.',
+    allProducts: 'All hive products',
+    sortLabel: 'Sort products',
+    sortPrefix: 'Sort:',
+    sort: {
+      popular: 'Most loved',
+      price_asc: 'Price, low to high',
+      price_desc: 'Price, high to low',
+      newest: 'Newest',
+    },
+    facet: {
+      category: 'Category',
+      benefit: 'Good for',
+      price: 'Price',
+    },
+    clearFilters: 'Clear filters',
+    noResults: 'Nothing on the shelf matches that.',
+    noResultsHint: 'Try fewer filters, or a wider price range.',
+    noResultsFor: 'Nothing found for “{{query}}”.',
+    seeAllResults_one: 'See {{count}} result',
+    seeAllResults_other: 'See all {{count}} results',
+    pagination: 'Pages',
+    nextPage: 'Next page',
+    // "500 g · Energy" — the card's one-line summary.
+    sizeAndBenefit: '{{size}} · {{benefit}}',
+    priceFrom: 'from {{price}}',
+    help: {
+      title: 'Not sure where to start?',
+      blurb: 'Tell us what you want to feel better about and we will point at one jar.',
+      cta: 'Ask a beekeeper',
+    },
+    // Badge KEYS from products.badge (migration 000009). The database stores
+    // the key and the wording lives here, so a badge reads correctly in all
+    // three languages and adding a fourth needs no backend change.
+    badge: {
+      best_seller: 'Best seller',
+      new: 'New',
+      cold_chain: 'Cold chain',
+      for_makers: 'For makers',
+      immunity: 'Immunity',
+      protein: 'Protein',
+    },
+  },
+  // ---- Home page (E2) --------------------------------------------------
+  // Copy about the SHOP, not about the catalog: it is translated here rather
+  // than stored in the database because nobody edits it from the admin and
+  // it changes with the design, not with the stock.
+  home: {
+    hero: {
+      eyebrow: 'Keep on buzzing',
+      titleAccent: 'Everything',
+      title: 'the hive gives',
+      blurb:
+        'Honey, beeswax, propolis, royal jelly, pollen and venom — harvested by our family on the high meadows, and nothing else added on the way to you.',
+      primaryCta: 'Shop the hive',
+      secondaryCta: 'Meet the beekeepers',
+      imageSlot: 'hero image — honey jar + comb',
+      stamp: { raw: 'Raw', unfiltered: 'unfiltered' },
+    },
+    stats: {
+      altitude: { value: '1,400 m', label: 'Meadow altitude' },
+      hives: { value: '210', label: 'Hives in the family' },
+      generations: { value: '3 gen.', label: 'Of beekeeping' },
+    },
+    harvest: {
+      title: 'How we harvest',
+      blurb:
+        'We take only the surplus comb, spin it cold, and jar it the same week. No heating above hive temperature, no filtering out the pollen, no blending across seasons.',
+      link: 'Read the harvest log',
+    },
+    benefits: {
+      title: 'What the hive',
+      titleAccent: 'does for you',
+      blurb:
+        'Every jar and tincture on this shelf earns its place by what it does in the body. Here is the short version, with sources on each product page.',
+      link: 'See all benefits',
+      items: {
+        energy: { lead: 'Honey and pollen for', emphasis: 'steady natural energy' },
+        defense: { lead: 'Propolis for', emphasis: 'antimicrobial defense' },
+        vitality: { lead: 'Royal jelly for', emphasis: 'vitality and skin' },
+        balms: { lead: 'Beeswax for', emphasis: 'balms, creams and candles' },
+      },
+    },
+    shelf: {
+      eyebrow: 'The shelf',
+      title: 'Six gifts of the hive',
+      action: 'Shop all',
+    },
+    story: {
+      eyebrow: 'Our family',
+      title: 'My grandfather kept nine hives. We keep two hundred and ten.',
+      blurb:
+        'Same meadow, same slow method, a lot more jars. If you ever come up the valley in July, we will put you in a veil and let you lift a frame yourself.',
+      link: 'Visit the apiary',
+      imageSlot: 'photo — beekeeper holding a frame',
+    },
   },
   cart: {
     title: 'Your cart',
@@ -121,6 +223,14 @@ export const en = {
       'A family apiary on the high meadows. Honey, beeswax, propolis, royal jelly, pollen and venom, harvested by hand.',
     shop: 'Shop',
     company: 'Company',
+    // The Shop column is built from the category list, so it needs no keys.
+    // These four are content pages E9 builds; the labels translate now.
+    companyLinks: {
+      ourHive: 'Our hive',
+      harvestLog: 'Harvest log',
+      shipping: 'Shipping',
+      contact: 'Contact',
+    },
     newsletter: {
       title: 'Harvest notes',
       blurb: 'What is flowering, what we are jarring. Once a month.',

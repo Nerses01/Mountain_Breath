@@ -397,7 +397,7 @@
 								{
 									"key": "category",
 									"value": "",
-									"description": "optional category slug filter, e.g. herbal-tea"
+									"description": "optional category slug filter, e.g. honey"
 								},
 								{
 									"key": "q",
@@ -414,6 +414,30 @@
 									"description": "1..100, default 20"
 								},
 								{
+									"key": "benefit",
+									"value": "",
+									"description": "repeatable; several chips WIDEN the result (OR) — ?benefit=energy&benefit=skin",
+									"disabled": true
+								},
+								{
+									"key": "min_price",
+									"value": "",
+									"description": "price floor in minor units (900 = $9.00); a product matches if ANY variant is in the band",
+									"disabled": true
+								},
+								{
+									"key": "max_price",
+									"value": "",
+									"description": "price ceiling in minor units",
+									"disabled": true
+								},
+								{
+									"key": "sort",
+									"value": "",
+									"description": "popular | price_asc | price_desc | newest. Anything else falls back to popular",
+									"disabled": true
+								},
+								{
 									"key": "lang",
 									"value": "{{lang}}",
 									"description": "en | hy | ru. Disabled by default so the request shows the negotiated default.",
@@ -421,7 +445,7 @@
 								}
 							]
 						},
-						"description": "Paginated list of active products with nested variants (sorted by price). Envelope: {items, page, per_page, total}.\n\nLanguage: resolved per request as ?lang= > mb_locale cookie > Accept-Language > en. An unknown value falls back rather than failing."
+						"description": "Paginated list of active products with nested variants (sorted by price). Envelope: {items, page, per_page, total}.\n\nEach item carries `badge` (a KEY like best_seller, empty when there is none), `badge_tone` and `benefits` [{slug, name}]. `sales_count` is deliberately not published — it orders the list server-side and nothing else.\n\nLanguage: resolved per request as ?lang= > mb_locale cookie > Accept-Language > en. An unknown value falls back rather than failing."
 					},
 					"event": [
 						{
@@ -442,6 +466,15 @@
 									"",
 									"pm.test(\"every product has variants array\", () => {",
 									"    body.items.forEach(p => pm.expect(p.variants).to.be.an(\"array\"));",
+									"});",
+									"",
+									"pm.test(\"badge is a key or empty, never English prose\", () => {",
+									"    const keys = [\"\", \"best_seller\", \"new\", \"cold_chain\", \"for_makers\", \"immunity\", \"protein\"];",
+									"    body.items.forEach(p => pm.expect(keys).to.include(p.badge));",
+									"});",
+									"",
+									"pm.test(\"sales_count is not published\", () => {",
+									"    body.items.forEach(p => pm.expect(p).to.not.have.property(\"sales_count\"));",
 									"});"
 								]
 							}
@@ -455,13 +488,13 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{apiV1}}/products/armenian-coffee",
+							"raw": "{{apiV1}}/products/mountain-wildflower-honey",
 							"host": [
 								"{{apiV1}}"
 							],
 							"path": [
 								"products",
-								"armenian-coffee"
+								"mountain-wildflower-honey"
 							],
 							"query": [
 								{
@@ -472,7 +505,7 @@
 								}
 							]
 						},
-						"description": "Product detail with variants. Slug comes from seed data.\n\nLanguage: resolved per request as ?lang= > mb_locale cookie > Accept-Language > en. An unknown value falls back rather than failing."
+						"description": "Product detail with variants, badge and benefits. Slug comes from seed data (backend/seed/seed.sql).\n\nLanguage: resolved per request as ?lang= > mb_locale cookie > Accept-Language > en. An unknown value falls back rather than failing."
 					},
 					"event": [
 						{
@@ -487,12 +520,23 @@
 									"const body = pm.response.json();",
 									"",
 									"pm.test(\"slug matches request\", () => {",
-									"    pm.expect(body.slug).to.eql(\"armenian-coffee\");",
+									"    pm.expect(body.slug).to.eql(\"mountain-wildflower-honey\");",
 									"});",
 									"",
 									"pm.test(\"variants sorted by price ascending\", () => {",
 									"    const prices = body.variants.map(v => v.price_minor);",
 									"    pm.expect(prices).to.eql([...prices].sort((a, b) => a - b));",
+									"});",
+									"",
+									"pm.test(\"variant labels are pure measurements\", () => {",
+									"    // The E2 decision: no container noun, so the column never needs",
+									"    // translating. \"500 g jar\" here would be a regression.",
+									"    body.variants.forEach(v => pm.expect(v.label).to.match(/^[0-9]/));",
+									"});",
+									"",
+									"pm.test(\"carries its badge and benefits\", () => {",
+									"    pm.expect(body.badge).to.eql(\"best_seller\");",
+									"    pm.expect(body.benefits.map(b => b.slug)).to.include(\"energy\");",
 									"});"
 								]
 							}
@@ -545,6 +589,365 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "Faceted catalog (Phase E2)",
+			"item": [
+				{
+					"name": "Catalog facets (unfiltered)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/catalog/facets",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"catalog",
+								"facets"
+							],
+							"query": [
+								{
+									"key": "lang",
+									"value": "{{lang}}",
+									"description": "en | hy | ru. Disabled by default so the request shows the negotiated default.",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Everything the Shop sidebar needs, in one round trip: category counts, benefit counts, the \"All hive products\" total, and the price slider's bounds in minor units.\n\nA separate endpoint from /products because the counts describe the WHOLE filtered catalog rather than the page on screen — paging through results must not re-run them.\n\nCounts assume backend/seed/seed.sql is loaded."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"",
+									"pm.test(\"has every facet group\", () => {",
+									"    pm.expect(body).to.have.keys(\"categories\", \"benefits\", \"total\",",
+									"        \"price_min_minor\", \"price_max_minor\");",
+									"});",
+									"",
+									"pm.test(\"six hive categories, one product each\", () => {",
+									"    pm.expect(body.total).to.eql(6);",
+									"    pm.expect(body.categories).to.have.lengthOf(6);",
+									"    body.categories.forEach(c => pm.expect(c.count).to.eql(1));",
+									"});",
+									"",
+									"pm.test(\"benefit counts match the seed\", () => {",
+									"    const by = Object.fromEntries(body.benefits.map(b => [b.slug, b.count]));",
+									"    pm.expect(by).to.deep.include({ energy: 3, immunity: 1, skin: 3, recovery: 3, sweetening: 1 });",
+									"});",
+									"",
+									"pm.test(\"price bounds span the cheapest and dearest variant\", () => {",
+									"    pm.expect(body.price_min_minor).to.eql(900);",
+									"    pm.expect(body.price_max_minor).to.eql(10500);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Catalog facets — a facet does not narrow itself",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/catalog/facets?benefit=energy",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"catalog",
+								"facets"
+							],
+							"query": [
+								{
+									"key": "benefit",
+									"value": "energy"
+								},
+								{
+									"key": "lang",
+									"value": "{{lang}}",
+									"description": "en | hy | ru. Disabled by default so the request shows the negotiated default.",
+									"disabled": true
+								}
+							]
+						},
+						"description": "The rule of faceted search, as an executable assertion: filtering by a benefit narrows the CATEGORY counts but leaves the BENEFIT counts alone. If a facet applied its own filter to itself, every unselected chip would read 0 and the only way out of a filter would be the back button."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"const cat = Object.fromEntries(body.categories.map(c => [c.slug, c.count]));",
+									"const ben = Object.fromEntries(body.benefits.map(b => [b.slug, b.count]));",
+									"",
+									"pm.test(\"three products are good for energy\", () => {",
+									"    pm.expect(body.total).to.eql(3);",
+									"});",
+									"",
+									"pm.test(\"category counts see the benefit filter\", () => {",
+									"    pm.expect(cat[\"honey\"]).to.eql(1);",
+									"    pm.expect(cat[\"beeswax\"]).to.eql(0);",
+									"});",
+									"",
+									"pm.test(\"but an emptied category is still listed\", () => {",
+									"    pm.expect(body.categories.map(c => c.slug)).to.include(\"beeswax\");",
+									"});",
+									"",
+									"pm.test(\"benefit counts do NOT see their own filter\", () => {",
+									"    pm.expect(ben[\"skin\"]).to.eql(3);",
+									"    pm.expect(ben[\"immunity\"]).to.eql(1);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Products — two benefit chips widen the result",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/products?benefit=skin&benefit=immunity",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"products"
+							],
+							"query": [
+								{
+									"key": "benefit",
+									"value": "skin"
+								},
+								{
+									"key": "benefit",
+									"value": "immunity"
+								},
+								{
+									"key": "lang",
+									"value": "{{lang}}",
+									"description": "en | hy | ru. Disabled by default so the request shows the negotiated default.",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Repeated params, not a comma-separated list. Chips inside ONE facet combine with OR (skin or immunity); filters from DIFFERENT facets combine with AND. A product carrying both selected benefits must appear once, not twice — which is why the store asks EXISTS rather than joining the taxonomy table."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"const slugs = body.items.map(p => p.slug);",
+									"",
+									"pm.test(\"union of both chips\", () => {",
+									"    pm.expect(body.total).to.eql(4);",
+									"    pm.expect(slugs).to.include.members([",
+									"        \"pure-beeswax-blocks\", \"raw-propolis-tincture\",",
+									"        \"fresh-royal-jelly\", \"bee-venom-serum\"]);",
+									"});",
+									"",
+									"pm.test(\"no product is listed twice\", () => {",
+									"    pm.expect(new Set(slugs).size).to.eql(slugs.length);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Products — price band",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/products?min_price=1500&max_price=3000",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"products"
+							],
+							"query": [
+								{
+									"key": "min_price",
+									"value": "1500",
+									"description": "$15.00 in minor units"
+								},
+								{
+									"key": "max_price",
+									"value": "3000",
+									"description": "$30.00 in minor units"
+								},
+								{
+									"key": "lang",
+									"value": "{{lang}}",
+									"description": "en | hy | ru. Disabled by default so the request shows the negotiated default.",
+									"disabled": true
+								}
+							]
+						},
+						"description": "A product matches when ANY of its variants falls inside the band — not when its price RANGE overlaps it. Royal jelly (25 g $32, 50 g $58, 100 g $105) is therefore excluded even though a range-overlap test would let it through."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"const slugs = body.items.map(p => p.slug);",
+									"",
+									"pm.test(\"only products with a variant inside the band\", () => {",
+									"    pm.expect(slugs).to.not.include(\"fresh-royal-jelly\");",
+									"    body.items.forEach(p => {",
+									"        const inBand = p.variants.some(v => v.price_minor >= 1500 && v.price_minor <= 3000);",
+									"        pm.expect(inBand, p.slug + \" has no variant in the band\").to.be.true;",
+									"    });",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Products — sort by price ascending",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/products?sort=price_asc",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"products"
+							],
+							"query": [
+								{
+									"key": "sort",
+									"value": "price_asc"
+								},
+								{
+									"key": "lang",
+									"value": "{{lang}}",
+									"description": "en | hy | ru. Disabled by default so the request shows the negotiated default.",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Sorting is by the CHEAPEST variant of each product — the \"from\" price the card shows. The whitelist lives in the domain layer because ORDER BY cannot be a bound parameter: the store selects a compile-time constant clause, so nothing a visitor types reaches the planner."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"",
+									"pm.test(\"ordered by each product's cheapest variant\", () => {",
+									"    const from = body.items.map(p => Math.min(...p.variants.map(v => v.price_minor)));",
+									"    pm.expect(from).to.eql([...from].sort((a, b) => a - b));",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Products — an invalid sort falls back (200, not 400)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/products?sort=price_asc;%20DROP%20TABLE%20products",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"products"
+							],
+							"query": [
+								{
+									"key": "sort",
+									"value": "price_asc; DROP TABLE products"
+								},
+								{
+									"key": "lang",
+									"value": "{{lang}}",
+									"description": "en | hy | ru. Disabled by default so the request shows the negotiated default.",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Anything outside the whitelist resolves to the default sort. Two properties at once: the injection attempt never reaches SQL, and a hand-edited URL still renders the shop instead of an error page."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"",
+									"pm.test(\"still returns the catalog\", () => {",
+									"    pm.expect(body.total).to.eql(6);",
+									"});",
+									"",
+									"pm.test(\"and the products table is still there\", () => {",
+									"    pm.expect(body.items.length).to.be.above(0);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				}
+			],
+			"description": "Phase E2: the Shop page's sidebar, sort and filters. Every request here assumes backend/seed/seed.sql has been loaded — the counts are asserted against the design's six hive products."
 		},
 		{
 			"name": "Localization (Phase E1.5)",
@@ -809,7 +1212,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"slug\": \"royal-jelly\",\n    \"name\": \"Royal jelly\",\n    \"sort_order\": 4,\n    \"translations\": {\n        \"hy\": {\n            \"name\": \"Մեղրի կաթ\"\n        },\n        \"ru\": {\n            \"name\": \"Маточное молочко\"\n        }\n    }\n}",
+							"raw": "{\n    \"slug\": \"{{newCatSlug}}\",\n    \"name\": \"Royal jelly\",\n    \"sort_order\": 4,\n    \"translations\": {\n        \"hy\": {\n            \"name\": \"Մայրական կաթ\"\n        },\n        \"ru\": {\n            \"name\": \"Маточное молочко\"\n        }\n    }\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -826,7 +1229,7 @@
 								"categories"
 							]
 						},
-						"description": "Creates a category (admin only — 401 anonymous, 403 customer). The pre-request script generates a unique slug each run.\n\nSince E1.5 an optional `translations` map may accompany the request. `name`/`description` stay required and mean ENGLISH - every other language falls back to them. The map holds NON-DEFAULT locales only: an \"en\" key is rejected with locale_is_default, and an unknown language with locale_unsupported. Omitting a language is normal and means \"show English there\"."
+						"description": "Creates a category. Admin only (401 anonymous / 403 non-admin).\n\nThe slug comes from a pre-request variable rather than a literal: E2's seed now owns royal-jelly, honey, beeswax and the rest, so a hardcoded slug here would 409 against a seeded database — and the test below asserts the echoed slug matches what was sent."
 					},
 					"event": [
 						{

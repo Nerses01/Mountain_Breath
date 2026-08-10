@@ -192,3 +192,49 @@
     outline-offset: 2px;
   }
 }
+
+/* The dual price slider's thumbs (see components/ui/PriceRange.tsx).
+   Hand-written CSS rather than Tailwind utilities because these are vendor
+   PSEUDO-ELEMENTS: ::-webkit-slider-thumb cannot be reached from a class on
+   the element, and the two vendor rules cannot be combined into one selector
+   list — a browser that does not understand one of them discards the whole
+   rule, so WebKit and Firefox get a block each.
+
+   pointer-events is the important line. The two stacked <input>s each cover
+   the full track, so the one painted on top would swallow every click meant
+   for the other. `none` on the input plus `auto` here makes only the 16px
+   thumbs interactive and lets the rest of the track fall through. */
+.range-thumb {
+  pointer-events: none;
+}
+
+.range-thumb::-webkit-slider-thumb {
+  pointer-events: auto;
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: var(--color-card);
+  border: 3px solid var(--color-brand);
+  cursor: pointer;
+}
+
+.range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: var(--color-card);
+  border: 3px solid var(--color-brand);
+  cursor: pointer;
+}
+
+.range-thumb:disabled::-webkit-slider-thumb {
+  border-color: var(--color-line-strong);
+  cursor: default;
+}
+
+.range-thumb:disabled::-moz-range-thumb {
+  border-color: var(--color-line-strong);
+  cursor: default;
+}

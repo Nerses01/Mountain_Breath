@@ -36,6 +36,28 @@ type Product struct {
 	CreatedAt  time.Time
 	Variants   []ProductVariant
 
+	// The product's category, resolved on a read. The card's eyebrow shows
+	// the NAME and the sidebar filters on the SLUG, and the list query
+	// already joins categories — carrying both here saves every client a
+	// second request and an id→name lookup it would have to keep in sync.
+	CategorySlug string
+	CategoryName string
+
+	// Badge is a KEY ("best_seller"), not a sentence — the client owns the
+	// wording in its three message catalogues. Empty means no badge.
+	// BadgeTone is presentation only ("honey"/"dark"/"outline").
+	Badge     string
+	BadgeTone string
+
+	// SalesCount is the denormalized popularity counter behind the "Most
+	// loved" sort (migration 000010). Read-only above the store: it is
+	// maintained by the checkout transaction, never set by a caller.
+	SalesCount int
+
+	// Benefits is the "Good for" taxonomy — many per product, hence a slice
+	// where CategoryID is a single field.
+	Benefits []Benefit
+
 	// Name/Description are English on a write and the RESOLVED text for the
 	// requested locale on a read — see the note on Category.Name.
 	Name        string
@@ -54,6 +76,46 @@ type ProductVariant struct {
 	StockQty   int
 }
 
+// ProductSort is the whitelist of orderings the Shop page's select offers.
+//
+// A string type rather than a bare string so the compiler stops a handler
+// from passing an arbitrary value: the ONLY way to obtain one is
+// ParseProductSort, which checks membership. That matters more than usual
+// here — the value ends up choosing an ORDER BY clause, and ORDER BY cannot
+// be a bound parameter (Postgres plans the sort at parse time, so `ORDER BY
+// $1` sorts by the constant string $1, not by that column). Every other
+// piece of user input in this file reaches SQL as a parameter; this one
+// reaches it by selecting a compile-time constant, which is why the
+// whitelist lives in the domain layer instead of being "validated" in the
+// store next to the query.
+type ProductSort string
+
+const (
+	SortPopular   ProductSort = "popular"    // sales_count, the "Most loved" default
+	SortPriceAsc  ProductSort = "price_asc"  // cheapest variant, ascending
+	SortPriceDesc ProductSort = "price_desc" // cheapest variant, descending
+	SortNewest    ProductSort = "newest"     // created_at
+
+	// DefaultProductSort is what an absent or unrecognised sort resolves to
+	// — the design labels the select "Sort: Most loved".
+	DefaultProductSort = SortPopular
+)
+
+// ProductSorts is the whole set, in the order the select lists them.
+var ProductSorts = []ProductSort{SortPopular, SortPriceAsc, SortPriceDesc, SortNewest}
+
+// ParseProductSort reports whether s named a real sort. Callers decide
+// whether an unknown value is an error or simply falls back — the same
+// contract as ParseLocale, deliberately, so the two read alike.
+func ParseProductSort(s string) (ProductSort, bool) {
+	for _, ps := range ProductSorts {
+		if string(ps) == s {
+			return ps, true
+		}
+	}
+	return DefaultProductSort, false
+}
+
 // ProductFilter describes what a product listing should return.
 type ProductFilter struct {
 	CategorySlug    string // empty = all categories
@@ -65,10 +127,38 @@ type ProductFilter struct {
 	// configuration to stem the query with. Zero value means unset, not
 	// invalid — see EffectiveLocale.
 	Locale Locale
+
+	// BenefitSlugs is an OR within the facet: picking Energy and Immunity
+	// widens the result to products good for either. Filters from DIFFERENT
+	// facets combine with AND (honey AND energy), which is the convention
+	// every faceted shop uses — narrowing inside one group would make the
+	// second click almost always return nothing.
+	BenefitSlugs []string
+
+	// Price bounds in minor units, nil = unbounded on that side. Pointers
+	// rather than an int64 sentinel because 0 is a legitimate bound and
+	// there is no spare value to mean "unset" — the same job std::optional
+	// does in C++, done here by the fact that a pointer can be nil. They
+	// also travel to pgx as SQL NULL without any conversion.
+	PriceMinMinor *int64
+	PriceMaxMinor *int64
+
+	// Sort is empty when the caller does not care; see EffectiveSort.
+	Sort ProductSort
 }
 
 func (f ProductFilter) Offset() int {
 	return (f.Page - 1) * f.PerPage
+}
+
+// EffectiveSort mirrors EffectiveLocale: a zero-value filter (a test, or a
+// caller written before sorting existed) means "no opinion", not "invalid",
+// and gets the default rather than an empty ORDER BY.
+func (f ProductFilter) EffectiveSort() ProductSort {
+	if f.Sort == "" {
+		return DefaultProductSort
+	}
+	return f.Sort
 }
 
 // EffectiveLocale is the language to actually query in. A zero-value filter

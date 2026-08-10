@@ -1,4 +1,8 @@
+import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
+import { useCategories } from '../../api/hooks'
+import { useLocale } from '../../i18n/useLocale'
 import { Button } from '../ui/Button'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 
@@ -17,10 +21,22 @@ import { LanguageSwitcher } from '../ui/LanguageSwitcher'
  */
 export function SiteFooter() {
   const { t } = useTranslation()
+  const { localePath } = useLocale()
   const year = new Date().getFullYear()
 
-  const shopLinks = ['Honey', 'Beeswax', 'Propolis', 'Royal jelly']
-  const companyLinks = ['Our hive', 'Harvest log', 'Shipping', 'Contact']
+  // E1.5 hardcoded these as English literals and E2 found them still English
+  // on the Russian home page — "no hardcoded string left in JSX" is easy to
+  // believe about a file until someone reads it in another language.
+  //
+  // The Shop column is now the real category list, so it translates itself
+  // and each entry is a working filter link. Four of six, matching the mock's
+  // column length; the shop page is the place that lists all of them.
+  const categories = useCategories()
+  const shopLinks = (categories.data ?? []).slice(0, 4)
+
+  // Company links stay plain text until E9 builds those pages — but their
+  // LABELS are translatable either way.
+  const companyLinks = ['ourHive', 'harvestLog', 'shipping', 'contact'] as const
 
   return (
     <footer className="mt-16 bg-bark">
@@ -35,8 +51,26 @@ export function SiteFooter() {
             </p>
           </div>
 
-          <FooterColumn title={t('footer:shop')} items={shopLinks} />
-          <FooterColumn title={t('footer:company')} items={companyLinks} />
+          <FooterColumn title={t('footer:shop')}>
+            {shopLinks.map((c) => (
+              <li key={c.id}>
+                <Link
+                  to={`${localePath('/shop')}?category=${c.slug}`}
+                  className="text-sm text-ink-on-dark-soft hover:text-ink-on-dark"
+                >
+                  {c.name}
+                </Link>
+              </li>
+            ))}
+          </FooterColumn>
+
+          <FooterColumn title={t('footer:company')}>
+            {companyLinks.map((key) => (
+              <li key={key} className="text-sm text-ink-on-dark-soft">
+                {t(`footer:companyLinks.${key}`)}
+              </li>
+            ))}
+          </FooterColumn>
 
           <div className="flex flex-col gap-3">
             <h2 className="font-display text-sm font-bold uppercase tracking-label text-honey">
@@ -80,19 +114,13 @@ export function SiteFooter() {
   )
 }
 
-function FooterColumn({ title, items }: { title: string; items: string[] }) {
+function FooterColumn({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-3">
       <h2 className="font-display text-sm font-bold uppercase tracking-label text-honey">
         {title}
       </h2>
-      <ul className="flex flex-col gap-3">
-        {items.map((item) => (
-          <li key={item} className="text-sm text-ink-on-dark-soft">
-            {item}
-          </li>
-        ))}
-      </ul>
+      <ul className="flex flex-col gap-3">{children}</ul>
     </div>
   )
 }

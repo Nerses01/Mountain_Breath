@@ -2,55 +2,182 @@ import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import type { Product } from '../api/types'
 import { useLocale } from '../i18n/useLocale'
-import { formatPrice } from '../lib/format'
+import { formatMoney } from '../lib/format'
+import { cx } from '../lib/cx'
+import { Badge, HeartIcon, IconButton } from './ui'
 
-export function ProductCard({ product }: { product: Product }) {
+/**
+ * The design's product card: image slot with a badge and a wishlist heart,
+ * a category eyebrow, the name, a "size · benefit" line, the price and an
+ * Add button.
+ *
+ * Two departures from the mock, both recorded here rather than in a comment
+ * nobody reads later:
+ *
+ *  1. The "size · benefit" line names a benefit from the TAXONOMY (Energy,
+ *     Immunity, Skin…) where the mock writes a per-product phrase ("Natural
+ *     energy", "Balms & candles"). Those would be two vocabularies for one
+ *     slot; E2 models the taxonomy, because that is what the sidebar has to
+ *     filter on. Slightly less evocative, one source of truth.
+ *  2. The price is the CHEAPEST variant, labelled "from" when there is more
+ *     than one. The mock draws a bare price because it shows one size per
+ *     product; royal jelly has three, and an unlabelled $32 next to a
+ *     product that also sells for $105 would be a lie of omission.
+ *
+ * The whole card is not one big <Link>. The mock's card holds two separate
+ * controls (Add, the heart) besides the product link, and nesting
+ * interactive elements inside an anchor is invalid HTML that browsers and
+ * screen readers resolve differently. Only the NAME is the link, stretched
+ * over the card with an ::after overlay so the whole surface is still
+ * clickable — and the two buttons sit above it in the stacking order.
+ */
+export function ProductCard({
+  product,
+  onAdd,
+  layout = 'compact',
+}: {
+  product: Product
+  /** Absent until E2's shop page wires it; the button is disabled then. */
+  onAdd?: (product: Product) => void
+  /** 'compact' is the shop grid, 'feature' the home page's roomier card. */
+  layout?: 'compact' | 'feature'
+}) {
   const { t } = useTranslation()
   const { localePath } = useLocale()
 
+  // Variants arrive sorted by price, so the first is the "from" price.
+  const cheapest = product.variants[0]
+  const hasChoice = product.variants.length > 1
+  const inStock = product.variants.some((v) => v.stock_qty > 0)
+  const benefit = product.benefits[0]
+
   return (
-    <Link
-      to={localePath(`/products/${product.slug}`)}
-      aria-label={product.name}
-      className="group"
+    <article
+      className={cx(
+        'group relative flex h-full flex-col gap-3 rounded-xl bg-card',
+        layout === 'feature' ? 'gap-3.5 p-5' : 'p-4.5',
+      )}
     >
-      <article className="flex h-full flex-col rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition-shadow group-hover:shadow-md">
-        {product.image_url && (
+      <div
+        className={cx(
+          'relative flex items-center justify-center overflow-hidden rounded-lg bg-panel',
+          layout === 'feature' ? 'h-52' : 'h-50',
+        )}
+      >
+        {product.image_url ? (
           <img
             src={product.image_url}
-            alt={product.name}
-            className="mb-3 h-36 w-full rounded-lg object-cover"
+            alt=""
+            className="size-full object-cover"
             loading="lazy"
           />
+        ) : (
+          // The mock draws a hatched placeholder with the shot description in
+          // it. Real products have no photos yet, so the slot keeps the
+          // card's geometry instead of collapsing. alt="" / aria-hidden: the
+          // product name is right underneath, so announcing this too would
+          // just repeat it.
+          <span
+            aria-hidden
+            className="px-4 text-center font-mono text-2xs uppercase tracking-label text-ink-muted"
+          >
+            {product.slug.replace(/-/g, ' ')}
+          </span>
         )}
-        <h3 className="text-lg font-semibold text-stone-800 group-hover:text-emerald-800">
-          {product.name}
-        </h3>
-        <p className="mt-1 flex-1 text-sm text-stone-500">{product.description}</p>
 
-        <ul className="mt-4 space-y-2">
-          {product.variants.map((v) => (
-            <li
-              key={v.id}
-              className="flex items-center justify-between rounded-lg bg-stone-50 px-3 py-2 text-sm"
-            >
-              <span className="font-medium text-stone-700">{v.label}</span>
-              <span className="flex items-center gap-3">
-                {v.stock_qty === 0 ? (
-                  <span className="text-xs text-red-500">{t('catalog:outOfStock')}</span>
-                ) : (
-                  <span className="text-xs text-stone-400">
-                    {t('catalog:stockLeft', { count: v.stock_qty })}
-                  </span>
-                )}
-                <span className="font-semibold text-stone-800">
-                  {formatPrice(v.price_minor)}
-                </span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </article>
-    </Link>
+        {product.badge && (
+          <Badge tone={product.badge_tone} className="absolute left-3 top-3">
+            {/* A KEY from the API, looked up here — the backend never sends
+                English prose, so the same response renders in all three
+                languages (backend/migrations/000009). */}
+            {t(`catalog:badge.${product.badge}`)}
+          </Badge>
+        )}
+
+        {/* Inert until E8 builds the wishlist. Disabled rather than absent:
+            leaving it out now and adding it later would move every card's
+            layout, and a disabled control announces itself honestly. */}
+        <IconButton
+          label={t('common:actions.wishlist')}
+          tone="bare"
+          disabled
+          className="absolute right-3 top-3 z-10 size-8 bg-panel-soft text-ink-faint"
+        >
+          <HeartIcon />
+        </IconButton>
+
+        {!inStock && (
+          <span className="absolute inset-x-3 bottom-3 rounded-full bg-bark/90 px-3 py-1.5 text-center text-2xs font-semibold uppercase tracking-label text-ink-on-dark">
+            {t('catalog:outOfStock')}
+          </span>
+        )}
+      </div>
+
+      {/* The mock's eyebrow is the CATEGORY, and it arrives already resolved
+          into the reader's language — the card would otherwise have to fetch
+          /categories and map category_id by hand. */}
+      <span className="font-display text-2xs font-semibold uppercase tracking-eyebrow text-ink-muted">
+        {product.category_name}
+      </span>
+
+      <h3
+        className={cx(
+          'font-display font-bold text-ink',
+          layout === 'feature' ? 'text-lg' : 'text-base',
+        )}
+      >
+        <Link
+          to={localePath(`/products/${product.slug}`)}
+          // The stretched-link trick: the ::after box covers the card, so
+          // the whole surface is clickable while only this anchor is the
+          // link. `relative` + `z-10` on the buttons keeps them on top.
+          className="after:absolute after:inset-0 after:content-[''] hover:text-brand-ink"
+        >
+          {product.name}
+        </Link>
+      </h3>
+
+      {layout === 'feature' ? (
+        <p className="text-sm leading-relaxed text-ink-soft">{product.description}</p>
+      ) : (
+        cheapest && (
+          <p className="text-xs text-ink-soft">
+            {benefit
+              ? t('catalog:sizeAndBenefit', {
+                  size: cheapest.label,
+                  benefit: benefit.name,
+                })
+              : cheapest.label}
+          </p>
+        )
+      )}
+
+      <div className="mt-auto flex items-end justify-between gap-3 pt-2">
+        <p className="flex flex-col">
+          <span className="font-display text-lg font-extrabold text-brand-ink">
+            {hasChoice
+              ? t('catalog:priceFrom', { price: formatMoney(cheapest.price_minor) })
+              : formatMoney(cheapest?.price_minor ?? 0)}
+          </span>
+          {/* E5 adds the second currency line the mock draws under the
+              price. Nothing is faked here in the meantime. */}
+        </p>
+
+        <button
+          type="button"
+          disabled={!inStock || !onAdd}
+          onClick={() => onAdd?.(product)}
+          className={cx(
+            'relative z-10 shrink-0 rounded-full font-display text-xs font-semibold transition',
+            'disabled:pointer-events-none disabled:opacity-50',
+            layout === 'feature'
+              ? 'bg-bark px-4.5 py-2.5 text-ink-on-dark hover:opacity-90'
+              : 'border-[1.5px] border-bark px-4 py-2.5 text-ink hover:bg-bark hover:text-ink-on-dark',
+          )}
+        >
+          {layout === 'feature' ? t('catalog:addToCart') : t('catalog:add')}
+        </button>
+      </div>
+    </article>
   )
 }

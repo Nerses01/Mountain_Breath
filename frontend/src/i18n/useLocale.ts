@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router'
 import { useTranslation } from 'react-i18next'
+import { setApiLocale } from '../api/client'
 import {
   DEFAULT_LOCALE,
   isLocale,
@@ -37,6 +38,13 @@ export function useLocale(): {
   const { i18n } = useTranslation()
 
   const locale = localeFromPath(pathname)
+
+  // The API client is told SYNCHRONOUSLY, during render, not in the effect
+  // below. Effects run after paint, and TanStack Query fires its request
+  // during the same render — so setting this in the effect would leave the
+  // first request on a page load of /hy/shop asking for English, and only
+  // the second one would be right.
+  setApiLocale(locale)
 
   useEffect(() => {
     if (i18n.language !== locale) {

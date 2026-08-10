@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/jackc/pgx/v5"
 
@@ -27,7 +28,7 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64) (domain.Order, er
 	// cannot be oversold. ORDER BY gives all transactions the same locking
 	// order — the classic deadlock avoidance rule.
 	rows, err := tx.Query(ctx, `
-		SELECT ci.variant_id, ci.qty, v.stock_qty, v.price_minor, v.label, p.name
+		SELECT ci.variant_id, ci.qty, v.stock_qty, v.price_minor, v.label, p.name, p.id
 		FROM cart_items ci
 		JOIN product_variants v ON v.id = ci.variant_id
 		JOIN products p ON p.id = v.product_id
@@ -46,11 +47,12 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64) (domain.Order, er
 		priceMinor int64
 		label      string
 		name       string
+		productID  int64
 	}
 	var lines []line
 	for rows.Next() {
 		var l line
-		if err := rows.Scan(&l.variantID, &l.qty, &l.stockQty, &l.priceMinor, &l.label, &l.name); err != nil {
+		if err := rows.Scan(&l.variantID, &l.qty, &l.stockQty, &l.priceMinor, &l.label, &l.name, &l.productID); err != nil {
 			rows.Close()
 			return domain.Order{}, fmt.Errorf("scanning cart line: %w", err)
 		}
@@ -107,6 +109,36 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64) (domain.Order, er
 			UPDATE product_variants SET stock_qty = stock_qty - $1 WHERE id = $2`,
 			l.qty, l.variantID); err != nil {
 			return domain.Order{}, fmt.Errorf("decrementing stock: %w", err)
+		}
+	}
+
+	// Maintain the denormalized popularity counter (migration 000010) — the
+	// signal behind the Shop page's "Most loved" sort. Free to do here: the
+	// transaction and the row locks are already open, so the counter can
+	// never disagree with the order that moved it.
+	//
+	// Written as one UPDATE per PRODUCT, in ascending id order, for the same
+	// reason the cart is locked ORDER BY variant_id. UPDATE takes a row lock,
+	// so two checkouts touching the same two products in opposite orders
+	// would deadlock; every transaction taking product locks in ascending id
+	// order makes that impossible. Quantities are summed per product first,
+	// because one cart can hold two variants of the same jar.
+	sold := make(map[int64]int, len(lines))
+	for _, l := range lines {
+		sold[l.productID] += l.qty
+	}
+	productIDs := make([]int64, 0, len(sold))
+	for id := range sold {
+		productIDs = append(productIDs, id)
+	}
+	// Map iteration order in Go is deliberately RANDOMISED, so this sort is
+	// not tidiness — without it the lock order would differ run to run.
+	slices.Sort(productIDs)
+	for _, id := range productIDs {
+		if _, err := tx.Exec(ctx,
+			`UPDATE products SET sales_count = sales_count + $1 WHERE id = $2`,
+			sold[id], id); err != nil {
+			return domain.Order{}, fmt.Errorf("incrementing sales count: %w", err)
 		}
 	}
 

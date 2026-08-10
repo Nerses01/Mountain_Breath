@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { ProductCard } from './ProductCard'
 import type { Product } from '../api/types'
@@ -7,56 +7,115 @@ import type { Product } from '../api/types'
 const product: Product = {
   id: 1,
   category_id: 1,
-  slug: 'wild-thyme-tea',
-  name: 'Wild Thyme Tea',
-  description: 'Fragrant wild thyme.',
+  category_slug: 'honey',
+  category_name: 'Honey',
+  slug: 'mountain-wildflower-honey',
+  name: 'Mountain Wildflower Honey',
+  description: 'Sweet liquid made from flower nectar.',
   image_url: '',
   created_at: '2026-07-29T00:00:00Z',
+  badge: 'best_seller',
+  badge_tone: 'honey',
+  benefits: [
+    { slug: 'energy', name: 'Energy' },
+    { slug: 'sweetening', name: 'Sweetening' },
+  ],
   variants: [
-    { id: 1, sku: 'TEA-1', label: '50 g', price_minor: 120000, stock_qty: 40 },
-    { id: 2, sku: 'TEA-2', label: '100 g', price_minor: 220000, stock_qty: 0 },
+    { id: 1, sku: 'HON-500', label: '500 g', price_minor: 1400, stock_qty: 40 },
+    { id: 2, sku: 'HON-1K', label: '1 kg', price_minor: 2600, stock_qty: 6 },
   ],
 }
 
 // Components using <Link> need a router context — MemoryRouter is the
 // test-friendly one (no real browser URL involved).
-function renderCard(p: Product) {
+function renderCard(p: Product, onAdd?: (p: Product) => void) {
   return render(
     <MemoryRouter>
-      <ProductCard product={p} />
+      <ProductCard product={p} onAdd={onAdd} />
     </MemoryRouter>,
   )
 }
 
 describe('ProductCard', () => {
-  it('shows name, description, and both variants', () => {
+  it('shows the name, the "size · benefit" line and the from-price', () => {
     renderCard(product)
 
-    expect(screen.getByText('Wild Thyme Tea')).toBeInTheDocument()
-    expect(screen.getByText('Fragrant wild thyme.')).toBeInTheDocument()
-    expect(screen.getByText('50 g')).toBeInTheDocument()
-    expect(screen.getByText('100 g')).toBeInTheDocument()
+    expect(screen.getByText('Mountain Wildflower Honey')).toBeInTheDocument()
+    // The eyebrow is the CATEGORY, resolved server-side into the reader's
+    // language; the line under the name pairs the size with the product's
+    // first benefit by the taxonomy's sort_order.
+    expect(screen.getByText('Honey')).toBeInTheDocument()
+    expect(screen.getByText('500 g · Energy')).toBeInTheDocument()
+    // Two variants, so the price is labelled "from" — an unlabelled $14 on a
+    // product that also sells for $26 would be a lie of omission.
+    expect(screen.getByText('from $14.00')).toBeInTheDocument()
   })
 
-  it('formats prices from minor units', () => {
+  it('renders the badge KEY through the message catalogue, not raw', () => {
     renderCard(product)
 
-    expect(screen.getByText('1,200.00')).toBeInTheDocument()
-    expect(screen.getByText('2,200.00')).toBeInTheDocument()
+    expect(screen.getByText('Best seller')).toBeInTheDocument()
+    expect(screen.queryByText('best_seller')).not.toBeInTheDocument()
   })
 
-  it('marks stock state per variant', () => {
-    renderCard(product)
+  it('omits the badge when the product has none', () => {
+    renderCard({ ...product, badge: '' })
 
-    // Copy now comes from the `catalog` namespace; these are the English
-    // values, which is the default locale the suite runs in.
-    expect(screen.getByText('40 left')).toBeInTheDocument()
+    expect(screen.queryByText('Best seller')).not.toBeInTheDocument()
+  })
+
+  it('drops the "from" label when there is only one size', () => {
+    renderCard({ ...product, variants: [product.variants[0]] })
+
+    expect(screen.getByText('$14.00')).toBeInTheDocument()
+    expect(screen.queryByText('from $14.00')).not.toBeInTheDocument()
+  })
+
+  it('marks a product with no stock in any variant as out of stock', () => {
+    const soldOut = {
+      ...product,
+      variants: product.variants.map((v) => ({ ...v, stock_qty: 0 })),
+    }
+    renderCard(soldOut)
+
     expect(screen.getByText('Out of stock')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()
   })
 
-  it('links to the product page', () => {
+  it('stays in stock while ANY variant has some', () => {
+    const partial = {
+      ...product,
+      variants: [
+        { ...product.variants[0], stock_qty: 0 },
+        { ...product.variants[1], stock_qty: 3 },
+      ],
+    }
+    renderCard(partial, () => {})
+
+    expect(screen.queryByText('Out of stock')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add' })).toBeEnabled()
+  })
+
+  it('hands the product to the Add handler', () => {
+    const onAdd = vi.fn()
+    renderCard(product, onAdd)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(onAdd).toHaveBeenCalledWith(product)
+  })
+
+  it('disables Add when no handler is wired (anonymous visitor)', () => {
     renderCard(product)
 
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/products/wild-thyme-tea')
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()
+  })
+
+  it('links the name to the product page', () => {
+    renderCard(product)
+
+    expect(
+      screen.getByRole('link', { name: 'Mountain Wildflower Honey' }),
+    ).toHaveAttribute('href', '/products/mountain-wildflower-honey')
   })
 })

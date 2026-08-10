@@ -53,7 +53,7 @@ func toCartResponse(items []domain.CartItem) cartResponse {
 func (s *Server) handleGetCart(w http.ResponseWriter, r *http.Request) {
 	user, _ := userFrom(r.Context()) // requireUser guarantees presence
 
-	items, err := s.store.GetCart(r.Context(), user.ID)
+	items, err := s.store.GetCart(r.Context(), user.ID, localeFromContext(r.Context()))
 	if err != nil {
 		s.log.Error("getting cart", "error", err)
 		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
@@ -99,7 +99,7 @@ func (s *Server) handleSetCartItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, err := s.store.GetCart(r.Context(), user.ID)
+	items, err := s.store.GetCart(r.Context(), user.ID, localeFromContext(r.Context()))
 	if err != nil {
 		s.log.Error("reloading cart", "error", err)
 		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")

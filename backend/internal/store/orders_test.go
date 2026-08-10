@@ -240,3 +240,65 @@ func TestUpdateOrderStatus_CancelRestoresStock(t *testing.T) {
 		t.Errorf("err = %v, want ErrInvalidTransition", err)
 	}
 }
+
+// products.sales_count is denormalized data (migration 000010): it is only
+// correct because the checkout transaction maintains it, so the increment
+// needs a test the way an aggregate query would not.
+func TestCreateOrder_IncrementsSalesCount(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test (needs Docker)")
+	}
+	resetDB(t)
+	s := store.New(testPool)
+	ctx := context.Background()
+
+	variantID := seedCatalog(t, 20)
+	ctx0 := context.Background()
+
+	// A SECOND variant of the same product: one cart holding both must move
+	// the counter once, by the summed quantity, not twice.
+	var variant2ID int64
+	if err := testPool.QueryRow(ctx0, `
+		INSERT INTO product_variants (product_id, sku, label, price_minor, stock_qty)
+		SELECT product_id, 'HON-2', '350 g', 520000, 20
+		FROM product_variants WHERE id = $1
+		RETURNING id`, variantID).Scan(&variant2ID); err != nil {
+		t.Fatalf("seeding second variant: %v", err)
+	}
+
+	userID := seedUserWithCart(t, "counter@test.local", variantID, 3)
+	if _, err := testPool.Exec(ctx,
+		`INSERT INTO cart_items (user_id, variant_id, qty) VALUES ($1, $2, 2)`,
+		userID, variant2ID); err != nil {
+		t.Fatalf("adding second cart line: %v", err)
+	}
+
+	order, err := s.CreateOrder(ctx, userID)
+	if err != nil {
+		t.Fatalf("CreateOrder: %v", err)
+	}
+
+	salesCount := func() int {
+		t.Helper()
+		var n int
+		if err := testPool.QueryRow(ctx,
+			`SELECT sales_count FROM products WHERE slug = 'wild-honey'`).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+
+	if got := salesCount(); got != 5 {
+		t.Errorf("sales_count = %d, want 5 (3 + 2 across two variants of one product)", got)
+	}
+
+	// Cancelling deliberately does NOT decrement — "most loved" measures
+	// interest over time, and this pins that as a decision rather than
+	// leaving a missing UPDATE to look like an oversight.
+	if _, err := s.UpdateOrderStatus(ctx, order.ID, domain.OrderCancelled); err != nil {
+		t.Fatalf("cancelling: %v", err)
+	}
+	if got := salesCount(); got != 5 {
+		t.Errorf("sales_count after cancel = %d, want 5 (cancellation does not undo interest)", got)
+	}
+}

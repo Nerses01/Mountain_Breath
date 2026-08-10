@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { cx } from '../../lib/cx'
@@ -5,6 +6,7 @@ import { useLocale } from '../../i18n/useLocale'
 import { useCart, useLogout, useMe } from '../../api/hooks'
 import { IconButton } from '../ui/IconButton'
 import { HeartIcon, SearchIcon, UserIcon } from '../ui/icons'
+import { SearchOverlay } from './SearchOverlay'
 
 /**
  * The design's header: brand block, five nav links, icon row, cart pill.
@@ -29,6 +31,18 @@ export function SiteHeader() {
   const me = useMe()
   const cart = useCart(!!me.data)
   const logout = useLogout()
+
+  // E2 moves search out of the catalog body and into an overlay opened from
+  // here. The ref is not decoration: closing a modal must put focus back on
+  // the control that opened it, or the next Tab restarts from the top of the
+  // document and a keyboard user loses their place.
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchButtonRef = useRef<HTMLButtonElement>(null)
+
+  const closeSearch = () => {
+    setSearchOpen(false)
+    searchButtonRef.current?.focus()
+  }
 
   const cartCount = cart.data?.items.reduce((sum, it) => sum + it.qty, 0) ?? 0
 
@@ -86,7 +100,12 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <IconButton label={t('common:actions.search')}>
+          <IconButton
+            ref={searchButtonRef}
+            label={t('common:actions.search')}
+            aria-expanded={searchOpen}
+            onClick={() => setSearchOpen(true)}
+          >
             <SearchIcon />
           </IconButton>
           <IconButton label={t('common:actions.wishlist')}>
@@ -138,6 +157,8 @@ export function SiteHeader() {
           </Link>
         </div>
       </div>
+
+      {searchOpen && <SearchOverlay onClose={closeSearch} />}
     </header>
   )
 }

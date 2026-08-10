@@ -619,26 +619,57 @@ queries with `FILTER`, many-to-many taxonomies, URL as state (deep-linkable
 filters), keyset vs. offset pagination.
 
 **Backend:**
-- [ ] Migration: `benefits` (id, slug, sort_order), `product_benefits`
+- [x] Migration: `benefits` (id, slug, sort_order), `product_benefits`
       (product_id, benefit_id, PK on both) and `benefit_translations`
       (benefit_id, locale, name) in one migration — Energy, Immunity, Skin,
       Recovery, Sweetening. The translations table lands here, not in E1.5,
       because its FK parent is created here.
-- [ ] Migration: `products.badge` (nullable TEXT) + `badge_tone` — one badge
+      The five benefits are seeded **by the migration, not by `seed.sql`**:
+      the taxonomy is part of the schema's meaning (the sidebar renders
+      exactly this set, and E2's seed references these slugs), unlike the
+      sample products a real deployment throws away. `product_benefits` also
+      gets a mirror index on `benefit_id` — the composite PK leads with
+      `product_id`, so it cannot answer "which products have this benefit".
+- [x] Migration: `products.badge` (nullable TEXT) + `badge_tone` — one badge
       per card in the design; a `product_badges` table only if that changes.
-- [ ] Extend `domain.ProductFilter`: `Benefits []string`, `PriceMinMinor`,
+      **Decided 2026-08-10: the column stores a closed KEY** (`best_seller`,
+      `new`, `cold_chain`, `for_makers`, `immunity`, `protein`) behind a
+      CHECK, and the three message catalogues own the wording — badges are
+      user-facing text but a fixed set nobody invents at runtime, so they are
+      UI vocabulary rather than content (decision #24). CHECK rather than a
+      Postgres ENUM: a CHECK is dropped and recreated by any migration that
+      adds a badge.
+- [x] Extend `domain.ProductFilter`: `Benefits []string`, `PriceMinMinor`,
       `PriceMaxMinor`, `Sort` (`popular|price_asc|price_desc|newest`).
       Validate `Sort` in the domain layer against a whitelist — never
       interpolate it into SQL.
-- [ ] Popularity signal for "Most loved": denormalized `products.sales_count`,
+      Price bounds are `*int64`, not an int64 sentinel: 0 is a legitimate
+      bound and there is no spare value to mean "unset". Benefits are an OR
+      *within* the facet and AND *across* facets, the convention every
+      faceted shop uses — narrowing inside one group would make the second
+      click almost always return nothing.
+- [x] Popularity signal for "Most loved": denormalized `products.sales_count`,
       incremented in the checkout transaction (it is already open), with a
       backfill query in the migration. Compare in the log with the alternative
       (aggregate `order_items` on every list query) and why denormalizing wins
       here.
-- [ ] `GET /api/v1/catalog/facets` → category counts, benefit counts, price
+      **One thing the plan did not anticipate:** adding a second `UPDATE` to
+      checkout introduces a new deadlock surface — two carts touching the same
+      two products in opposite orders. Quantities are summed per product and
+      applied in ascending id order, the same rule the variant lock already
+      followed. Go randomises map iteration, so the sort is the fix, not tidiness.
+- [x] `GET /api/v1/catalog/facets` → category counts, benefit counts, price
       bounds, respecting the *other* active filters. One round trip, CTEs +
       `count(*) FILTER (WHERE …)`.
-- [ ] **Decide what a variant label is — before the seed is written.**
+      A `base` CTE tags each product with the three predicates as boolean
+      COLUMNS rather than applying them, so one materialised scan feeds three
+      differently-filtered aggregates, UNIONed into one tagged row shape and
+      sorted apart in Go. Zero-count values stay listed (a zero caused by a
+      filter is information); values with nothing behind them at all are
+      dropped with `HAVING` — not hypothetical, the dev database still holds
+      Era I's herbal-tea and coffee categories, kept alive by deactivated
+      products that old orders reference and so cannot be deleted.
+- [x] **Decide what a variant label is — before the seed is written.**
       *(Moved here from E1.5 on 2026-08-05. It was noted there as "decide in
       E3 when variants are reworked", which was wrong: E3 only DISPLAYS
       labels in the variant picker, whereas this phase's seed is what
@@ -662,7 +693,11 @@ filters), keyset vs. offset pagination.
       Whichever wins, the seed row below, `ValidateProduct`, the admin form
       and E3's variant picker all follow from it — which is why it sits
       immediately before the seed bullet rather than after it.
-- [ ] Rewrite `seed/seed.sql` for the six hive products with the design's copy,
+
+      **Decided 2026-08-10: option 1, pure measurements** (decision #23). The
+      container noun moves into the product's translatable description, where
+      it reads more naturally than it did on a size pill anyway.
+- [x] Rewrite `seed/seed.sql` for the six hive products with the design's copy,
       badges, benefits and both currencies' prices (or USD only until E5) —
       seeded in all three languages from the start, not English-only with
       translations bolted on later. Variant labels follow the decision above.
@@ -671,30 +706,112 @@ filters), keyset vs. offset pagination.
       (`/products/armenian-coffee`, and the category/product create bodies
       still say herbal-tea). They will 404 the moment the seed changes, which
       is the collection-and-code disagreement rule #15 exists to prevent.
-- [ ] Tests: store tests for each filter and sort, a facet-count test that
+
+      **Decided 2026-08-10: USD only**, per the note under decision #2 — E5
+      introduces `variant_prices` and backfills AMD. Seeding twice is the
+      cheaper mistake than migrating a live price column, and it keeps E2 on
+      facets, which is what the phase is for.
+
+      Three things the bullet did not foresee:
+      - The seed is now **convergent, not just idempotent**. `ON CONFLICT DO
+        NOTHING` makes re-running safe but leaves old content in place, so
+        editing this file changed nothing on an already-seeded database.
+        Every upsert is `DO UPDATE`.
+      - It has to **retire Era I's rows**, not just add new ones, or the
+        sidebar counts nine categories. `order_items.variant_id` is ON DELETE
+        RESTRICT, so products someone actually ordered in a dev session are
+        deactivated instead of deleted — which is what happened on this
+        machine: 4 deactivated, 1 deleted, 0 categories removed.
+      - The stale Postman requests were **not the ones the bullet named**.
+        `/products/armenian-coffee` was real, but the create bodies said
+        `royal-jelly` — a slug E2's seed now owns, so the request would 409
+        against a seeded database, and its own test already contradicted its
+        body. Both fixed; a "Faceted catalog (E2)" folder adds 6 requests
+        (32 → 38), every assertion verified against the running API.
+- [x] Tests: store tests for each filter and sort, a facet-count test that
       proves counts change with the active filter, domain test for sort
       whitelisting.
-- [ ] Update the Postman collection (RULES.md #15).
+      The sort test is written as a **security** test — `price_asc; DROP
+      TABLE products` and `p.sales_count DESC` are the cases, because
+      `ORDER BY` cannot be a bound parameter and this whitelist is the only
+      thing between a query param and the planner. The fixture deliberately
+      overlaps benefits in both directions (one product with two, one benefit
+      on two products): a fixture where every product had exactly one benefit
+      would pass with a plain JOIN and never notice the duplicate rows.
+      A stable-pagination test pins the ORDER BY tiebreak — six products that
+      have never sold all have `sales_count = 0`, and without a total order
+      page 2 may repeat a row from page 1.
+- [x] Update the Postman collection (RULES.md #15).
 
 **Frontend:**
-- [ ] `HomePage` at `/`: hero (headline, subcopy, two CTAs, 3-stat strip),
+- [x] `HomePage` at `/`: hero (headline, subcopy, two CTAs, 3-stat strip),
       "How we harvest" dark card + "What the hive does for you" panel, six
       product cards, story band, all from the API — no hardcoded product copy.
-- [ ] `ShopPage` at `/shop`: breadcrumbs, result count, sort select, sidebar
+      Everything that is *not* product data (hero headline, harvest story) is
+      copy, and lives in the message catalogues rather than the database: it
+      describes the shop, changes with the design, and nobody edits it from
+      the admin.
+- [x] `ShopPage` at `/shop`: breadcrumbs, result count, sort select, sidebar
       (`CategoryFilter` with counts, `BenefitChips`, `PriceRange` dual slider,
       "Ask a beekeeper" card), grid, pagination.
-- [ ] **All filter state lives in the query string** via `useSearchParams`, so
+- [x] **All filter state lives in the query string** via `useSearchParams`, so
       back/forward work and a shared link reproduces the exact view.
-- [ ] `ProductCard` redesigned to the mock: image, badge, category eyebrow,
+      Narrowing a filter resets the page (filtering to two products while on
+      page 3 shows an empty grid, which reads as a broken shop); the
+      paginator is the one caller that opts out. The e2e test asserts the
+      back button undoes a filter — a `useState` implementation would pass
+      every click-based test and fail that one.
+- [x] `ProductCard` redesigned to the mock: image, badge, category eyebrow,
       name, "size · benefit", dual price, Add button, wishlist heart (inert
       until E8).
-- [ ] Search moves from the catalog body into a header overlay, keeping the
+      Not one big `<Link>`: the card holds two other controls, and nesting
+      interactive elements inside an anchor is invalid HTML. Only the name is
+      the link, stretched over the card with an `::after` overlay. Two
+      departures from the mock — the "size · benefit" line names a benefit
+      from the taxonomy rather than the mock's per-product phrase (two
+      vocabularies for one slot, and the sidebar needs the taxonomy), and the
+      price is labelled "from" when a product has several sizes, since an
+      unlabelled $32 on a product that also sells for $105 would mislead.
+      The **category eyebrow needed a backend change**: the response carried
+      only `category_id`, so the card would have had to fetch `/categories`
+      and redo the locale fallback by hand. `category_slug`/`category_name`
+      now come back resolved.
+- [x] Search moves from the catalog body into a header overlay, keeping the
       existing 300 ms debounce and the trigram behaviour.
-- [ ] Vitest: `PriceRange` emits clamped values; `ProductCard` renders badge
-      and out-of-stock states.
+      Focus returns to the button that opened it on close — losing focus to
+      `<body>` is the classic modal bug, where the next Tab restarts from the
+      top of the document.
+- [x] Vitest: `PriceRange` emits clamped values; `ProductCard` renders badge
+      and out-of-stock states. 88 tests total (63 → 88), including a
+      regression suite for the locale bug below that asserts on the request
+      URL, and rewrites of `App` routing (`/` is no longer the catalog) and
+      the Playwright purchase journey (which bought a product the seed no
+      longer has).
+
+**Two gaps E1.5 left, both found by RUNNING the app rather than by testing it
+— recorded here because the shape is the lesson:**
+- **The frontend never asked the API for a language.** `/hy/shop` rendered an
+  Armenian shell around an entirely English catalog: no `?lang=`, no cookie,
+  no `Accept-Language`, ever. Nothing failed, because the backend's fallback
+  chain returns perfectly valid English — E1.5's own `locales.ts` even
+  describes "the `Accept-Language` header sent to the API" that no code sent.
+  Fixed in the client, set synchronously during render (an effect runs after
+  the query fires, so the first request of a page load would still ask for
+  English), and the locale is now part of every translated query key —
+  otherwise a language switch changes the URL but not the cache key.
+- **`GetCart` had no locale at all**, so a basket showed English names under
+  an Armenian page; and the footer's two link columns were hardcoded English
+  literals. The Shop column is now the real category list, so it translates
+  itself and each entry is a working filter link.
+
+`CatalogPage` is deleted — `ShopPage` supersedes it and nothing mounted it
+after the route split. The same dead-code check E1.5 ended with, run again.
 
 **Done when:** every filter, the sort and the page number survive a reload and
 a copy-pasted URL; sidebar counts match the grid; `/` is the designed home page.
+✅ **Complete 2026-08-10.** Verified in a real browser at 1440 px in all three
+languages, plus `go test ./...`, `golangci-lint` (0 issues), `npm test`
+(88 passing), `tsc -b`, `oxlint`, and the Playwright purchase journey.
 
 ---
 

@@ -18,16 +18,63 @@ export interface ProductVariant {
   stock_qty: number
 }
 
+// Badge keys the backend's CHECK constraint allows (migration 000009). A
+// union, not `string`, so a typo in a translation lookup is a compile error
+// and adding a badge to the database without adding its three translations
+// fails the build rather than rendering a raw key on a card.
+export type BadgeKey =
+  | 'best_seller'
+  | 'new'
+  | 'cold_chain'
+  | 'for_makers'
+  | 'immunity'
+  | 'protein'
+
+export interface Benefit {
+  slug: string
+  name: string
+}
+
 export interface Product {
   id: number
   category_id: number
+  // The category, already resolved into the requested language — the card's
+  // eyebrow shows the name, the sidebar links on the slug.
+  category_slug: string
+  category_name: string
   slug: string
   name: string
   description: string
   image_url: string
   created_at: string
   variants: ProductVariant[]
+  // '' when the product has no badge — the backend sends an empty string
+  // rather than null so no consumer has to handle two kinds of absence.
+  badge: BadgeKey | ''
+  badge_tone: 'honey' | 'dark' | 'outline'
+  benefits: Benefit[]
 }
+
+// One row of a filter group: what to show, what to put in the URL, and how
+// many products survive if it is clicked.
+export interface FacetCount {
+  slug: string
+  name: string
+  count: number
+}
+
+export interface CatalogFacets {
+  categories: FacetCount[]
+  benefits: FacetCount[]
+  // The "All hive products" row: the total with the CATEGORY filter lifted.
+  total: number
+  price_min_minor: number
+  price_max_minor: number
+}
+
+// The four orderings the backend whitelists. Keeping this a union means the
+// sort select cannot offer a value the API would silently ignore.
+export type ProductSort = 'popular' | 'price_asc' | 'price_desc' | 'newest'
 
 export interface Paginated<T> {
   items: T[]

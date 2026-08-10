@@ -19,6 +19,14 @@ type variantResponse struct {
 	StockQty   int    `json:"stock_qty"`
 }
 
+// benefitResponse is one "Good for" chip. Slug travels alongside name
+// because the client puts the slug in the query string when the chip is
+// clicked — the name is for reading, the slug is for linking.
+type benefitResponse struct {
+	Slug string `json:"slug"`
+	Name string `json:"name"`
+}
+
 type productResponse struct {
 	ID          int64             `json:"id"`
 	CategoryID  int64             `json:"category_id"`
@@ -28,6 +36,26 @@ type productResponse struct {
 	ImageURL    string            `json:"image_url"`
 	CreatedAt   time.Time         `json:"created_at"`
 	Variants    []variantResponse `json:"variants"`
+
+	// The category, resolved into the requested language. category_id alone
+	// would force every client to fetch /categories and join by hand — and
+	// to get the fallback chain right a second time.
+	CategorySlug string `json:"category_slug"`
+	CategoryName string `json:"category_name"`
+
+	// Badge is a KEY the client looks up in its message catalogue
+	// ("best_seller"), empty when the product has no badge; BadgeTone is how
+	// to paint it. Same codes-not-prose contract as validation errors.
+	Badge     string `json:"badge"`
+	BadgeTone string `json:"badge_tone"`
+
+	Benefits []benefitResponse `json:"benefits"`
+
+	// products.sales_count is deliberately NOT here. It orders the list
+	// server-side, and that is all a shopper needs from it — publishing it
+	// would tell every visitor (and every competitor) exactly how many jars
+	// the family sells. The sort works fine without the number being
+	// readable, which is the test for whether a field belongs in a response.
 }
 
 // paginated is a generic envelope for list endpoints — the same shape for
@@ -47,23 +75,63 @@ func toProductResponse(p domain.Product) productResponse {
 			PriceMinor: v.PriceMinor, StockQty: v.StockQty,
 		})
 	}
+	benefits := make([]benefitResponse, 0, len(p.Benefits))
+	for _, b := range p.Benefits {
+		benefits = append(benefits, benefitResponse{Slug: b.Slug, Name: b.Name})
+	}
 	return productResponse{
 		ID: p.ID, CategoryID: p.CategoryID, Slug: p.Slug, Name: p.Name,
 		Description: p.Description, ImageURL: p.ImageURL,
 		CreatedAt: p.CreatedAt, Variants: variants,
+		CategorySlug: p.CategorySlug, CategoryName: p.CategoryName,
+		Badge: p.Badge, BadgeTone: p.BadgeTone, Benefits: benefits,
 	}
+}
+
+// productFilterFromQuery reads the shared catalog filter out of the query
+// string. Shared by the listing and the facets endpoint on purpose: two
+// parsers would eventually disagree about what "?benefit=energy&max_price=2000"
+// means, and the sidebar counts would stop matching the grid.
+//
+// Everything here is defensive. A query string is the most public input the
+// app has — anyone can type one — so every field either parses or falls back
+// to a sane default. Nothing rejects the request: a shopper who edits the
+// URL badly should see the shop, not a 400.
+func productFilterFromQuery(r *http.Request) domain.ProductFilter {
+	q := r.URL.Query()
+
+	f := domain.ProductFilter{
+		CategorySlug: q.Get("category"),
+		Search:       q.Get("q"),
+		Locale:       localeFromContext(r.Context()),
+		// Repeated params, not a comma-separated list: ?benefit=energy&
+		// benefit=skin. url.Values is already a map to a SLICE, so this is
+		// what the standard library hands us for free, and it needs no
+		// escaping rule for a benefit slug that contains a comma.
+		BenefitSlugs:  q["benefit"],
+		PriceMinMinor: int64QueryParam(q.Get("min_price")),
+		PriceMaxMinor: int64QueryParam(q.Get("max_price")),
+	}
+	// An unknown sort falls back to the default rather than erroring — the
+	// second return value of ParseProductSort is ignored deliberately here,
+	// and the whitelist is what protects the ORDER BY.
+	f.Sort, _ = domain.ParseProductSort(q.Get("sort"))
+
+	// A reversed range ($30–$10) is a slider bug or a hand-edited URL, and
+	// it would return nothing at all. Swapping is friendlier than an empty
+	// grid and cannot surprise anyone.
+	if f.PriceMinMinor != nil && f.PriceMaxMinor != nil && *f.PriceMinMinor > *f.PriceMaxMinor {
+		f.PriceMinMinor, f.PriceMaxMinor = f.PriceMaxMinor, f.PriceMinMinor
+	}
+	return f
 }
 
 func (s *Server) handleListProducts(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
-	filter := domain.ProductFilter{
-		CategorySlug: q.Get("category"),
-		Search:       q.Get("q"),
-		Page:         intQueryParam(q.Get("page"), 1),
-		PerPage:      intQueryParam(q.Get("per_page"), 20),
-		Locale:       localeFromContext(r.Context()),
-	}
+	filter := productFilterFromQuery(r)
+	filter.Page = intQueryParam(q.Get("page"), 1)
+	filter.PerPage = intQueryParam(q.Get("per_page"), 20)
 	if filter.Page < 1 {
 		filter.Page = 1
 	}
@@ -114,4 +182,19 @@ func intQueryParam(s string, fallback int) int {
 		return fallback
 	}
 	return n
+}
+
+// int64QueryParam is intQueryParam for an OPTIONAL number: absent or
+// unparseable both mean "no bound", which is nil rather than a magic value.
+// Negative bounds are dropped too — money is never negative here, and a
+// price floor of -5 is a client bug, not a filter.
+func int64QueryParam(s string) *int64 {
+	if s == "" {
+		return nil
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil || n < 0 {
+		return nil
+	}
+	return &n
 }

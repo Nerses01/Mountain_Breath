@@ -35,7 +35,37 @@ describe('App routing', () => {
 
     expect(screen.getByRole('banner')).toBeInTheDocument()
     expect(screen.getByRole('contentinfo')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /shop/i })).toBeInTheDocument()
+    // Scoped to the header, and an exact name rather than /shop/i: since E2
+    // put the designed home page at `/`, the document also holds "Shop the
+    // hive" and "Shop all" and the footer's "Shop" column — the same
+    // ambiguity the Armenian case below already had to work around.
+    expect(
+      within(screen.getByRole('banner')).getByRole('link', { name: 'Shop' }),
+    ).toHaveAttribute('href', '/shop')
+  })
+
+  it('serves the designed home page at `/`, not the catalog', async () => {
+    await i18n.changeLanguage('en')
+    renderAt('/')
+
+    // E2 split the two: `/` used to BE the product listing because there was
+    // nothing else to put there.
+    expect(
+      screen.getByRole('heading', { name: /everything\s+the hive gives/i, level: 1 }),
+    ).toBeInTheDocument()
+  })
+
+  it('serves the faceted listing at /shop', async () => {
+    await i18n.changeLanguage('en')
+    renderAt('/shop')
+
+    expect(
+      screen.getByRole('heading', { name: 'The whole shelf', level: 1 }),
+    ).toBeInTheDocument()
+    // The sidebar's three filter groups, from the design.
+    expect(screen.getByRole('heading', { name: 'Category' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Good for' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Price' })).toBeInTheDocument()
   })
 
   it('renders the same shell under a locale prefix', async () => {
