@@ -108,6 +108,27 @@ export const ru = {
       protein: 'Белок',
     },
   },
+  product: {
+    whatItDoes: 'Что он делает',
+    size: 'Размер',
+    addToCartWithPrice: 'В корзину — {{price}}',
+    related: 'Часто принимают вместе',
+    gallery: {
+      label: 'Изображения продукта',
+      image: 'Изображение {{n}}',
+    },
+    meta: {
+      harvest: 'Сбор',
+      shipping: 'Доставка',
+      lab: 'Лабораторный отчёт',
+      batch: 'Партия {{batch}}',
+    },
+    tabs: {
+      label: 'Подробности о продукте',
+      howToTakeIt: 'Как принимать',
+      storage: 'Хранение',
+    },
+  },
   home: {
     hero: {
       eyebrow: 'Пусть жужжит',

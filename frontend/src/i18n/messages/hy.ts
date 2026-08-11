@@ -105,6 +105,27 @@ export const hy = {
       protein: 'Սպիտակուց',
     },
   },
+  product: {
+    whatItDoes: 'Ինչ է անում',
+    size: 'Չափս',
+    addToCartWithPrice: 'Ավելացնել զամբյուղ — {{price}}',
+    related: 'Հաճախ ընդունվում են միասին',
+    gallery: {
+      label: 'Ապրանքի նկարներ',
+      image: 'Նկար {{n}}',
+    },
+    meta: {
+      harvest: 'Բերք',
+      shipping: 'Առաքում',
+      lab: 'Լաբորատոր եզրակացություն',
+      batch: 'Խմբաքանակ {{batch}}',
+    },
+    tabs: {
+      label: 'Ապրանքի մանրամասներ',
+      howToTakeIt: 'Ինչպես ընդունել',
+      storage: 'Պահպանում',
+    },
+  },
   home: {
     hero: {
       eyebrow: 'Բզզոցը շարունակվում է',

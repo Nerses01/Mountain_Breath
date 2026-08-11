@@ -42,10 +42,12 @@ func (s *Store) CreateProduct(ctx context.Context, p *domain.Product) error {
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	err = tx.QueryRow(ctx, `
-		INSERT INTO products (category_id, slug, name, description, image_url, is_active)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO products (category_id, slug, name, description, image_url, is_active,
+		                      lab_batch, is_cold_chain)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, created_at`,
 		p.CategoryID, p.Slug, p.Name, p.Description, p.ImageURL, p.IsActive,
+		p.LabBatch, p.IsColdChain,
 	).Scan(&p.ID, &p.CreatedAt)
 	if err != nil {
 		if mapped := mapProductConstraint(err); mapped != nil {
@@ -90,7 +92,11 @@ func (s *Store) CreateProduct(ctx context.Context, p *domain.Product) error {
 // It also means create and update share this one function.
 func upsertProductTranslations(ctx context.Context, tx pgx.Tx, p *domain.Product) error {
 	texts := map[domain.Locale]domain.ProductText{
-		domain.DefaultLocale: {Name: p.Name, Description: p.Description},
+		domain.DefaultLocale: {
+			Name: p.Name, Description: p.Description,
+			Disclaimer: p.Disclaimer, StorageNote: p.StorageNote,
+			HarvestNote: p.HarvestNote, ShippingNote: p.ShippingNote,
+		},
 	}
 	for locale, text := range p.Translations {
 		texts[locale] = text
@@ -98,11 +104,19 @@ func upsertProductTranslations(ctx context.Context, tx pgx.Tx, p *domain.Product
 
 	for locale, text := range texts {
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO product_translations (product_id, locale, name, description)
-			VALUES ($1, $2, $3, $4)
+			INSERT INTO product_translations
+			    (product_id, locale, name, description,
+			     disclaimer, storage_note, harvest_note, shipping_note)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 			ON CONFLICT (product_id, locale)
-			DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description`,
+			DO UPDATE SET name          = EXCLUDED.name,
+			              description   = EXCLUDED.description,
+			              disclaimer    = EXCLUDED.disclaimer,
+			              storage_note  = EXCLUDED.storage_note,
+			              harvest_note  = EXCLUDED.harvest_note,
+			              shipping_note = EXCLUDED.shipping_note`,
 			p.ID, locale, text.Name, text.Description,
+			text.Disclaimer, text.StorageNote, text.HarvestNote, text.ShippingNote,
 		); err != nil {
 			return fmt.Errorf("upserting %s product translation: %w", locale, err)
 		}
@@ -125,9 +139,11 @@ func (s *Store) UpdateProduct(ctx context.Context, p *domain.Product) error {
 
 	tag, err := tx.Exec(ctx, `
 		UPDATE products
-		SET category_id = $1, name = $2, description = $3, image_url = $4, is_active = $5
-		WHERE id = $6`,
-		p.CategoryID, p.Name, p.Description, p.ImageURL, p.IsActive, p.ID)
+		SET category_id = $1, name = $2, description = $3, image_url = $4, is_active = $5,
+		    lab_batch = $6, is_cold_chain = $7
+		WHERE id = $8`,
+		p.CategoryID, p.Name, p.Description, p.ImageURL, p.IsActive,
+		p.LabBatch, p.IsColdChain, p.ID)
 	if err != nil {
 		if mapped := mapProductConstraint(err); mapped != nil {
 			return mapped

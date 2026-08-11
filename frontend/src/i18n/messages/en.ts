@@ -131,6 +131,31 @@ export const en = {
       protein: 'Protein',
     },
   },
+  // ---- Product page (E3) -----------------------------------------------
+  // Everything a product page says that is NOT the product's own content.
+  // The bullets, usage cards and notes come from the API, because the family
+  // writes those; these are the labels around them.
+  product: {
+    whatItDoes: 'What it does',
+    size: 'Size',
+    addToCartWithPrice: 'Add to cart — {{price}}',
+    related: 'Often taken together',
+    gallery: {
+      label: 'Product images',
+      image: 'Image {{n}}',
+    },
+    meta: {
+      harvest: 'Harvest',
+      shipping: 'Shipping',
+      lab: 'Lab report',
+      batch: 'Batch {{batch}}',
+    },
+    tabs: {
+      label: 'Product details',
+      howToTakeIt: 'How to take it',
+      storage: 'Storage',
+    },
+  },
   // ---- Home page (E2) --------------------------------------------------
   // Copy about the SHOP, not about the catalog: it is translated here rather
   // than stored in the database because nobody edits it from the admin and

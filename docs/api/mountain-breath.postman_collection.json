@@ -505,7 +505,7 @@
 								}
 							]
 						},
-						"description": "Product detail with variants, badge and benefits. Slug comes from seed data (backend/seed/seed.sql).\n\nLanguage: resolved per request as ?lang= > mb_locale cookie > Accept-Language > en. An unknown value falls back rather than failing."
+						"description": "Product detail: variants, badge, benefits, AND the editorial half E3 added — gallery images with per-locale alt text, \"What it does\" bullets, the Morning/Course/Pairs-with usage cards, the four notes, lab_batch and is_cold_chain.\n\nDeliberately a DIFFERENT shape from the card in GET /products: a grid of twelve cards renders none of this, and loading it for them would be work nobody sees.\n\nLanguage: resolved per request as ?lang= > mb_locale cookie > Accept-Language > en. An unknown value falls back rather than failing."
 					},
 					"event": [
 						{
@@ -537,6 +537,14 @@
 									"pm.test(\"carries its badge and benefits\", () => {",
 									"    pm.expect(body.badge).to.eql(\"best_seller\");",
 									"    pm.expect(body.benefits.map(b => b.slug)).to.include(\"energy\");",
+									"});",
+									"",
+									"pm.test(\"carries the E3 editorial half\", () => {",
+									"    pm.expect(body.highlights).to.be.an(\"array\");",
+									"    pm.expect(body.usage_cards).to.be.an(\"array\");",
+									"    pm.expect(body.images).to.be.an(\"array\");",
+									"    pm.expect(body).to.include.keys(\"disclaimer\", \"storage_note\",",
+									"        \"harvest_note\", \"shipping_note\", \"lab_batch\", \"is_cold_chain\");",
 									"});"
 								]
 							}
@@ -948,6 +956,464 @@
 				}
 			],
 			"description": "Phase E2: the Shop page's sidebar, sort and filters. Every request here assumes backend/seed/seed.sql has been loaded — the counts are asserted against the design's six hive products."
+		},
+		{
+			"name": "Product page (Phase E3)",
+			"item": [
+				{
+					"name": "Related — curated list",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/products/fresh-royal-jelly/related",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"products",
+								"fresh-royal-jelly",
+								"related"
+							],
+							"query": [
+								{
+									"key": "lang",
+									"value": "{{lang}}",
+									"description": "en | hy | ru. Disabled by default so the request shows the negotiated default.",
+									"disabled": true
+								}
+							]
+						},
+						"description": "\"Often taken together\". Royal jelly is the one product the seed CURATES, so this returns the admin's list in the admin's order.\n\nAn endpoint of its own rather than a field on the detail: the panel sits below the fold and changes far less often than stock or price, so the two cache separately."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"",
+									"pm.test(\"the curated list, in the curated order\", () => {",
+									"    pm.expect(body.map(p => p.slug)).to.eql([",
+									"        \"mountain-wildflower-honey\",",
+									"        \"bee-pollen-granules\",",
+									"        \"raw-propolis-tincture\"]);",
+									"});",
+									"",
+									"pm.test(\"related cards carry what a card renders\", () => {",
+									"    body.forEach(p => {",
+									"        pm.expect(p.variants).to.be.an(\"array\").that.is.not.empty;",
+									"        pm.expect(p.benefits).to.be.an(\"array\");",
+									"    });",
+									"});",
+									"",
+									"pm.test(\"never lists the product itself\", () => {",
+									"    pm.expect(body.map(p => p.slug)).to.not.include(\"fresh-royal-jelly\");",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Related — computed fallback",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/products/mountain-wildflower-honey/related",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"products",
+								"mountain-wildflower-honey",
+								"related"
+							],
+							"query": [
+								{
+									"key": "lang",
+									"value": "{{lang}}",
+									"description": "en | hy | ru. Disabled by default so the request shows the negotiated default.",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Nothing is curated for honey, so the shop computes the panel.\n\nNOT the \"same category by popularity\" rule the plan first specified: E2 gave this shop six products in six categories, one each, so that rule matches nothing and the panel would always be empty. The fallback ranks by how many BENEFITS a product shares with this one, then by popularity — which is also the better claim for \"often taken together\"."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"",
+									"pm.test(\"the panel is not empty\", () => {",
+									"    pm.expect(body.length).to.be.above(0);",
+									"});",
+									"",
+									"pm.test(\"products sharing a benefit come first\", () => {",
+									"    // Honey is energy + sweetening. Pollen and royal jelly share",
+									"    // energy; beeswax and venom share nothing with it.",
+									"    pm.expect(body.slice(0, 2).map(p => p.slug)).to.have.members([",
+									"        \"bee-pollen-granules\", \"fresh-royal-jelly\"]);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Related — unknown slug is [] not 404",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/products/no-such-product/related",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"products",
+								"no-such-product",
+								"related"
+							]
+						},
+						"description": "This is a panel on a page, and the page itself already 404s if the product is missing. Answering 404 here would mean a client had to handle the same missing product twice."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"an empty array, never null\", () => {",
+									"    pm.expect(pm.response.json()).to.eql([]);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Editorial content falls back per LIST",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiV1}}/products/bee-venom-serum?lang=hy",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"products",
+								"bee-venom-serum"
+							],
+							"query": [
+								{
+									"key": "lang",
+									"value": "hy"
+								}
+							]
+						},
+						"description": "Decision #4 keys editorial rows BY LOCALE, so \"the Armenian bullets\" and \"the English bullets\" are separate lists rather than fields of one row. The fallback therefore happens per LIST: venom serum has Armenian highlights but no Armenian usage cards, so the whole English card set shows. Falling back per ROW would have interleaved two languages inside one panel."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"",
+									"pm.test(\"Armenian highlights are Armenian\", () => {",
+									"    pm.expect(body.highlights[0].text).to.match(/[\\u0530-\\u058F]/);",
+									"});",
+									"",
+									"pm.test(\"usage cards fall back to English as a whole set\", () => {",
+									"    pm.expect(body.usage_cards.length).to.be.above(0);",
+									"    body.usage_cards.forEach(c =>",
+									"        pm.expect(c.title).to.not.match(/[\\u0530-\\u058F]/));",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Admin — reorder gallery / set hero",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{apiV1}}/admin/products/1/images",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"products",
+								"1",
+								"images"
+							]
+						},
+						"description": "Replaces the gallery's order, hero and alt text in one call. The ARRAY ORDER becomes sort_order — the list the admin dragged is the list that is saved, so a separate sort_order field cannot disagree with it.\n\nExactly one image must be flagged is_primary. The database enforces \"at most one\" with a PARTIAL unique index (only rows where is_primary is true are indexed); the handler catches \"none\" and turns \"two\" into a field error a form can attach.\n\nNeeds image ids that exist — upload two first.",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"images\": [\n        {\n            \"id\": 1,\n            \"is_primary\": true,\n            \"alt\": {\n                \"en\": \"A jar of royal jelly\",\n                \"hy\": \"Մայրական կաթի բանկա\"\n            }\n        },\n        {\n            \"id\": 2,\n            \"is_primary\": false,\n            \"alt\": {\n                \"en\": \"The texture, close up\"\n            }\n        }\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 204\", () => {",
+									"    pm.response.to.have.status(204);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Admin — gallery with no hero (400)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{apiV1}}/admin/products/1/images",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"products",
+								"1",
+								"images"
+							]
+						},
+						"description": "A gallery that nominates no hero renders nothing where the design's 520 px hero belongs. Caught as a validation CODE, like every other field error since E1.5.",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"images\": [\n        {\n            \"id\": 1,\n            \"is_primary\": false,\n            \"alt\": {}\n        }\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 400\", () => {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"pm.test(\"answers with a code, not English prose\", () => {",
+									"    pm.expect(pm.response.json().error.fields.images)",
+									"        .to.eql(\"one_primary_image\");",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Admin — save page copy for one locale",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{apiV1}}/admin/products/1/editorial",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"products",
+								"1",
+								"editorial"
+							]
+						},
+						"description": "Replaces the \"What it does\" bullets and usage cards for the locales named in the body. Locales left out are untouched, so editing the Armenian tab cannot wipe the English one.\n\n\"en\" is a legitimate key here, unlike in `translations` on the product itself — these rows have no parent field holding the English copy, so all three languages are peers.\n\nREPLACE, not merge: the rows are keyed by position, so \"the third bullet\" has no identity to patch once the editor reorders one.",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"content\": {\n        \"en\": {\n            \"highlights\": [\n                {\n                    \"text\": \"Supports energy and stamina through the season change\"\n                },\n                {\n                    \"text\": \"Rich in B vitamins, amino acids and proteins\"\n                }\n            ],\n            \"usage_cards\": [\n                {\n                    \"kicker\": \"Morning\",\n                    \"title\": \"A grain of rice\",\n                    \"body\": \"Under the tongue before breakfast, on an empty stomach.\"\n                }\n            ]\n        },\n        \"hy\": {\n            \"highlights\": [\n                {\n                    \"text\": \"Աջակցում է էներգիային և տոկունությանը\"\n                }\n            ],\n            \"usage_cards\": []\n        }\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 204\", () => {",
+									"    pm.response.to.have.status(204);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Admin — blank bullet (400)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{apiV1}}/admin/products/1/editorial",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"products",
+								"1",
+								"editorial"
+							]
+						},
+						"description": "Omitting a language is fine — the read falls back as a whole list. Sending one with a blank row is a form bug, and the field path in the response is the JSON path the form used, so the error lands on the right input.",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"content\": {\n        \"en\": {\n            \"highlights\": [\n                {\n                    \"text\": \"Fine\"\n                },\n                {\n                    \"text\": \"   \"\n                }\n            ]\n        }\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 400\", () => {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"pm.test(\"field path points at the offending row\", () => {",
+									"    pm.expect(pm.response.json().error.fields)",
+									"        .to.have.property(\"content.en.highlights[1].text\", \"required\");",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				},
+				{
+					"name": "Admin — curate \"Often taken together\"",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{apiV1}}/admin/products/1/related",
+							"host": [
+								"{{apiV1}}"
+							],
+							"path": [
+								"admin",
+								"products",
+								"1",
+								"related"
+							]
+						},
+						"description": "The array's order is the display order. An empty array clears the curation and hands the panel back to the computed fallback.\n\nSelf-references and duplicates are dropped rather than rejected: ticking the product you are editing is an obvious slip, and a constraint violation would be a worse answer than doing the sensible thing.",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"related_ids\": [\n        2,\n        3\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"status is 204\", () => {",
+									"    pm.response.to.have.status(204);",
+									"});"
+								]
+							}
+						}
+					],
+					"response": []
+				}
+			],
+			"description": "Phase E3: the product page's editorial half — gallery, \"What it does\", usage cards, notes and related products. The public requests assume backend/seed/seed.sql is loaded; the admin ones need \"Login as admin\" first and real ids from your own database."
 		},
 		{
 			"name": "Localization (Phase E1.5)",

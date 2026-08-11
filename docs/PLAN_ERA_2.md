@@ -824,45 +824,127 @@ ordered child collections, the ARIA tabs pattern, image galleries without a
 library.
 
 **Backend:**
-- [ ] Decide decision #4 (columns vs JSONB) and log it — together with
+- [x] Decide decision #4 (columns vs JSONB) and log it — together with
       decision #6 (E1.5's translation storage), since the two overlap directly.
-- [ ] Migration: `product_images` (product_id, url, alt, sort_order,
+
+      **Decided 2026-08-10: locale-keyed child rows** (decision #31), a third
+      option neither the plan nor decision #4 had named. The overlap with #6
+      turned out to be the whole answer: #6 splits locale-invariant fields
+      from prose, and a highlight bullet HAS no invariant field, so the split
+      degenerates into a parent row carrying nothing but a `sort_order`.
+      Keying the row by locale applies #6's principle to a row that is
+      entirely text. Images keep #6's original split (decision #32), because
+      an image row is mostly not text — the two shapes ask the same question
+      and get different answers.
+- [x] Migration: `product_images` (product_id, url, alt, sort_order,
       is_primary) with a partial unique index enforcing one primary per
       product. `alt` is translatable text (screen readers read it aloud in
       the visitor's language) and follows decision #6 like every other field.
       Backfill from `products.image_url`, then drop the column in a
       follow-up migration once the admin UI writes the new table.
-- [ ] Migration: `product_highlights` (product_id, sort_order, text) for the
+
+      The partial index is the phase's sharpest schema lesson: a plain
+      `UNIQUE (product_id, is_primary)` would also forbid two NON-primary
+      images, which is the normal case. It also changes the writer — the
+      index rejects the intermediate state, so setting a new hero must clear
+      the old flag first, in the same transaction.
+      **`products.image_url` is NOT yet dropped:** the shop grid still reads
+      it and the upload endpoint still writes it alongside the gallery. That
+      is migration 000015's job, once the list read moves over.
+- [x] Migration: `product_highlights` (product_id, sort_order, text) for the
       "What it does" bullets; `product_usage_cards` (kicker, title, body,
       sort_order) for Morning / Course / Pairs with. Both carry translatable
       text per decision #6.
-- [ ] Migration: `products.disclaimer`, `storage_note`, `harvest_note`
+      Two tables rather than four, per the decision above — and the languages
+      may now differ in COUNT, so a translator is not forced to pad. The
+      consequence for reads: the fallback happens per LIST, not per row, or
+      an English bullet would land in the middle of an Armenian panel.
+- [x] Migration: `products.disclaimer`, `storage_note`, `harvest_note`
       ("June 2026, Hive 41"), `shipping_note` ("Chilled, 2–4 days"),
       `lab_batch` ("RJ-0626"), `is_cold_chain`.
-- [ ] Related products: `product_related` (product_id, related_id, sort_order)
+      Split by the project's standing question: `lab_batch` and
+      `is_cold_chain` are locale-invariant and stay on `products`; the four
+      notes are prose and join `product_translations` as columns, since they
+      are scalar fields rather than ordered collections. `is_cold_chain` is a
+      BOOLEAN specifically so E6 can charge chilled shipping off it — a
+      translated string could not be reasoned about.
+- [x] Related products: `product_related` (product_id, related_id, sort_order)
       curated by the admin, falling back to same-category-by-popularity when
       empty. `GET /products/{slug}/related`.
-- [ ] Extend `GET /products/{slug}`; keep the list payload lean — the card does
+
+      **The specified fallback is dead on arrival and was replaced**
+      (decision #34): E2 gave the shop six products in six categories, one
+      each, so "another product in this category" matches nothing and the
+      panel would always be empty. It now ranks by how many BENEFITS a
+      product shares with this one, then by popularity — which is also the
+      better claim, since "often taken together" is about what the things do
+      rather than which shelf they sit on. The table carries a
+      `CHECK (product_id <> related_id)`: a product related to itself would
+      render the page you are already reading inside its own panel.
+- [x] Extend `GET /products/{slug}`; keep the list payload lean — the card does
       not need highlights or usage cards.
-- [ ] Admin: extend the product form for images (multi-upload, reorder,
+      A separate response struct EMBEDDING the card shape, so the two cannot
+      drift and no card carries six fields nothing renders. Pinned by a test
+      asserting the listing does NOT contain them.
+- [x] Admin: extend the product form for images (multi-upload, reorder,
       set primary), highlights, usage cards and metadata.
-- [ ] Tests: store test for ordering and the one-primary-image constraint; API
+      English-only, per E1.5's scope decision — what it edits is trilingual,
+      the chrome around it is not. It reads through the PUBLIC product
+      endpoint one locale at a time, so the editor sees exactly what a
+      shopper sees, fallbacks included, rather than growing a second
+      resolution path that could disagree with the storefront.
+- [x] Tests: store test for ordering and the one-primary-image constraint; API
       test for the fallback path of `/related`.
+      The constraint test writes to the table DIRECTLY, bypassing the store,
+      and asserts the database refuses — the difference between a constraint
+      and a convention. Also covered: deleting the hero promotes the next
+      image, editing one locale leaves the others alone, and a shortened list
+      replaces rather than merges.
 
 **Frontend:**
-- [ ] `Gallery`: hero + 4 thumbnails, arrow-key navigable, `alt` from the API.
-- [ ] `VariantPicker` as labelled price pills ("25 g · $32"), disabled and
-      marked when out of stock.
-- [ ] `QtyStepper` + `AddToCart` with the price in the button label.
-- [ ] "What it does" panel with the disclaimer in muted small print.
-- [ ] Meta row: Harvest / Shipping / Lab report cards.
-- [ ] `Tabs` (How to take it · Storage · Reviews) using the ARIA tabs pattern,
+- [x] `Gallery`: hero + 4 thumbnails, arrow-key navigable, `alt` from the API.
+      Built as an ARIA tablist, no library. The contract that matters is ONE
+      tab stop for the strip (roving `tabIndex`), selection following focus,
+      and focus moved imperatively — React state alone repaints the highlight
+      and leaves the browser focused on the old thumbnail. It deliberately
+      does not steal focus on first render.
+- [x] `VariantPicker` as labelled price pills ("25 g · $32"), disabled and
+      marked when out of stock. A `fieldset`/`legend`, since picking a size
+      is choosing one of a set.
+- [x] `QtyStepper` + `AddToCart` with the price in the button label.
+      E1 built `QtyStepper` unused, and putting it on a storefront page
+      exposed that its aria-labels were assembled in English at runtime — a
+      string is no less hardcoded for being concatenated. Now props.
+- [x] "What it does" panel with the disclaimer in muted small print.
+- [x] Meta row: Harvest / Shipping / Lab report cards.
+- [x] `Tabs` (How to take it · Storage · Reviews) using the ARIA tabs pattern,
       with the active tab in the URL hash so a tab is linkable.
-- [ ] `RelatedProducts` grid.
+      **Two tabs, not three.** Reviews are E4; a tab that opens onto nothing
+      is worse than the design's shape arriving one phase late — the same
+      call E1.5 made for nav links to unbuilt pages. The design's ★★★★★
+      "(64 reviews)" line is absent for the same reason.
+- [x] `RelatedProducts` grid.
+- [x] Vitest: 18 new tests (88 → 106), covering both keyboard contracts —
+      arrow keys, Home/End, wrap-around, the single tab stop, that focus
+      really moves, and that the gallery does not grab focus on load.
+
+**A defect found by opening the admin editor, not by testing it:** the related
+picker read the STOREFRONT's endpoint, which answers "what should this panel
+show" — curated list *or* computed fallback. Pre-filled from that, saving
+would silently freeze a dynamic panel into a static one; left empty, as it
+first was, a single Save would wipe an existing curation. Neither failure
+raises an error. Fixed with a narrower question the API can be asked
+(`?curated=true`, decision #35); the picker also hides inactive products,
+which the storefront read skips anyway.
 
 **Done when:** no string on the product page is hardcoded, the gallery and tabs
 are operable by keyboard alone, and the admin can produce a complete product
-page without SQL.
+page without SQL. ✅ **Complete 2026-08-10.** Verified in a real browser in
+English and Armenian, and the admin editor driven end to end against a seeded
+product (the related picker arrives pre-ticked with the real curation), plus
+`go test ./...`, `golangci-lint` (0 issues), `npm test` (106), `tsc -b`,
+`oxlint`, `npm run build`. Postman: 38 → 47 requests, every public assertion
+checked against the running API.
 
 ---
 

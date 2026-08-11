@@ -268,7 +268,12 @@ func (s *Store) GetProductBySlug(ctx context.Context, slug string, locale domain
 		       `+sqlProductDesc+`,
 		       p.image_url, p.is_active, p.created_at,
 		       COALESCE(p.badge, ''), p.badge_tone, p.sales_count,
-		       c.slug, `+sqlCategoryName+`
+		       c.slug, `+sqlCategoryName+`,
+		       p.lab_batch, p.is_cold_chain,
+		       COALESCE(t.disclaimer,    en.disclaimer,    ''),
+		       COALESCE(t.storage_note,  en.storage_note,  ''),
+		       COALESCE(t.harvest_note,  en.harvest_note,  ''),
+		       COALESCE(t.shipping_note, en.shipping_note, '')
 		FROM products p
 		JOIN categories c ON c.id = p.category_id
 		LEFT JOIN product_translations t  ON t.product_id  = p.id AND t.locale  = $2
@@ -280,7 +285,9 @@ func (s *Store) GetProductBySlug(ctx context.Context, slug string, locale domain
 	).Scan(&p.ID, &p.CategoryID, &p.Slug, &p.Name, &p.Description,
 		&p.ImageURL, &p.IsActive, &p.CreatedAt,
 		&p.Badge, &p.BadgeTone, &p.SalesCount,
-		&p.CategorySlug, &p.CategoryName)
+		&p.CategorySlug, &p.CategoryName,
+		&p.LabBatch, &p.IsColdChain,
+		&p.Disclaimer, &p.StorageNote, &p.HarvestNote, &p.ShippingNote)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Product{}, domain.ErrNotFound
@@ -295,7 +302,20 @@ func (s *Store) GetProductBySlug(ctx context.Context, slug string, locale domain
 	if err := s.attachBenefits(ctx, products, locale); err != nil {
 		return domain.Product{}, err
 	}
-	return products[0], nil
+
+	// The editorial half, loaded only here — see products_detail.go for why
+	// the listing does not get it.
+	detail := &products[0]
+	if err := s.attachImages(ctx, detail, locale); err != nil {
+		return domain.Product{}, err
+	}
+	if err := s.attachHighlights(ctx, detail, locale); err != nil {
+		return domain.Product{}, err
+	}
+	if err := s.attachUsageCards(ctx, detail, locale); err != nil {
+		return domain.Product{}, err
+	}
+	return *detail, nil
 }
 
 // attachVariants loads the variants for all given products in ONE query

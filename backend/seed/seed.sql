@@ -252,3 +252,270 @@ ON CONFLICT (sku) DO UPDATE
     SET label = EXCLUDED.label,
         price_minor = EXCLUDED.price_minor,
         stock_qty = EXCLUDED.stock_qty;
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- E3: the product page's editorial half
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- A NOTE ON HOW MUCH OF THIS IS REAL. The design wrote full product-page copy
+-- for ONE product (royal jelly); everything below for the other five is
+-- plausible placeholder prose, and the family's to replace. So the languages
+-- are seeded unevenly, on purpose:
+--
+--   * notes and highlights — all six products, all three languages. They are
+--     short and mechanical enough to be worth translating now.
+--   * usage cards — all six in English, plus Armenian and Russian for royal
+--     jelly, the product the design actually wrote. The rest deliberately
+--     fall back to English, which also makes the per-LIST fallback visible in
+--     a running shop rather than only in a test.
+--
+-- Armenian and Russian remain machine-assisted and flagged for native review.
+
+-- ── Locale-invariant metadata ─────────────────────────────────────────────
+UPDATE products p
+SET lab_batch = v.lab_batch, is_cold_chain = v.is_cold_chain
+FROM (VALUES
+    ('mountain-wildflower-honey', 'WH-0626', FALSE),
+    ('pure-beeswax-blocks',       'BW-0526', FALSE),
+    ('raw-propolis-tincture',     'PR-0426', FALSE),
+    -- The one product the design marks "Cold chain", and the reason the
+    -- column is a BOOLEAN: E6 charges chilled shipping off this, and a
+    -- translated string could not be reasoned about.
+    ('fresh-royal-jelly',         'RJ-0626', TRUE),
+    ('bee-pollen-granules',       'BP-0626', FALSE),
+    ('bee-venom-serum',           'BV-0326', FALSE)
+) AS v(slug, lab_batch, is_cold_chain)
+WHERE p.slug = v.slug;
+
+-- ── Per-language notes ────────────────────────────────────────────────────
+-- An UPDATE, not an INSERT: the translation rows already exist from the E2
+-- section above, and these are four more columns on them (migration 000013).
+UPDATE product_translations t
+SET disclaimer    = v.disclaimer,
+    storage_note  = v.storage_note,
+    harvest_note  = v.harvest_note,
+    shipping_note = v.shipping_note
+FROM (VALUES
+    ('mountain-wildflower-honey', 'en',
+     'A food, not a medicine. Not for infants under one year.',
+     'Keep the jar closed at room temperature, away from direct sun. Crystallisation is normal and reverses in a warm water bath.',
+     'August 2026, Hives 12–18', 'Ships in 2–4 days'),
+    ('mountain-wildflower-honey', 'hy',
+     'Սնունդ է, ոչ դեղամիջոց։ Չտալ մեկ տարեկանից փոքր երեխաներին։',
+     'Պահել փակ բանկայում՝ սենյակային ջերմաստիճանում, արևից հեռու։ Բյուրեղացումը բնական է և վերանում է տաք ջրի բաղնիքում։',
+     '2026 օգոստոս, փեթակներ 12–18', 'Առաքվում է 2–4 օրում'),
+    ('mountain-wildflower-honey', 'ru',
+     'Продукт питания, а не лекарство. Не давать детям до года.',
+     'Держите банку закрытой при комнатной температуре, вдали от солнца. Кристаллизация естественна и уходит на водяной бане.',
+     'Август 2026, ульи 12–18', 'Доставка 2–4 дня'),
+
+    ('pure-beeswax-blocks', 'en',
+     'For external and craft use. Not intended to be eaten.',
+     'Keeps for years in a cool, dry cupboard. No refrigeration needed.',
+     'July 2026, Hives 3–9', 'Ships in 2–4 days'),
+    ('pure-beeswax-blocks', 'hy',
+     'Արտաքին և արհեստագործական օգտագործման համար։ Նախատեսված չէ ուտելու։',
+     'Պահպանվում է տարիներ՝ զով, չոր պահարանում։ Սառնարան պետք չէ։',
+     '2026 հուլիս, փեթակներ 3–9', 'Առաքվում է 2–4 օրում'),
+    ('pure-beeswax-blocks', 'ru',
+     'Для наружного и ремесленного применения. Не предназначен в пищу.',
+     'Хранится годами в прохладном сухом шкафу. Холодильник не нужен.',
+     'Июль 2026, ульи 3–9', 'Доставка 2–4 дня'),
+
+    ('raw-propolis-tincture', 'en',
+     'Not a medicine. Avoid if you are allergic to bee products.',
+     'Store the bottle upright in a dark place. The tincture keeps its strength for two years.',
+     'April 2026, Hives 20–24', 'Ships in 2–4 days'),
+    ('raw-propolis-tincture', 'hy',
+     'Դեղամիջոց չէ։ Խուսափեք, եթե ալերգիա ունեք մեղվի արտադրանքի նկատմամբ։',
+     'Պահել շիշը ուղղահայաց՝ մութ տեղում։ Թուրմը պահպանում է ուժը երկու տարի։',
+     '2026 ապրիլ, փեթակներ 20–24', 'Առաքվում է 2–4 օրում'),
+    ('raw-propolis-tincture', 'ru',
+     'Не лекарство. Избегайте при аллергии на продукты пчеловодства.',
+     'Храните флакон вертикально в тёмном месте. Настойка держит силу два года.',
+     'Апрель 2026, ульи 20–24', 'Доставка 2–4 дня'),
+
+    ('fresh-royal-jelly', 'en',
+     'Not a medicine. Avoid if you are allergic to bee products.',
+     'Keep refrigerated at 2–5 °C and closed between doses. Do not freeze — freezing breaks the proteins this is worth eating for.',
+     'June 2026, Hive 41', 'Chilled, 2–4 days'),
+    ('fresh-royal-jelly', 'hy',
+     'Դեղամիջոց չէ։ Խուսափեք, եթե ալերգիա ունեք մեղվի արտադրանքի նկատմամբ։',
+     'Պահել սառնարանում՝ 2–5 °C, և փակ պահել դեղաչափերի միջև։ Չսառեցնել — սառեցումը քայքայում է հենց այն սպիտակուցները, որոնց համար այն արժե։',
+     '2026 հունիս, փեթակ 41', 'Սառը շղթայով, 2–4 օր'),
+    ('fresh-royal-jelly', 'ru',
+     'Не лекарство. Избегайте при аллергии на продукты пчеловодства.',
+     'Держите в холодильнике при 2–5 °C и закрытым между приёмами. Не замораживать — заморозка разрушает те самые белки, ради которых его берут.',
+     'Июнь 2026, улей 41', 'Охлаждённая доставка, 2–4 дня'),
+
+    ('bee-pollen-granules', 'en',
+     'A food supplement, not a medicine. Start with a small dose if you have not eaten pollen before.',
+     'Reseal the pouch after each use and keep it dry. Refrigeration extends its life but is not required.',
+     'May 2026, Hives 5–11', 'Ships in 2–4 days'),
+    ('bee-pollen-granules', 'hy',
+     'Սննդային հավելում է, ոչ դեղամիջոց։ Սկսեք փոքր չափաբաժնից, եթե նախկինում ծաղկափոշի չեք կերել։',
+     'Ամեն օգտագործումից հետո փակեք տոպրակը և պահեք չոր։ Սառնարանը երկարացնում է ժամկետը, բայց պարտադիր չէ։',
+     '2026 մայիս, փեթակներ 5–11', 'Առաքվում է 2–4 օրում'),
+    ('bee-pollen-granules', 'ru',
+     'Пищевая добавка, а не лекарство. Начните с малой дозы, если раньше не ели пыльцу.',
+     'Закрывайте пакет после каждого раза и держите сухим. Холодильник продлевает срок, но не обязателен.',
+     'Май 2026, ульи 5–11', 'Доставка 2–4 дня'),
+
+    ('bee-venom-serum', 'en',
+     'Not a medicine. Patch-test on a small area first, and do not use if you are allergic to bee stings.',
+     'Room temperature, cap closed, away from sunlight. Use within six months of opening.',
+     'March 2026, Hives 30–33', 'Ships in 2–4 days'),
+    ('bee-venom-serum', 'hy',
+     'Դեղամիջոց չէ։ Նախ փորձարկեք փոքր հատվածի վրա և մի օգտագործեք, եթե ալերգիա ունեք մեղվի խայթոցի նկատմամբ։',
+     'Սենյակային ջերմաստիճան, փակ խցան, արևից հեռու։ Օգտագործել բացելուց հետո վեց ամսվա ընթացքում։',
+     '2026 մարտ, փեթակներ 30–33', 'Առաքվում է 2–4 օրում'),
+    ('bee-venom-serum', 'ru',
+     'Не лекарство. Сначала сделайте тест на небольшом участке и не используйте при аллергии на укусы пчёл.',
+     'Комнатная температура, флакон закрыт, вдали от солнца. Использовать в течение шести месяцев после вскрытия.',
+     'Март 2026, ульи 30–33', 'Доставка 2–4 дня')
+) AS v(product_slug, locale, disclaimer, storage_note, harvest_note, shipping_note)
+JOIN products p ON p.slug = v.product_slug
+WHERE t.product_id = p.id AND t.locale = v.locale;
+
+-- ── "What it does" bullets ────────────────────────────────────────────────
+-- Rows keyed by (product, locale, position) — decision #4. sort_order is
+-- stated explicitly here rather than derived, because a seed is a literal
+-- description of a desired state, not a form submission.
+--
+-- DELETE first: the PK includes sort_order, so an upsert would leave a
+-- stale fourth bullet behind if a later edit shortens a list. Re-running the
+-- seed must CONVERGE, which for a positional collection means replace.
+DELETE FROM product_highlights
+WHERE product_id IN (SELECT id FROM products WHERE slug IN (
+    'mountain-wildflower-honey', 'pure-beeswax-blocks', 'raw-propolis-tincture',
+    'fresh-royal-jelly', 'bee-pollen-granules', 'bee-venom-serum'));
+
+INSERT INTO product_highlights (product_id, locale, sort_order, text)
+SELECT p.id, v.locale, v.sort_order, v.text
+FROM (VALUES
+    ('mountain-wildflower-honey', 'en', 0, 'Steady natural energy from fruit sugars, not a caffeine spike'),
+    ('mountain-wildflower-honey', 'en', 1, 'Unfiltered, so the pollen and enzymes are still in the jar'),
+    ('mountain-wildflower-honey', 'en', 2, 'One meadow, one season — never blended across harvests'),
+    ('mountain-wildflower-honey', 'hy', 0, 'Կայուն բնական էներգիա մրգային շաքարներից, ոչ թե կոֆեինային ցատկ'),
+    ('mountain-wildflower-honey', 'hy', 1, 'Չզտված՝ ծաղկափոշին և ֆերմենտները մնում են բանկայում'),
+    ('mountain-wildflower-honey', 'hy', 2, 'Մեկ մարգագետին, մեկ սեզոն — երբեք չի խառնվում բերքերի միջև'),
+    ('mountain-wildflower-honey', 'ru', 0, 'Ровная природная энергия от фруктовых сахаров, без кофеинового скачка'),
+    ('mountain-wildflower-honey', 'ru', 1, 'Нефильтрованный — пыльца и ферменты остаются в банке'),
+    ('mountain-wildflower-honey', 'ru', 2, 'Один луг, один сезон — никогда не смешиваем урожаи'),
+
+    ('pure-beeswax-blocks', 'en', 0, 'Melts clean for balms, salves and creams'),
+    ('pure-beeswax-blocks', 'en', 1, 'Burns slowly and without soot in poured candles'),
+    ('pure-beeswax-blocks', 'en', 2, 'Nothing added — no paraffin, no bleaching, no scent'),
+    ('pure-beeswax-blocks', 'hy', 0, 'Մաքուր հալվում է քսուքների, բալզամների և կրեմների համար'),
+    ('pure-beeswax-blocks', 'hy', 1, 'Այրվում է դանդաղ և առանց մրի ձուլված մոմերի մեջ'),
+    ('pure-beeswax-blocks', 'hy', 2, 'Ոչինչ ավելացված չէ — ոչ պարաֆին, ոչ սպիտակեցում, ոչ բույր'),
+    ('pure-beeswax-blocks', 'ru', 0, 'Чисто плавится для бальзамов, мазей и кремов'),
+    ('pure-beeswax-blocks', 'ru', 1, 'Горит медленно и без копоти в литых свечах'),
+    ('pure-beeswax-blocks', 'ru', 2, 'Ничего не добавлено — ни парафина, ни отбеливания, ни отдушек'),
+
+    ('raw-propolis-tincture', 'en', 0, 'Known for antimicrobial and antifungal activity'),
+    ('raw-propolis-tincture', 'en', 1, 'Traditionally taken at the first sign of a sore throat'),
+    ('raw-propolis-tincture', 'en', 2, 'Collected by hand from the hive, never scraped from frames'),
+    ('raw-propolis-tincture', 'hy', 0, 'Հայտնի է հակամանրէային և հակասնկային ազդեցությամբ'),
+    ('raw-propolis-tincture', 'hy', 1, 'Ավանդաբար ընդունվում է կոկորդի ցավի առաջին նշանից'),
+    ('raw-propolis-tincture', 'hy', 2, 'Հավաքվում է ձեռքով փեթակից, երբեք չի քերվում շրջանակներից'),
+    ('raw-propolis-tincture', 'ru', 0, 'Известен противомикробным и противогрибковым действием'),
+    ('raw-propolis-tincture', 'ru', 1, 'Традиционно принимают при первых признаках боли в горле'),
+    ('raw-propolis-tincture', 'ru', 2, 'Собран вручную из улья, а не соскоблен с рамок'),
+
+    ('fresh-royal-jelly', 'en', 0, 'Supports energy and stamina through the season change'),
+    ('fresh-royal-jelly', 'en', 1, 'Used in cosmetics for skin elasticity and repair'),
+    ('fresh-royal-jelly', 'en', 2, 'Rich in B vitamins, amino acids and proteins'),
+    ('fresh-royal-jelly', 'hy', 0, 'Աջակցում է էներգիային և տոկունությանը եղանակների փոփոխության ժամանակ'),
+    ('fresh-royal-jelly', 'hy', 1, 'Օգտագործվում է կոսմետիկայում՝ մաշկի առաձգականության և վերականգնման համար'),
+    ('fresh-royal-jelly', 'hy', 2, 'Հարուստ է B խմբի վիտամիններով, ամինաթթուներով և սպիտակուցներով'),
+    ('fresh-royal-jelly', 'ru', 0, 'Поддерживает энергию и выносливость при смене сезона'),
+    ('fresh-royal-jelly', 'ru', 1, 'Используется в косметике для упругости и восстановления кожи'),
+    ('fresh-royal-jelly', 'ru', 2, 'Богато витаминами группы B, аминокислотами и белками'),
+
+    ('bee-pollen-granules', 'en', 0, 'Roughly a quarter protein by weight, with all the essential amino acids'),
+    ('bee-pollen-granules', 'en', 1, 'A slow, even lift rather than a sugar rush'),
+    ('bee-pollen-granules', 'en', 2, 'Dried below hive temperature, so the enzymes survive'),
+    ('bee-pollen-granules', 'hy', 0, 'Կշռի մոտ քառորդը սպիտակուց է՝ բոլոր անհրաժեշտ ամինաթթուներով'),
+    ('bee-pollen-granules', 'hy', 1, 'Դանդաղ, հավասար վերելք, ոչ թե շաքարային ցատկ'),
+    ('bee-pollen-granules', 'hy', 2, 'Չորացվում է փեթակի ջերմաստիճանից ցածր՝ ֆերմենտները պահպանվում են'),
+    ('bee-pollen-granules', 'ru', 0, 'Около четверти веса — белок, со всеми незаменимыми аминокислотами'),
+    ('bee-pollen-granules', 'ru', 1, 'Медленный ровный подъём, а не сахарный скачок'),
+    ('bee-pollen-granules', 'ru', 2, 'Сушится ниже температуры улья, поэтому ферменты сохраняются'),
+
+    ('bee-venom-serum', 'en', 0, 'Used in apitherapy for stiff joints and tired muscles'),
+    ('bee-venom-serum', 'en', 1, 'Blended at a low concentration into a light, fast-absorbing base'),
+    ('bee-venom-serum', 'en', 2, 'Venom collected without harming the bees'),
+    ('bee-venom-serum', 'hy', 0, 'Օգտագործվում է ապիթերապիայում՝ կարկամած հոդերի և հոգնած մկանների համար'),
+    ('bee-venom-serum', 'hy', 1, 'Խառնված է ցածր խտությամբ՝ թեթև, արագ ներծծվող հիմքի մեջ'),
+    ('bee-venom-serum', 'hy', 2, 'Թույնը հավաքվում է առանց մեղուներին վնասելու'),
+    ('bee-venom-serum', 'ru', 0, 'Применяется в апитерапии при скованных суставах и усталых мышцах'),
+    ('bee-venom-serum', 'ru', 1, 'Смешан в низкой концентрации с лёгкой, быстро впитывающейся основой'),
+    ('bee-venom-serum', 'ru', 2, 'Яд собирается без вреда для пчёл')
+) AS v(product_slug, locale, sort_order, text)
+JOIN products p ON p.slug = v.product_slug;
+
+-- ── Usage cards (Morning / Course / Pairs with) ───────────────────────────
+-- English for all six; Armenian and Russian for royal jelly only — see the
+-- note at the top of this section. The other five fall back as a whole list,
+-- which is the behaviour store.attachUsageCards implements.
+DELETE FROM product_usage_cards
+WHERE product_id IN (SELECT id FROM products WHERE slug IN (
+    'mountain-wildflower-honey', 'pure-beeswax-blocks', 'raw-propolis-tincture',
+    'fresh-royal-jelly', 'bee-pollen-granules', 'bee-venom-serum'));
+
+INSERT INTO product_usage_cards (product_id, locale, sort_order, kicker, title, body)
+SELECT p.id, v.locale, v.sort_order, v.kicker, v.title, v.body
+FROM (VALUES
+    ('mountain-wildflower-honey', 'en', 0, 'Morning', 'A spoon, plain', 'On bread or straight from the spoon. Stirring it into boiling tea undoes most of what it is here for.'),
+    ('mountain-wildflower-honey', 'en', 1, 'Kitchen', 'Off the heat', 'Add at the end of cooking, not the start — above 40 °C the enzymes go and you are left with sweetness alone.'),
+    ('mountain-wildflower-honey', 'en', 2, 'Pairs with', 'Pollen and jelly', 'A spoon of honey is the easiest way to take the sharper things on this shelf.'),
+
+    ('pure-beeswax-blocks', 'en', 0, 'Balms', 'One part wax', 'Three parts oil to one part wax by weight gives a salve that holds its shape in a tin without going hard.'),
+    ('pure-beeswax-blocks', 'en', 1, 'Candles', 'Melt low and slow', 'A water bath, never direct heat. Beeswax scorches, and scorched wax smells like nothing you want in a room.'),
+    ('pure-beeswax-blocks', 'en', 2, 'Pairs with', 'Propolis', 'A few drops of tincture in a balm base is the classic winter hand salve.'),
+
+    ('raw-propolis-tincture', 'en', 0, 'Daily', 'Ten drops in water', 'The resin will cloud the glass — that is the propolis coming out of the alcohol, not a fault.'),
+    ('raw-propolis-tincture', 'en', 1, 'Course', 'Two weeks on', 'Then a week off. Most people run it through the changeable weeks of autumn.'),
+    ('raw-propolis-tincture', 'en', 2, 'Pairs with', 'Honey', 'A spoon of honey after the drops takes the sting out of the taste.'),
+
+    ('fresh-royal-jelly', 'en', 0, 'Morning', 'A grain of rice', 'Under the tongue before breakfast, on an empty stomach. Let it dissolve rather than swallowing.'),
+    ('fresh-royal-jelly', 'en', 1, 'Course', 'Three weeks on', 'Then a week off. Most people run a course at the turn of autumn and again in early spring.'),
+    ('fresh-royal-jelly', 'en', 2, 'Pairs with', 'Honey and pollen', 'Stir the day''s dose into a spoon of wildflower honey if the taste is too sharp on its own.'),
+    ('fresh-royal-jelly', 'hy', 0, 'Առավոտյան', 'Բրնձի հատիկի չափ', 'Լեզվի տակ՝ նախաճաշից առաջ, դատարկ ստամոքսին։ Թողեք, որ լուծվի, մի կուլ տվեք։'),
+    ('fresh-royal-jelly', 'hy', 1, 'Կուրս', 'Երեք շաբաթ', 'Ապա մեկ շաբաթ ընդմիջում։ Շատերն անցնում են կուրս աշնան սկզբին և կրկին վաղ գարնանը։'),
+    ('fresh-royal-jelly', 'hy', 2, 'Զուգակցվում է', 'Մեղրի և ծաղկափոշու հետ', 'Խառնեք օրվա չափաբաժինը մի գդալ վայրի ծաղիկների մեղրի մեջ, եթե համը շատ սուր է։'),
+    ('fresh-royal-jelly', 'ru', 0, 'Утром', 'С рисовое зерно', 'Под язык до завтрака, натощак. Дайте раствориться, не глотайте.'),
+    ('fresh-royal-jelly', 'ru', 1, 'Курс', 'Три недели', 'Затем неделя перерыва. Обычно курс проходят на переломе осени и ещё раз ранней весной.'),
+    ('fresh-royal-jelly', 'ru', 2, 'Сочетается с', 'Мёдом и пыльцой', 'Размешайте дневную дозу в ложке цветочного мёда, если вкус кажется слишком резким.'),
+
+    ('bee-pollen-granules', 'en', 0, 'Start', 'A few granules', 'Build up over a week. Pollen is a common allergen and a small first dose is the sensible way in.'),
+    ('bee-pollen-granules', 'en', 1, 'Daily', 'A teaspoon', 'In yoghurt, on porridge, or chewed on their own if you like the taste of a meadow.'),
+    ('bee-pollen-granules', 'en', 2, 'Pairs with', 'Honey', 'Honey and pollen together are the oldest breakfast on this shelf.'),
+
+    ('bee-venom-serum', 'en', 0, 'First', 'Patch-test', 'Inside the forearm, and wait a day. Bee venom is exactly as serious as it sounds if you react to stings.'),
+    ('bee-venom-serum', 'en', 1, 'Use', 'A thin layer', 'Massage into the joint or muscle until it disappears. A warm tingle is expected; burning is not.'),
+    ('bee-venom-serum', 'en', 2, 'Pairs with', 'Beeswax balm', 'A wax balm over the top holds the serum against the skin for longer.')
+) AS v(product_slug, locale, sort_order, kicker, title, body)
+JOIN products p ON p.slug = v.product_slug;
+
+-- ── Curated "Often taken together" ────────────────────────────────────────
+-- Only royal jelly is curated, on purpose: it exercises the CURATED path
+-- while the other five demonstrate the computed fallback (shared benefits,
+-- then popularity). Two behaviours visible in one seeded shop.
+--
+-- The pairings come from that product's own usage cards, which is what the
+-- panel is really claiming: "people take these together".
+DELETE FROM product_related
+WHERE product_id IN (SELECT id FROM products WHERE slug = 'fresh-royal-jelly');
+
+INSERT INTO product_related (product_id, related_id, sort_order)
+SELECT src.id, dst.id, v.sort_order
+FROM (VALUES
+    ('fresh-royal-jelly', 'mountain-wildflower-honey', 0),
+    ('fresh-royal-jelly', 'bee-pollen-granules',       1),
+    ('fresh-royal-jelly', 'raw-propolis-tincture',     2)
+) AS v(product_slug, related_slug, sort_order)
+JOIN products src ON src.slug = v.product_slug
+JOIN products dst ON dst.slug = v.related_slug
+ON CONFLICT (product_id, related_id) DO UPDATE SET sort_order = EXCLUDED.sort_order;

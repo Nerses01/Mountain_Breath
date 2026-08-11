@@ -58,6 +58,75 @@ type productResponse struct {
 	// readable, which is the test for whether a field belongs in a response.
 }
 
+// --- Detail-only shapes (E3) ------------------------------------------
+//
+// A separate struct EMBEDDING the list shape rather than more optional
+// fields on it. The two endpoints answer different questions, and a single
+// struct would have made every card in the grid carry six nulls and every
+// TypeScript consumer guess which fields are populated when.
+
+type imageResponse struct {
+	ID        int64  `json:"id"`
+	URL       string `json:"url"`
+	Alt       string `json:"alt"`
+	IsPrimary bool   `json:"is_primary"`
+}
+
+type highlightResponse struct {
+	Text string `json:"text"`
+}
+
+type usageCardResponse struct {
+	Kicker string `json:"kicker"`
+	Title  string `json:"title"`
+	Body   string `json:"body"`
+}
+
+type productDetailResponse struct {
+	productResponse
+
+	Images     []imageResponse     `json:"images"`
+	Highlights []highlightResponse `json:"highlights"`
+	UsageCards []usageCardResponse `json:"usage_cards"`
+
+	Disclaimer   string `json:"disclaimer"`
+	StorageNote  string `json:"storage_note"`
+	HarvestNote  string `json:"harvest_note"`
+	ShippingNote string `json:"shipping_note"`
+	LabBatch     string `json:"lab_batch"`
+	IsColdChain  bool   `json:"is_cold_chain"`
+}
+
+func toProductDetailResponse(p domain.Product) productDetailResponse {
+	images := make([]imageResponse, 0, len(p.Images))
+	for _, img := range p.Images {
+		images = append(images, imageResponse{
+			ID: img.ID, URL: img.URL, Alt: img.Alt, IsPrimary: img.IsPrimary,
+		})
+	}
+	highlights := make([]highlightResponse, 0, len(p.Highlights))
+	for _, h := range p.Highlights {
+		highlights = append(highlights, highlightResponse{Text: h.Text})
+	}
+	cards := make([]usageCardResponse, 0, len(p.UsageCards))
+	for _, c := range p.UsageCards {
+		cards = append(cards, usageCardResponse{Kicker: c.Kicker, Title: c.Title, Body: c.Body})
+	}
+
+	return productDetailResponse{
+		productResponse: toProductResponse(p),
+		Images:          images,
+		Highlights:      highlights,
+		UsageCards:      cards,
+		Disclaimer:      p.Disclaimer,
+		StorageNote:     p.StorageNote,
+		HarvestNote:     p.HarvestNote,
+		ShippingNote:    p.ShippingNote,
+		LabBatch:        p.LabBatch,
+		IsColdChain:     p.IsColdChain,
+	}
+}
+
 // paginated is a generic envelope for list endpoints — the same shape for
 // products now, orders later.
 type paginated[T any] struct {
@@ -168,7 +237,46 @@ func (s *Server) handleGetProduct(w http.ResponseWriter, r *http.Request) {
 		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 		return
 	}
-	s.respondJSON(w, http.StatusOK, toProductResponse(p))
+	s.respondJSON(w, http.StatusOK, toProductDetailResponse(p))
+}
+
+// GET /products/{slug}/related — "Often taken together".
+//
+// Its own endpoint rather than a field on the detail response: the panel sits
+// below the fold, changes far less often than stock or price, and a client
+// that only needs the buy box should not pay for four extra products. It also
+// lets the frontend cache the two under different keys.
+func (s *Server) handleRelatedProducts(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+	locale := localeFromContext(r.Context())
+
+	// ?curated=true asks ONLY for what the admin curated, with no computed
+	// fallback. The admin's picker needs that distinction and the storefront
+	// does not: pre-filling from the normal read would present the COMPUTED
+	// list as though it were curated, and saving it would silently freeze a
+	// dynamic panel into a static one.
+	var (
+		products []domain.Product
+		err      error
+	)
+	if r.URL.Query().Get("curated") == "true" {
+		products, err = s.store.ListCuratedRelated(r.Context(), slug, locale)
+	} else {
+		products, err = s.store.ListRelated(r.Context(), slug, locale)
+	}
+	if err != nil {
+		s.log.Error("listing related products", "slug", slug, "error", err)
+		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
+
+	// An unknown slug returns an empty list, not a 404: this is a panel on a
+	// page, and the page itself already 404s if the product is missing.
+	items := make([]productResponse, 0, len(products))
+	for _, p := range products {
+		items = append(items, toProductResponse(p))
+	}
+	s.respondJSON(w, http.StatusOK, items)
 }
 
 // intQueryParam parses s, falling back on absence or garbage. Query params

@@ -5,12 +5,15 @@ import type {
   CatalogFacets,
   Category,
   Credentials,
+  EditorialInput,
+  ImageInput,
   NewCategory,
   NewProduct,
   Order,
   OrderStatus,
   Paginated,
   Product,
+  ProductDetail,
   ProductSort,
   UpdateProduct,
   User,
@@ -160,7 +163,19 @@ export const api = {
   },
 
   getProduct: (slug: string) =>
-    request<Product>(withLang(`/api/v1/products/${encodeURIComponent(slug)}`)),
+    request<ProductDetail>(withLang(`/api/v1/products/${encodeURIComponent(slug)}`)),
+
+  // Its own request, not a field on the detail: the panel sits below the
+  // fold and changes far less often than stock or price, so the two cache
+  // under different keys.
+  // `curated: true` asks for ONLY the admin's list, with no computed
+  // fallback — the admin picker's pre-fill, and never the storefront's read.
+  relatedProducts: (slug: string, curated = false) =>
+    request<Product[]>(
+      withLang(
+        `/api/v1/products/${encodeURIComponent(slug)}/related${curated ? '?curated=true' : ''}`,
+      ),
+    ),
 
   // auth — the browser attaches the session cookie automatically
   me: () => request<User>('/api/v1/auth/me'),
@@ -199,6 +214,29 @@ export const api = {
       method: 'PATCH',
       body: { price_minor: priceMinor, stock_qty: stockQty },
     }),
+  // E3 editorial writes. All 204 No Content — the form already holds the
+  // state it just sent, so echoing it back would only invite the two to
+  // disagree.
+  saveProductImages: (id: number, images: ImageInput[]) =>
+    request<void>(`/api/v1/admin/products/${id}/images`, {
+      method: 'PUT',
+      body: { images },
+    }),
+  deleteProductImage: (productId: number, imageId: number) =>
+    request<void>(`/api/v1/admin/products/${productId}/images/${imageId}`, {
+      method: 'DELETE',
+    }),
+  saveProductEditorial: (id: number, content: Record<string, EditorialInput>) =>
+    request<void>(`/api/v1/admin/products/${id}/editorial`, {
+      method: 'PUT',
+      body: { content },
+    }),
+  saveProductRelated: (id: number, relatedIds: number[]) =>
+    request<void>(`/api/v1/admin/products/${id}/related`, {
+      method: 'PUT',
+      body: { related_ids: relatedIds },
+    }),
+
   uploadProductImage: (id: number, file: File) => {
     const form = new FormData()
     form.append('image', file)

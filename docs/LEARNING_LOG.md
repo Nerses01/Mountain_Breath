@@ -17,6 +17,75 @@ Template for an entry:
 
 ---
 
+## 2026-08-10 — Phase E3: modelling editorial content, and two ARIA patterns
+
+**Worked on:** migrations 000011–000014 (`product_images` + alt translations
+with a partial unique index; `product_highlights` / `product_usage_cards`
+keyed by locale; product metadata split invariant/translatable;
+`product_related`); detail-only store reads; `GET /products/{slug}/related`
+with a computed fallback; admin endpoints for gallery, copy and curation; the
+seeded editorial content; the rebuilt product page with a keyboard-navigable
+gallery and hash-linkable tabs; the admin's content editor.
+
+**Learned:**
+
+- **A "translation table" is not one shape.** Decision #6 splits
+  locale-invariant fields from prose. For a highlight bullet there IS no
+  invariant field, so the split degenerates into a parent row holding only a
+  `sort_order` — the same principle, applied honestly, produces a different
+  table. Images went the other way for the same reason.
+- **A PARTIAL unique index is "unique among SOME rows".** `UNIQUE (product_id,
+  is_primary)` would forbid two non-primary images; `UNIQUE (product_id) WHERE
+  is_primary` forbids two heroes and nothing else. Postgres has no
+  constraint syntax for it — the index *is* the constraint.
+- **A constraint changes the code that writes to it.** Because the index
+  rejects the intermediate state, "set a new hero" has to clear the old flag
+  first, in the same transaction. Verified by writing directly to the table
+  in a test and asserting the database says no.
+- **Fallback has a UNIT, and picking the wrong one interleaves languages.**
+  Names fall back per field; bullet lists fall back per LIST, because a
+  per-row fallback would put an English bullet in the middle of an Armenian
+  panel. That choice follows directly from the rows being keyed by locale.
+- **The ARIA tabs pattern is one tab stop, not N.** Roving `tabIndex`
+  (`0` on the selected, `-1` on the rest) is what stops a five-image gallery
+  costing a keyboard user five presses. Selection follows focus, and focus
+  has to be moved imperatively — React state repaints the highlight and
+  leaves the browser focused on the old element.
+- **A fragment identifier means "a position within this document"**, which is
+  exactly what a tab is — so the tab belongs in the hash, not a query param,
+  and `replace: true` keeps three tab clicks from becoming three history
+  entries.
+- **A plan's rule can be dead on arrival against real data.** "Related =
+  same category by popularity" is the standard rule and returns nothing in a
+  catalog with one product per category. Shared benefits is both what works
+  and what the panel actually claims.
+
+**The recurring lesson, in a new costume.** E2's was "a green suite is not a
+working app". E3's is narrower and sharper: **an admin tool has to know the
+difference between what it stores and what it computes.** The related-products
+picker read the storefront's endpoint, which answers "what should this panel
+show" — curated list *or* computed fallback. Pre-filled from that, saving
+would silently freeze a dynamic panel into a static one; left empty (as it
+first was), one click of Save would wipe an existing curation. Neither
+failure produces an error. The fix was a second, narrower question the API
+can be asked — `?curated=true` — and it only surfaced because the editor was
+opened in a browser against a product that was actually curated.
+
+**Questions / to revisit:**
+
+- The editor reads through the PUBLIC product endpoint, one locale at a time.
+  That keeps the admin seeing what a shopper sees, fallbacks included, at the
+  cost of a request per language tab. If the catalog grows, is an
+  admin-shaped "every language at once" read worth the second resolution path
+  it would create?
+- `products.image_url` still exists and is still what the shop grid reads,
+  even though the gallery now owns the images. Migration 000015 drops it —
+  which read paths have to move first?
+- The design's ★★★★★ and "Reviews (64)" tab are deliberately absent until E4.
+  Does the meta row look unfinished without them, or better?
+
+---
+
 ## 2026-08-10 — Phase E2: faceted shop, home page, and a bug only running found
 
 **Worked on:** migrations 000008–000010 (benefit taxonomy + join table +

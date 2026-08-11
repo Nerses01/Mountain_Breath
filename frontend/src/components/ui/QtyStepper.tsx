@@ -12,6 +12,12 @@ import { MinusIcon, PlusIcon } from './icons'
  *
  * In the mock the − and + are bare text. That leaves a screen-reader user
  * with two unlabelled buttons, so each gets an explicit aria-label here.
+ *
+ * Those labels are PROPS with English defaults rather than being built from
+ * `label` in English ("Decrease " + label), which is what E1 did while this
+ * component was still unused. E3 put it on a storefront page, where an
+ * Armenian reader would have met two English button names — a string is no
+ * less hardcoded for being assembled at runtime.
  */
 export function QtyStepper({
   value,
@@ -19,6 +25,8 @@ export function QtyStepper({
   min = 1,
   max,
   label = 'Quantity',
+  decreaseLabel,
+  increaseLabel,
   className,
 }: {
   value: number
@@ -26,6 +34,8 @@ export function QtyStepper({
   min?: number
   max?: number
   label?: string
+  decreaseLabel?: string
+  increaseLabel?: string
   className?: string
 }) {
   const clamp = (n: number) => {
@@ -46,7 +56,7 @@ export function QtyStepper({
     >
       <button
         type="button"
-        aria-label={`Decrease ${label.toLowerCase()}`}
+        aria-label={decreaseLabel ?? `Decrease ${label.toLowerCase()}`}
         disabled={atMin}
         onClick={() => onChange(clamp(value - 1))}
         className="text-ink-muted disabled:opacity-40"
@@ -65,7 +75,7 @@ export function QtyStepper({
 
       <button
         type="button"
-        aria-label={`Increase ${label.toLowerCase()}`}
+        aria-label={increaseLabel ?? `Increase ${label.toLowerCase()}`}
         disabled={atMax}
         onClick={() => onChange(clamp(value + 1))}
         className="text-ink disabled:opacity-40"

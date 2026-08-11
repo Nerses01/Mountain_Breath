@@ -22,9 +22,80 @@ var (
 // and stock are not in here on purpose — they mean the same thing in every
 // language, and duplicating them per locale would create three ways to
 // disagree about one fact.
+//
+// The E3 notes are scalar fields of the product, so they live here beside
+// name and description rather than in tables of their own — unlike the
+// ordered collections below, which are genuinely child rows.
 type ProductText struct {
 	Name        string
 	Description string
+
+	Disclaimer   string // "Not a medicine. Avoid if you are allergic…"
+	StorageNote  string // the Storage tab's paragraph
+	HarvestNote  string // "June 2026, Hive 41"
+	ShippingNote string // "Chilled, 2–4 days"
+}
+
+// ProductImage is one photo in the gallery. Unlike a highlight, most of this
+// row is locale-invariant — the file, its position, whether it is the hero —
+// so only Alt is resolved per language (migration 000011).
+type ProductImage struct {
+	ID        int64
+	URL       string
+	SortOrder int
+	IsPrimary bool
+	Alt       string
+}
+
+// ProductHighlight is one "What it does" bullet. The whole ROW is per-locale
+// (migration 000012), so there is no id here worth exposing: a bullet's
+// identity is its position within a language.
+type ProductHighlight struct {
+	SortOrder int
+	Text      string
+}
+
+// ProductUsageCard is one of the Morning / Course / Pairs-with cards. Three
+// fields rather than one blob because the design types each differently, and
+// splitting prose in the frontend cannot be validated.
+type ProductUsageCard struct {
+	SortOrder int
+	Kicker    string
+	Title     string
+	Body      string
+}
+
+// ProductEditorial is one language's worth of editorial content — what the
+// admin form submits per locale tab, and what the store replaces as a unit.
+//
+// Replaced wholesale rather than edited row by row: the rows are keyed by
+// position, so "the third bullet" has no identity to update once the admin
+// reorders or deletes one. Sending the whole list and rewriting it inside a
+// transaction is both simpler and the only version that cannot half-apply.
+type ProductEditorial struct {
+	Highlights []ProductHighlight
+	UsageCards []ProductUsageCard
+}
+
+// ValidateEditorial rejects blank rows. A missing language is fine — the
+// read falls back to English as a whole list — but an empty bullet inside a
+// submitted list is a form bug, exactly like a blank translated name.
+func ValidateEditorial(prefix string, e ProductEditorial) map[string]string {
+	fields := make(map[string]string)
+	for i, h := range e.Highlights {
+		if strings.TrimSpace(h.Text) == "" {
+			fields[fmt.Sprintf("%s.highlights[%d].text", prefix, i)] = ValidationRequired
+		}
+	}
+	for i, c := range e.UsageCards {
+		if strings.TrimSpace(c.Title) == "" {
+			fields[fmt.Sprintf("%s.usage_cards[%d].title", prefix, i)] = ValidationRequired
+		}
+		if strings.TrimSpace(c.Body) == "" {
+			fields[fmt.Sprintf("%s.usage_cards[%d].body", prefix, i)] = ValidationRequired
+		}
+	}
+	return fields
 }
 
 type Product struct {
@@ -58,13 +129,48 @@ type Product struct {
 	// where CategoryID is a single field.
 	Benefits []Benefit
 
+	// Locale-invariant product metadata (migration 000013).
+	LabBatch    string
+	IsColdChain bool
+
+	// Editorial content, loaded only by the DETAIL read. The listing leaves
+	// these empty on purpose: a card shows none of them, and fetching six
+	// products' worth of bullets to render six cards is work nobody sees.
+	Images     []ProductImage
+	Highlights []ProductHighlight
+	UsageCards []ProductUsageCard
+
 	// Name/Description are English on a write and the RESOLVED text for the
-	// requested locale on a read — see the note on Category.Name.
-	Name        string
-	Description string
+	// requested locale on a read — see the note on Category.Name. The four
+	// notes below follow exactly the same rule.
+	Name         string
+	Description  string
+	Disclaimer   string
+	StorageNote  string
+	HarvestNote  string
+	ShippingNote string
 
 	// Translations holds non-default locales only; English is the pair above.
 	Translations map[Locale]ProductText
+}
+
+// PrimaryImage is the gallery's hero, or the zero value when a product has
+// no images at all. The database guarantees at most one is_primary per
+// product (a partial unique index in 000011), so this cannot be ambiguous —
+// but it CAN be absent, which is why the second return value exists rather
+// than handing back a silently empty image.
+func (p Product) PrimaryImage() (ProductImage, bool) {
+	for _, img := range p.Images {
+		if img.IsPrimary {
+			return img, true
+		}
+	}
+	// Falling back to the first image rather than nothing: an uncurated
+	// gallery should still show a picture.
+	if len(p.Images) > 0 {
+		return p.Images[0], true
+	}
+	return ProductImage{}, false
 }
 
 type ProductVariant struct {

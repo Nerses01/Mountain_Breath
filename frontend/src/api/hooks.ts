@@ -5,7 +5,13 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 import { api, ApiError, type CatalogFilterParams, type ProductListParams } from './client'
-import type { OrderStatus, UpdateProduct, User } from './types'
+import type {
+  EditorialInput,
+  ImageInput,
+  OrderStatus,
+  UpdateProduct,
+  User,
+} from './types'
 import { useLocale } from '../i18n/useLocale'
 
 // TanStack Query caches by queryKey: two components asking for the same key
@@ -61,6 +67,21 @@ export function useProduct(slug: string) {
   return useQuery({
     queryKey: ['product', locale, slug],
     queryFn: () => api.getProduct(slug),
+  })
+}
+
+// "Often taken together". A separate key from ['product', …] so scrolling
+// past it does not invalidate the buy box, and so a stock change that
+// refetches the product leaves this panel alone.
+export function useRelatedProducts(slug: string, curated = false) {
+  const { locale } = useLocale()
+  return useQuery({
+    // `curated` is part of the key: the two answers are different lists, and
+    // sharing a key would let the storefront's computed panel be served to
+    // the admin picker, which is the exact confusion the flag exists to
+    // prevent.
+    queryKey: ['related', locale, slug, curated],
+    queryFn: () => api.relatedProducts(slug, curated),
   })
 }
 
@@ -201,6 +222,11 @@ function useInvalidateProducts() {
     // Adding, hiding or recategorising a product moves the sidebar counts —
     // easy to forget precisely because nothing on the admin screen shows them.
     qc.invalidateQueries({ queryKey: ['catalog-facets'] })
+    // E3: curating a related list, or editing a product at all, changes what
+    // other products' "Often taken together" panels show — the fallback
+    // ranks by shared benefits and popularity, both of which product edits
+    // can move.
+    qc.invalidateQueries({ queryKey: ['related'] })
   }
 }
 
@@ -227,6 +253,47 @@ export function useUploadProductImage() {
     mutationFn: ({ id, file }: { id: number; file: File }) =>
       api.uploadProductImage(id, file),
     onSuccess: invalidate,
+  })
+}
+
+// E3 editorial writes. All four invalidate the same caches as any other
+// product edit — a reordered gallery or a new bullet changes the product
+// page, and a curated related list changes another product's panel.
+export function useSaveProductImages() {
+  const invalidate = useInvalidateProducts()
+  return useMutation({
+    mutationFn: ({ id, images }: { id: number; images: ImageInput[] }) =>
+      api.saveProductImages(id, images),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteProductImage() {
+  const invalidate = useInvalidateProducts()
+  return useMutation({
+    mutationFn: ({ productId, imageId }: { productId: number; imageId: number }) =>
+      api.deleteProductImage(productId, imageId),
+    onSuccess: invalidate,
+  })
+}
+
+export function useSaveProductEditorial() {
+  const invalidate = useInvalidateProducts()
+  return useMutation({
+    mutationFn: ({ id, content }: { id: number; content: Record<string, EditorialInput> }) =>
+      api.saveProductEditorial(id, content),
+    onSuccess: invalidate,
+  })
+}
+
+export function useSaveProductRelated() {
+  const invalidate = useInvalidateProducts()
+  return useMutation({
+    mutationFn: ({ id, relatedIds }: { id: number; relatedIds: number[] }) =>
+      api.saveProductRelated(id, relatedIds),
+    // Also drops the cached "Often taken together" of every product, since
+    // curating one list can change what another product's fallback returns.
+    onSuccess: () => invalidate(),
   })
 }
 

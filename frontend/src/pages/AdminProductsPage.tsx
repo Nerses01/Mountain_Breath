@@ -14,6 +14,7 @@ import {
 import type { AdminProduct, NewVariantInput, ProductVariant } from '../api/types'
 import { AdminNav } from '../components/AdminNav'
 import { formatPrice } from '../lib/format'
+import { ProductContentEditor } from './admin/ProductContentEditor'
 
 // Admins type prices in major units ("1500.00"); the API speaks minor units.
 // The conversion lives at this edge and nowhere else.
@@ -281,6 +282,13 @@ function ProductRow({ product }: { product: AdminProduct }) {
         {product.variants.map((v) => (
           <VariantEditor key={v.id} variant={v} />
         ))}
+      </div>
+
+      {/* E3: the editorial half of the product page. Collapsed by default —
+          the list is for scanning stock and prices, and six expanded content
+          editors would bury that. */}
+      <div className="mt-3">
+        <ProductContentEditor product={product} />
       </div>
     </article>
   )

@@ -55,6 +55,43 @@ export interface Product {
   benefits: Benefit[]
 }
 
+// --- Product detail (E3) ------------------------------------------------
+//
+// A separate interface EXTENDING Product rather than optional fields on it.
+// The listing and the detail endpoint answer different questions, and one
+// shared type would make every card in the grid carry six `| undefined`
+// fields that a reader has to guess the population rules for.
+
+export interface ProductImage {
+  id: number
+  url: string
+  alt: string
+  is_primary: boolean
+}
+
+export interface ProductHighlight {
+  text: string
+}
+
+export interface ProductUsageCard {
+  kicker: string
+  title: string
+  body: string
+}
+
+export interface ProductDetail extends Product {
+  images: ProductImage[]
+  highlights: ProductHighlight[]
+  usage_cards: ProductUsageCard[]
+
+  disclaimer: string
+  storage_note: string
+  harvest_note: string
+  shipping_note: string
+  lab_batch: string
+  is_cold_chain: boolean
+}
+
 // One row of a filter group: what to show, what to put in the URL, and how
 // many products survive if it is clicked.
 export interface FacetCount {
@@ -172,6 +209,31 @@ export interface UpdateProduct {
   image_url: string
   is_active: boolean
   translations?: Record<string, ProductText>
+
+  // E3 metadata. Optional on the wire, so the existing calls that only
+  // toggle is_active keep working unchanged.
+  disclaimer?: string
+  storage_note?: string
+  harvest_note?: string
+  shipping_note?: string
+  lab_batch?: string
+  is_cold_chain?: boolean
+}
+
+// --- E3 admin writes ----------------------------------------------------
+// Each replaces a whole collection with what the form is showing, which is
+// why they are PUTs and why there is no per-row id to patch.
+
+export interface ImageInput {
+  id: number
+  is_primary: boolean
+  /** Alt per locale, including "en" — an image has no parent field for it. */
+  alt: Record<string, string>
+}
+
+export interface EditorialInput {
+  highlights: ProductHighlight[]
+  usage_cards: ProductUsageCard[]
 }
 
 // Shape of the backend's error envelope (docs/ARCHITECTURE.md).

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
-import { useCategories } from '../../api/hooks'
+import { useCatalogFacets } from '../../api/hooks'
 import { useLocale } from '../../i18n/useLocale'
 import { Button } from '../ui/Button'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
@@ -28,11 +28,20 @@ export function SiteFooter() {
   // on the Russian home page — "no hardcoded string left in JSX" is easy to
   // believe about a file until someone reads it in another language.
   //
-  // The Shop column is now the real category list, so it translates itself
-  // and each entry is a working filter link. Four of six, matching the mock's
+  // The Shop column is the real category list, so it translates itself and
+  // each entry is a working filter link. Four of six, matching the mock's
   // column length; the shop page is the place that lists all of them.
-  const categories = useCategories()
-  const shopLinks = (categories.data ?? []).slice(0, 4)
+  //
+  // From the FACETS endpoint, not /categories, and E3 found out why by
+  // looking at the rendered footer: /categories returns every row in the
+  // table, including Era I's herbal-tea and coffee, which still exist
+  // because deactivated products that old orders reference cannot be
+  // deleted. The footer was linking to two filters that return nothing.
+  // Facets already answers the narrower question the footer is actually
+  // asking — "categories with something in them" — and the shop page has
+  // usually cached it already.
+  const facets = useCatalogFacets({})
+  const shopLinks = (facets.data?.categories ?? []).slice(0, 4)
 
   // Company links stay plain text until E9 builds those pages — but their
   // LABELS are translatable either way.
@@ -53,7 +62,7 @@ export function SiteFooter() {
 
           <FooterColumn title={t('footer:shop')}>
             {shopLinks.map((c) => (
-              <li key={c.id}>
+              <li key={c.slug}>
                 <Link
                   to={`${localePath('/shop')}?category=${c.slug}`}
                   className="text-sm text-ink-on-dark-soft hover:text-ink-on-dark"

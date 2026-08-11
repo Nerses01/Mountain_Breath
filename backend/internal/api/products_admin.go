@@ -23,6 +23,14 @@ type newVariantRequest struct {
 type productTextRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+
+	// E3's per-language notes. Optional and additive, so every client and
+	// Postman request written before E3 keeps working unchanged — the same
+	// rule the `translations` key itself followed when E1.5 added it.
+	Disclaimer   string `json:"disclaimer"`
+	StorageNote  string `json:"storage_note"`
+	HarvestNote  string `json:"harvest_note"`
+	ShippingNote string `json:"shipping_note"`
 }
 
 type createProductRequest struct {
@@ -37,6 +45,15 @@ type createProductRequest struct {
 	// Optional, non-default locales only: {"hy": {"name": "...", ...}}.
 	// Additive, so existing clients are unaffected.
 	Translations map[string]productTextRequest `json:"translations"`
+
+	// English copy of E3's notes; the other languages ride in Translations.
+	Disclaimer   string `json:"disclaimer"`
+	StorageNote  string `json:"storage_note"`
+	HarvestNote  string `json:"harvest_note"`
+	ShippingNote string `json:"shipping_note"`
+	// Locale-invariant metadata (migration 000013).
+	LabBatch    string `json:"lab_batch"`
+	IsColdChain bool   `json:"is_cold_chain"`
 }
 
 type updateProductRequest struct {
@@ -46,6 +63,13 @@ type updateProductRequest struct {
 	ImageURL     string                        `json:"image_url"`
 	IsActive     bool                          `json:"is_active"`
 	Translations map[string]productTextRequest `json:"translations"`
+
+	Disclaimer   string `json:"disclaimer"`
+	StorageNote  string `json:"storage_note"`
+	HarvestNote  string `json:"harvest_note"`
+	ShippingNote string `json:"shipping_note"`
+	LabBatch     string `json:"lab_batch"`
+	IsColdChain  bool   `json:"is_cold_chain"`
 }
 
 // toDomainTranslations converts the wire shape into the domain one.
@@ -56,7 +80,11 @@ func toDomainTranslations(in map[string]productTextRequest) map[domain.Locale]do
 	}
 	out := make(map[domain.Locale]domain.ProductText, len(parsed))
 	for locale, t := range parsed {
-		out[locale] = domain.ProductText{Name: t.Name, Description: t.Description}
+		out[locale] = domain.ProductText{
+			Name: t.Name, Description: t.Description,
+			Disclaimer: t.Disclaimer, StorageNote: t.StorageNote,
+			HarvestNote: t.HarvestNote, ShippingNote: t.ShippingNote,
+		}
 	}
 	return out
 }
@@ -128,6 +156,12 @@ func (s *Server) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 		ImageURL:     req.ImageURL,
 		IsActive:     true,
 		Translations: toDomainTranslations(req.Translations),
+		Disclaimer:   req.Disclaimer,
+		StorageNote:  req.StorageNote,
+		HarvestNote:  req.HarvestNote,
+		ShippingNote: req.ShippingNote,
+		LabBatch:     req.LabBatch,
+		IsColdChain:  req.IsColdChain,
 	}
 	for _, v := range req.Variants {
 		product.Variants = append(product.Variants, domain.ProductVariant{
@@ -194,6 +228,12 @@ func (s *Server) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
 		ID: id, CategoryID: req.CategoryID, Name: req.Name,
 		Description: req.Description, ImageURL: req.ImageURL, IsActive: req.IsActive,
 		Translations: translations,
+		Disclaimer:   req.Disclaimer,
+		StorageNote:  req.StorageNote,
+		HarvestNote:  req.HarvestNote,
+		ShippingNote: req.ShippingNote,
+		LabBatch:     req.LabBatch,
+		IsColdChain:  req.IsColdChain,
 	}
 	if err := s.store.UpdateProduct(r.Context(), &product); err != nil {
 		s.respondProductError(w, err)

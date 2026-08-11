@@ -29,8 +29,21 @@ type fakeStore struct {
 	// lastFilter does the same job for the whole catalog filter: parsing a
 	// query string into a ProductFilter is API-layer logic, and this is what
 	// lets it be tested without a database behind it.
-	lastFilter domain.ProductFilter
-	facets     domain.CatalogFacets
+	lastFilter          domain.ProductFilter
+	facets              domain.CatalogFacets
+	related             []domain.Product
+	curatedRelated      []domain.Product
+	curatedRelatedAsked bool
+
+	// What the E3 editorial handlers passed down. Recorded rather than
+	// stored: these tests are about request bodies becoming the right calls;
+	// the store's own behaviour is covered by the Docker-backed suite.
+	savedImages       []domain.ProductImage
+	lastImageAlts     map[domain.Locale]string
+	lastImageAltsByID map[int64]map[domain.Locale]string
+	deletedImageID    int64
+	savedEditorial    map[domain.Locale]domain.ProductEditorial
+	savedRelatedIDs   []int64
 }
 
 func newFakeStore() *fakeStore {
@@ -118,6 +131,66 @@ func (f *fakeStore) UpdateProductImage(_ context.Context, productID int64, image
 	return domain.ErrNotFound
 }
 
+func (f *fakeStore) ListRelated(_ context.Context, _ string, locale domain.Locale) ([]domain.Product, error) {
+	f.lastLocale = locale
+	return f.related, nil
+}
+
+func (f *fakeStore) ListCuratedRelated(_ context.Context, _ string, locale domain.Locale) ([]domain.Product, error) {
+	f.lastLocale = locale
+	f.curatedRelatedAsked = true
+	return f.curatedRelated, nil
+}
+
+// --- E3 editorial writes ---
+//
+// These record their arguments rather than simulating storage: what the
+// handler tests actually check is that a request body becomes the right
+// call, since the store's own behaviour has integration tests behind Docker.
+
+func (f *fakeStore) AddProductImage(_ context.Context, productID int64, url string, alts map[domain.Locale]string) (domain.ProductImage, error) {
+	// The real store gets this from a foreign-key violation; the fake has to
+	// check by hand, or the upload handler's "unknown product ⇒ 404, and no
+	// orphan file left on disk" path is never exercised.
+	if !f.hasProduct(productID) {
+		return domain.ProductImage{}, domain.ErrNotFound
+	}
+	img := domain.ProductImage{ID: int64(len(f.savedImages) + 1), URL: url, IsPrimary: len(f.savedImages) == 0}
+	f.savedImages = append(f.savedImages, img)
+	f.lastImageAlts = alts
+	return img, nil
+}
+
+func (f *fakeStore) hasProduct(id int64) bool {
+	for _, p := range f.products {
+		if p.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *fakeStore) SaveProductImages(_ context.Context, _ int64, images []domain.ProductImage, alts map[int64]map[domain.Locale]string) error {
+	f.savedImages = images
+	f.lastImageAltsByID = alts
+	return nil
+}
+
+func (f *fakeStore) DeleteProductImage(_ context.Context, _, imageID int64) error {
+	f.deletedImageID = imageID
+	return nil
+}
+
+func (f *fakeStore) SaveProductEditorial(_ context.Context, _ int64, byLocale map[domain.Locale]domain.ProductEditorial) error {
+	f.savedEditorial = byLocale
+	return nil
+}
+
+func (f *fakeStore) SaveProductRelated(_ context.Context, _ int64, relatedIDs []int64) error {
+	f.savedRelatedIDs = relatedIDs
+	return nil
+}
+
 func (f *fakeStore) UpdateVariant(_ context.Context, variantID, priceMinor int64, stockQty int) error {
 	for i := range f.products {
 		for j := range f.products[i].Variants {
@@ -164,8 +237,8 @@ func (f *fakeStore) DeleteSession(_ context.Context, token string) error {
 func (f *fakeStore) GetCart(_ context.Context, _ int64, _ domain.Locale) ([]domain.CartItem, error) {
 	return nil, nil
 }
-func (f *fakeStore) SetCartItem(_ context.Context, _, _ int64, _ int) error   { return nil }
-func (f *fakeStore) DeleteCartItem(_ context.Context, _, _ int64) error       { return nil }
+func (f *fakeStore) SetCartItem(_ context.Context, _, _ int64, _ int) error { return nil }
+func (f *fakeStore) DeleteCartItem(_ context.Context, _, _ int64) error     { return nil }
 func (f *fakeStore) CreateOrder(_ context.Context, _ int64) (domain.Order, error) {
 	return domain.Order{}, domain.ErrEmptyCart
 }

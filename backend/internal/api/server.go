@@ -33,10 +33,25 @@ type ProductStore interface {
 	// counts describe the same query the grid runs, minus paging.
 	CatalogFacets(ctx context.Context, f domain.ProductFilter) (domain.CatalogFacets, error)
 	GetProductBySlug(ctx context.Context, slug string, locale domain.Locale) (domain.Product, error)
+	// ListRelated is "Often taken together": the admin's curated list, or a
+	// shared-benefit-then-popularity ranking when nothing is curated.
+	ListRelated(ctx context.Context, slug string, locale domain.Locale) ([]domain.Product, error)
+	// ListCuratedRelated is the same question without the fallback — what
+	// the admin actually chose, which is the only version a picker can
+	// safely pre-fill from.
+	ListCuratedRelated(ctx context.Context, slug string, locale domain.Locale) ([]domain.Product, error)
 	CreateProduct(ctx context.Context, p *domain.Product) error
 	UpdateProduct(ctx context.Context, p *domain.Product) error
 	UpdateVariant(ctx context.Context, variantID, priceMinor int64, stockQty int) error
 	UpdateProductImage(ctx context.Context, productID int64, imageURL string) error
+
+	// E3 editorial writes. Collections are replaced wholesale — see the note
+	// at the top of store/products_admin_detail.go for why.
+	AddProductImage(ctx context.Context, productID int64, url string, alts map[domain.Locale]string) (domain.ProductImage, error)
+	SaveProductImages(ctx context.Context, productID int64, images []domain.ProductImage, alts map[int64]map[domain.Locale]string) error
+	DeleteProductImage(ctx context.Context, productID, imageID int64) error
+	SaveProductEditorial(ctx context.Context, productID int64, byLocale map[domain.Locale]domain.ProductEditorial) error
+	SaveProductRelated(ctx context.Context, productID int64, relatedIDs []int64) error
 }
 
 type UserStore interface {
@@ -133,6 +148,7 @@ func (s *Server) Routes() chi.Router {
 		r.Get("/catalog/facets", s.handleCatalogFacets)
 		r.Get("/products", s.handleListProducts)
 		r.Get("/products/{slug}", s.handleGetProduct)
+		r.Get("/products/{slug}/related", s.handleRelatedProducts)
 
 		// Logged-in customers: cart and checkout.
 		r.Group(func(r chi.Router) {
@@ -154,6 +170,12 @@ func (s *Server) Routes() chi.Router {
 			r.Put("/products/{id}", s.handleUpdateProduct)
 			r.Post("/products/{id}/image", s.handleUploadProductImage)
 			r.Patch("/variants/{id}", s.handleUpdateVariant)
+
+			// E3: the editorial half of a product page.
+			r.Put("/products/{id}/images", s.handleSaveProductImages)
+			r.Delete("/products/{id}/images/{imageID}", s.handleDeleteProductImage)
+			r.Put("/products/{id}/editorial", s.handleSaveProductEditorial)
+			r.Put("/products/{id}/related", s.handleSaveProductRelated)
 		})
 	})
 

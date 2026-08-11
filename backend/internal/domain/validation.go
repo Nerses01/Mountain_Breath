@@ -22,6 +22,10 @@ const (
 	ValidationPositive         = "positive"
 	ValidationNotNegative      = "not_negative"
 	ValidationVariantsRequired = "variants_required"
+	// A gallery must nominate exactly one hero. The database enforces "at
+	// most one" with a partial unique index; this catches "none" and turns
+	// "two" into a field error instead of a constraint violation.
+	ValidationOnePrimary = "one_primary_image"
 
 	// A translations map keyed by a language the shop does not serve. Caught
 	// here rather than at the database, whose CHECK constraint would answer

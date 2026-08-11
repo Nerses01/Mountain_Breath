@@ -94,16 +94,39 @@ func (s *Server) handleUploadProductImage(w http.ResponseWriter, r *http.Request
 	}
 
 	url := "/uploads/" + filename
-	if err := s.store.UpdateProductImage(r.Context(), productID, url); err != nil {
+
+	// E3: an upload now APPENDS to the gallery (product_images) instead of
+	// overwriting one image_url. The first one a product gets becomes its
+	// hero automatically — see store.AddProductImage.
+	//
+	// Alt text starts empty rather than being invented from the product
+	// name: a caption the admin never wrote is worse than a visibly missing
+	// one, because it looks finished. The images form is where it gets set.
+	img, err := s.store.AddProductImage(r.Context(), productID, url, nil)
+	if err != nil {
 		_ = os.Remove(path) // don't strand orphan files for missing products
 		if errors.Is(err, domain.ErrNotFound) {
 			s.respondError(w, http.StatusNotFound, "not_found", "no such product")
 			return
 		}
-		s.log.Error("saving image url", "error", err)
+		s.log.Error("saving image", "error", err)
 		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 		return
 	}
 
-	s.respondJSON(w, http.StatusOK, map[string]string{"image_url": url})
+	// products.image_url is still written, and still the column the shop
+	// grid reads. It is dropped in migration 000015 once every read path
+	// uses the gallery — the same add-backfill-then-drop sequence 000007
+	// used, and the reason this one write does double duty for now.
+	if img.IsPrimary {
+		if err := s.store.UpdateProductImage(r.Context(), productID, url); err != nil {
+			s.log.Error("syncing legacy image url", "error", err)
+		}
+	}
+
+	s.respondJSON(w, http.StatusOK, map[string]any{
+		"image_url":  url,
+		"image_id":   img.ID,
+		"is_primary": img.IsPrimary,
+	})
 }
