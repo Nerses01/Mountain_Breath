@@ -8,7 +8,9 @@ import { api, ApiError, type CatalogFilterParams, type ProductListParams } from 
 import type {
   EditorialInput,
   ImageInput,
+  NewReview,
   OrderStatus,
+  ReviewStatus,
   UpdateProduct,
   User,
 } from './types'
@@ -82,6 +84,55 @@ export function useRelatedProducts(slug: string, curated = false) {
     // prevent.
     queryKey: ['related', locale, slug, curated],
     queryFn: () => api.relatedProducts(slug, curated),
+  })
+}
+
+// --- Reviews (E4) ---
+
+export function useReviews(slug: string, page = 1) {
+  const { locale } = useLocale()
+  return useQuery({
+    queryKey: ['reviews', locale, slug, page],
+    queryFn: () => api.listReviews(slug, page),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useCreateReview(slug: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (review: NewReview) => api.createReview(slug, review),
+    onSuccess: () => {
+      // The review lands PENDING, so the public list does not change — but
+      // `can_review` on the product just flipped to false, and the form must
+      // disappear. That is the detail query, not the review list.
+      qc.invalidateQueries({ queryKey: ['product'] })
+      qc.invalidateQueries({ queryKey: ['reviews'] })
+    },
+  })
+}
+
+export function useAdminReviews(status?: ReviewStatus) {
+  return useQuery({
+    queryKey: ['admin-reviews', status ?? 'all'],
+    queryFn: () => api.adminReviews(status),
+  })
+}
+
+export function useModerateReview() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, status }: { id: number; status: ReviewStatus }) =>
+      api.moderateReview(id, status),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-reviews'] })
+      // Publishing or rejecting moves the product's stored average, and the
+      // average is on the CARD as well as the detail — so both catalog
+      // caches are stale, not just the one product.
+      qc.invalidateQueries({ queryKey: ['reviews'] })
+      qc.invalidateQueries({ queryKey: ['product'] })
+      qc.invalidateQueries({ queryKey: ['products'] })
+    },
   })
 }
 

@@ -9,6 +9,8 @@ const product: Product = {
   category_id: 1,
   category_slug: 'honey',
   category_name: 'Honey',
+  rating_avg: 4.67,
+  rating_count: 3,
   slug: 'mountain-wildflower-honey',
   name: 'Mountain Wildflower Honey',
   description: 'Sweet liquid made from flower nectar.',

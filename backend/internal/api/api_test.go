@@ -44,6 +44,17 @@ type fakeStore struct {
 	deletedImageID    int64
 	savedEditorial    map[domain.Locale]domain.ProductEditorial
 	savedRelatedIDs   []int64
+
+	// E4 reviews. reviewErr lets a test drive the handler's error mapping
+	// (403 for a non-purchaser, 409 for a second review) without a database
+	// to produce those conditions naturally.
+	reviews          []domain.Review
+	lastReviewFilter domain.ReviewFilter
+	createdReview    domain.Review
+	reviewErr        error
+	moderatedID      int64
+	moderatedStatus  string
+	canReview        bool
 }
 
 func newFakeStore() *fakeStore {
@@ -202,6 +213,35 @@ func (f *fakeStore) UpdateVariant(_ context.Context, variantID, priceMinor int64
 		}
 	}
 	return domain.ErrNotFound
+}
+
+// --- ReviewStore ---
+
+func (f *fakeStore) ListReviews(_ context.Context, filter domain.ReviewFilter) ([]domain.Review, int, error) {
+	f.lastReviewFilter = filter
+	return f.reviews, len(f.reviews), nil
+}
+
+func (f *fakeStore) CreateReview(_ context.Context, r *domain.Review, _ string) error {
+	if f.reviewErr != nil {
+		return f.reviewErr
+	}
+	r.ID = int64(len(f.reviews) + 1)
+	r.Status = domain.ReviewPending
+	f.createdReview = *r
+	return nil
+}
+
+func (f *fakeStore) UpdateReviewStatus(_ context.Context, reviewID int64, status string) (domain.Review, error) {
+	if f.reviewErr != nil {
+		return domain.Review{}, f.reviewErr
+	}
+	f.moderatedID, f.moderatedStatus = reviewID, status
+	return domain.Review{ID: reviewID, Status: status, Rating: 5}, nil
+}
+
+func (f *fakeStore) CanReview(_ context.Context, _ int64, _ string) (bool, error) {
+	return f.canReview, nil
 }
 
 // --- UserStore / SessionStore (only what these tests exercise) ---

@@ -202,7 +202,8 @@ func (s *Store) relatedProducts(ctx context.Context, slug string, locale domain.
 		       ` + sqlProductDesc + `,
 		       p.image_url, p.is_active, p.created_at,
 		       COALESCE(p.badge, ''), p.badge_tone, p.sales_count,
-		       c.slug, ` + sqlCategoryName + `
+		       c.slug, ` + sqlCategoryName + `,
+		       p.rating_avg::float8, p.rating_count
 		FROM products p
 		JOIN categories c ON c.id = p.category_id
 		LEFT JOIN product_translations t  ON t.product_id  = p.id AND t.locale  = $2
@@ -224,7 +225,8 @@ func (s *Store) relatedProducts(ctx context.Context, slug string, locale domain.
 		if err := rows.Scan(&p.ID, &p.CategoryID, &p.Slug, &p.Name, &p.Description,
 			&p.ImageURL, &p.IsActive, &p.CreatedAt,
 			&p.Badge, &p.BadgeTone, &p.SalesCount,
-			&p.CategorySlug, &p.CategoryName); err != nil {
+			&p.CategorySlug, &p.CategoryName,
+			&p.Rating.Average, &p.Rating.Count); err != nil {
 			return nil, fmt.Errorf("scanning related product: %w", err)
 		}
 		products = append(products, p)

@@ -8,7 +8,10 @@ import { useLocale } from '../i18n/useLocale'
 import { cx } from '../lib/cx'
 import { PER_PAGE, useCatalogFilters } from '../lib/useCatalogFilters'
 
-const SORTS: ProductSort[] = ['popular', 'price_asc', 'price_desc', 'newest']
+// Mirrors domain.ProductSorts. "Most loved" stays sales-based and rating is
+// its own entry — see the note on DefaultProductSort for why an average over
+// few reviews makes a bad default.
+const SORTS: ProductSort[] = ['popular', 'rating', 'price_asc', 'price_desc', 'newest']
 
 /**
  * The design's Shop screen: breadcrumbs, title, result count, sort, a

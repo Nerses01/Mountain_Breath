@@ -1,6 +1,10 @@
 import type {
   AdminProduct,
+  AdminReview,
   ApiErrorBody,
+  NewReview,
+  Review,
+  ReviewStatus,
   Cart,
   CatalogFacets,
   Category,
@@ -176,6 +180,30 @@ export const api = {
         `/api/v1/products/${encodeURIComponent(slug)}/related${curated ? '?curated=true' : ''}`,
       ),
     ),
+
+  // --- Reviews (E4) ---
+  //
+  // The public list needs no `status` param and deliberately offers none:
+  // the endpoint pins it to `published` server-side, so there is nothing a
+  // client could ask for that would expose an unmoderated review.
+  listReviews: (slug: string, page = 1) =>
+    request<Paginated<Review>>(
+      withLang(`/api/v1/products/${encodeURIComponent(slug)}/reviews?page=${page}`),
+    ),
+  createReview: (slug: string, review: NewReview) =>
+    request<Review>(`/api/v1/products/${encodeURIComponent(slug)}/reviews`, {
+      method: 'POST',
+      body: review,
+    }),
+  adminReviews: (status?: ReviewStatus) =>
+    request<Paginated<AdminReview>>(
+      `/api/v1/admin/reviews${status ? `?status=${status}` : ''}`,
+    ),
+  moderateReview: (id: number, status: ReviewStatus) =>
+    request<Review>(`/api/v1/admin/reviews/${id}`, {
+      method: 'PATCH',
+      body: { status },
+    }),
 
   // auth — the browser attaches the session cookie automatically
   me: () => request<User>('/api/v1/auth/me'),

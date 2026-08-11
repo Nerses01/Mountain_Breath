@@ -5,7 +5,16 @@ import type { ProductSort } from '../api/types'
 
 export const PER_PAGE = 12
 
-const SORTS: readonly ProductSort[] = ['popular', 'price_asc', 'price_desc', 'newest']
+// Mirrors domain.ProductSorts. A value here that the backend does not
+// whitelist would be a URL that silently falls back to popular; a value the
+// backend has and this list does not would be a link nobody can reach.
+const SORTS: readonly ProductSort[] = [
+  'popular',
+  'rating',
+  'price_asc',
+  'price_desc',
+  'newest',
+]
 
 function parseSort(raw: string | null): ProductSort {
   return SORTS.includes(raw as ProductSort) ? (raw as ProductSort) : 'popular'

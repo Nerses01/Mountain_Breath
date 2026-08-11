@@ -12,6 +12,7 @@ import {
 import type { ProductDetail, ProductVariant } from '../api/types'
 import { ProductCard } from '../components/ProductCard'
 import { Gallery } from '../components/product/Gallery'
+import { Reviews } from '../components/product/Reviews'
 import { Tabs, type Tab } from '../components/product/Tabs'
 import {
   Badge,
@@ -23,6 +24,7 @@ import {
   IconButton,
   QtyStepper,
   SectionHeading,
+  Stars,
 } from '../components/ui'
 import { useLocale } from '../i18n/useLocale'
 import { cx } from '../lib/cx'
@@ -113,6 +115,13 @@ export function ProductPage() {
       ),
     })
   }
+  // E4 fills the third tab the design draws and E3 deliberately left out.
+  // The count is in the label, as the mock has it.
+  tabs.push({
+    id: 'reviews',
+    label: t('product:tabs.reviews', { count: p.rating_count }),
+    panel: <Reviews product={p} />,
+  })
 
   return (
     <div className="mx-auto max-w-360 px-6 py-8 lg:px-14">
@@ -139,9 +148,14 @@ export function ProductPage() {
         </div>
 
         <div className="flex flex-col gap-5">
-          <span className="font-display text-xs font-semibold uppercase tracking-eyebrow text-ink-muted">
-            {p.category_name}
-          </span>
+          {/* The design's eyebrow row: category, then the rating. E3 shipped
+              the left half; E4 adds the right. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-display text-xs font-semibold uppercase tracking-eyebrow text-ink-muted">
+              {p.category_name}
+            </span>
+            <Stars rating={p.rating_avg} count={p.rating_count} />
+          </div>
 
           <h1 className="font-display text-display-lg font-extrabold text-ink">{p.name}</h1>
 

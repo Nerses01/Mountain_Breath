@@ -17,6 +17,85 @@ Template for an entry:
 
 ---
 
+## 2026-08-11 — Phase E4: keeping a denormalized aggregate honest
+
+**Worked on:** migration 000015 (`reviews` with a status workflow and a
+UNIQUE per person per product; `products.rating_avg`/`rating_count`);
+verified-purchase enforcement; the moderation queue; `sort=rating`; an
+accessible `Stars` used by the card, the detail and every review row; the
+Reviews tab the design draws and E3 deliberately left empty.
+
+**Learned:**
+
+- **Recompute, don't nudge.** The tempting version of a stored average keeps
+  a running total and adjusts it by each review's delta. It is cheaper and it
+  drifts — and worse, it is *order-dependent*: publish, reject, re-publish
+  has to land back on the same number, which incremental arithmetic does not
+  guarantee. Reading one product's reviews and recomputing is bounded, exact,
+  and idempotent. The test walks that whole lifecycle for exactly this reason.
+- **Why a stored average and not `sum` + `count`.** The pair is exact by
+  construction and updates incrementally — and cannot be indexed for
+  `ORDER BY rating_avg`, which is the only reason to denormalize at all.
+  Knowing *why the obvious better idea is wrong here* is the actual lesson.
+- **`avg()` over zero rows is NULL, not 0.** Reject a product's last review
+  and the `NOT NULL` column rejects the write unless you `coalesce`. SQL's
+  "no rows" and "zero" are different answers to different questions.
+- **A default value can be a security control.** `status` defaults to
+  `pending`, so forgetting to moderate fails CLOSED: the worst outcome of a
+  bug is an unpublished review, not an unmoderated one on the storefront.
+  The public endpoint pins the status server-side for the same reason —
+  `?status=pending` must not be a thing a URL can ask for.
+- **A constraint beats a check under concurrency.** "Have you already
+  reviewed this?" asked in application code passes for *both* of two
+  simultaneous submissions. `UNIQUE (product_id, user_id)` cannot.
+- **403 and 404 answer different questions.** A non-purchaser gets 403: the
+  product exists and we know who is asking; what is missing is standing. A
+  404 would tell the client the product had vanished.
+- **`can_review` is a hint, not a permission.** It exists so the UI does not
+  reimplement the rule and guess — and the store checks the rule again,
+  because anyone can POST.
+- **Fractions and floating point, again.** `(4.67 / 5) * 100` is
+  `93.39999999999999`, and that whole string was going into a style
+  attribute on every card. Same family as the money rule; caught by a test
+  that asserted the exact width.
+- **A partial fill beats half-star rounding.** Drawing five outlines and
+  clipping a filled layer to the exact percentage means 4.67 renders as 4.67
+  — no rounding, no per-star branching, and any precision the backend picks
+  renders correctly.
+
+**The decision the plan left to me, and why it went the boring way.** The
+plan said "Most loved" could now mean sales or rating — pick one. Rating is
+the more literal reading and the wrong answer: an average over few reviews is
+violently unstable, so as the *default* sort one five-star review would
+outrank a jar that has sold 148 times, and the home page would reshuffle
+every time anyone submitted anything. Ranking honestly by stars needs a
+Bayesian prior — weight each average toward the catalog mean by how few
+ratings it has — which is real work a six-product shop cannot justify. So
+there are two sorts, each meaning exactly what it says, and the cheap half of
+the prior (tie-break by `rating_count`) is in the ORDER BY. The choice is
+pinned by a test, because it lives in a constant and would otherwise look
+like an accident.
+
+**A smaller thing worth keeping.** An orphaned `api.exe` from earlier in the
+session was still holding :8080, so the browser verification would have
+tested pre-E4 code against post-E4 expectations. The harness reported its
+task as dead; the port disagreed. Checking the port rather than the task
+status is what caught it — the same lesson as before, arriving unprompted.
+
+**Questions / to revisit:**
+
+- Reviews are moderated by hand. At what volume does that stop scaling, and
+  is the first automation a spam heuristic or just "auto-publish 4★+ from
+  verified purchasers"?
+- `rating_avg` is recomputed synchronously inside the moderation transaction.
+  Fine at this size; at a million reviews the recompute is the slow part of
+  publishing. Where would that move — a trigger, a queue, a materialised view?
+- The review form is shown only when `can_review`. Someone who has bought the
+  product but is signed out sees nothing explaining why. Worth a "sign in to
+  review" prompt in E8, when the account area is built?
+
+---
+
 ## 2026-08-10 — Phase E3: modelling editorial content, and two ARIA patterns
 
 **Worked on:** migrations 000011–000014 (`product_images` + alt translations

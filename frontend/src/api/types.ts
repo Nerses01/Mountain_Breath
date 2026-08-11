@@ -42,6 +42,10 @@ export interface Product {
   // eyebrow shows the name, the sidebar links on the slug.
   category_slug: string
   category_name: string
+  /** The denormalized review aggregate — on the CARD as well as the detail,
+   *  because the design draws stars in the grid too. */
+  rating_avg: number
+  rating_count: number
   slug: string
   name: string
   description: string
@@ -53,6 +57,35 @@ export interface Product {
   badge: BadgeKey | ''
   badge_tone: 'honey' | 'dark' | 'outline'
   benefits: Benefit[]
+}
+
+// --- Reviews (E4) -------------------------------------------------------
+
+export type ReviewStatus = 'pending' | 'published' | 'rejected'
+
+export interface Review {
+  id: number
+  rating: number
+  title: string
+  body: string
+  /** A display name derived from the email — never the address itself. */
+  author: string
+  created_at: string
+  /** Present on the admin queue and on a just-created review; absent on the
+   *  public list, where everything is published by definition. */
+  status?: ReviewStatus
+}
+
+/** The moderation queue sees two things the storefront must not. */
+export interface AdminReview extends Review {
+  product_id: number
+  email: string
+}
+
+export interface NewReview {
+  rating: number
+  title: string
+  body: string
 }
 
 // --- Product detail (E3) ------------------------------------------------
@@ -90,6 +123,10 @@ export interface ProductDetail extends Product {
   shipping_note: string
   lab_batch: string
   is_cold_chain: boolean
+  /** Whether the CURRENT viewer may leave a review: signed in, has a
+   *  delivered order for it, and has not reviewed it already. A hint for
+   *  rendering — the write path checks the rule again. */
+  can_review: boolean
 }
 
 // One row of a filter group: what to show, what to put in the URL, and how
@@ -111,7 +148,7 @@ export interface CatalogFacets {
 
 // The four orderings the backend whitelists. Keeping this a union means the
 // sort select cannot offer a value the API would silently ignore.
-export type ProductSort = 'popular' | 'price_asc' | 'price_desc' | 'newest'
+export type ProductSort = 'popular' | 'rating' | 'price_asc' | 'price_desc' | 'newest'
 
 export interface Paginated<T> {
   items: T[]

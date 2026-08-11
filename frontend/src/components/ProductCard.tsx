@@ -4,7 +4,7 @@ import type { Product } from '../api/types'
 import { useLocale } from '../i18n/useLocale'
 import { formatMoney } from '../lib/format'
 import { cx } from '../lib/cx'
-import { Badge, HeartIcon, IconButton } from './ui'
+import { Badge, HeartIcon, IconButton, Stars } from './ui'
 
 /**
  * The design's product card: image slot with a badge and a wishlist heart,
@@ -136,6 +136,13 @@ export function ProductCard({
           {product.name}
         </Link>
       </h3>
+
+      {/* Rendered only once a product HAS ratings: an empty star row on
+          every card in a new shop is five grey shapes saying nothing, and it
+          pushes the price line down for no information. */}
+      {product.rating_count > 0 && (
+        <Stars rating={product.rating_avg} count={product.rating_count} />
+      )}
 
       {layout === 'feature' ? (
         <p className="text-sm leading-relaxed text-ink-soft">{product.description}</p>

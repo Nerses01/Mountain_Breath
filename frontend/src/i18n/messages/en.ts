@@ -56,6 +56,12 @@ export const en = {
     positive: 'Must be greater than zero',
     not_negative: 'Cannot be negative',
     variants_required: 'Add at least one size',
+    one_primary_image: 'Choose exactly one main image',
+    rating_range: 'Choose a rating from 1 to 5 stars',
+    // The LIMIT lives in the backend, the SENTENCE lives here — which is why
+    // the code carries no number.
+    too_long: 'This is too long',
+    invalid_status: 'Not a valid status',
     unknown: 'This value is not valid',
   },
   // Shared UI states. These belong in `common` rather than being repeated
@@ -93,7 +99,10 @@ export const en = {
     sortLabel: 'Sort products',
     sortPrefix: 'Sort:',
     sort: {
+      // "Most loved" deliberately still means bought-most, not rated-highest
+      // — see the note on DefaultProductSort in the Go domain layer.
       popular: 'Most loved',
+      rating: 'Best rated',
       price_asc: 'Price, low to high',
       price_desc: 'Price, high to low',
       newest: 'Newest',
@@ -154,6 +163,28 @@ export const en = {
       label: 'Product details',
       howToTakeIt: 'How to take it',
       storage: 'Storage',
+      reviews: 'Reviews ({{count}})',
+    },
+    rating: {
+      // The accessible name of the star row. A number read aloud is worth
+      // more than five glyph names.
+      outOf: '{{rating}} out of 5',
+      outOfWithCount_one: '{{rating}} out of 5, {{count}} review',
+      outOfWithCount_other: '{{rating}} out of 5, {{count}} reviews',
+      count_one: '({{count}} review)',
+      count_other: '({{count}} reviews)',
+      none: 'No reviews yet',
+    },
+    reviews: {
+      empty: 'No reviews yet. If you have tried it, yours would be the first.',
+      formTitle: 'Write a review',
+      yourRating: 'Your rating',
+      title: 'Title',
+      body: 'Your review',
+      submit: 'Submit review',
+      thanks: 'Thank you — your review will appear once we have read it.',
+      notPurchased: 'You can review a product once it has been delivered to you.',
+      pagination: 'Review pages',
     },
   },
   // ---- Home page (E2) --------------------------------------------------

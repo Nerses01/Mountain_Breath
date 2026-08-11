@@ -54,6 +54,16 @@ type ProductStore interface {
 	SaveProductRelated(ctx context.Context, productID int64, relatedIDs []int64) error
 }
 
+// ReviewStore is E4's slice. CanReview is separate from ListReviews because
+// it answers a question about the VIEWER, not about the data — and the
+// product detail handler needs it without loading a single review.
+type ReviewStore interface {
+	ListReviews(ctx context.Context, f domain.ReviewFilter) ([]domain.Review, int, error)
+	CreateReview(ctx context.Context, r *domain.Review, productSlug string) error
+	UpdateReviewStatus(ctx context.Context, reviewID int64, status string) (domain.Review, error)
+	CanReview(ctx context.Context, userID int64, productSlug string) (bool, error)
+}
+
 type UserStore interface {
 	CreateUser(ctx context.Context, u *domain.User) error
 	GetUserByEmail(ctx context.Context, email string) (domain.User, error)
@@ -85,6 +95,7 @@ type OrderStore interface {
 type Store interface {
 	CategoryStore
 	ProductStore
+	ReviewStore
 	UserStore
 	SessionStore
 	CartStore
@@ -149,6 +160,10 @@ func (s *Server) Routes() chi.Router {
 		r.Get("/products", s.handleListProducts)
 		r.Get("/products/{slug}", s.handleGetProduct)
 		r.Get("/products/{slug}/related", s.handleRelatedProducts)
+		// Published reviews only — the handler PINS the status rather than
+		// reading it from the query string, or `?status=pending` would
+		// publish everything the moderator has not looked at yet.
+		r.Get("/products/{slug}/reviews", s.handleListReviews)
 
 		// Logged-in customers: cart and checkout.
 		r.Group(func(r chi.Router) {
@@ -158,6 +173,9 @@ func (s *Server) Routes() chi.Router {
 			r.Delete("/cart/items/{variantID}", s.handleDeleteCartItem)
 			r.Post("/orders", s.handleCreateOrder)
 			r.Get("/orders", s.handleListMyOrders)
+			// Writing a review needs a session; the store additionally
+			// requires a DELIVERED order containing the product.
+			r.Post("/products/{slug}/reviews", s.handleCreateReview)
 		})
 
 		r.Route("/admin", func(r chi.Router) {
@@ -176,6 +194,10 @@ func (s *Server) Routes() chi.Router {
 			r.Delete("/products/{id}/images/{imageID}", s.handleDeleteProductImage)
 			r.Put("/products/{id}/editorial", s.handleSaveProductEditorial)
 			r.Put("/products/{id}/related", s.handleSaveProductRelated)
+
+			// E4: the moderation queue.
+			r.Get("/reviews", s.handleAdminListReviews)
+			r.Patch("/reviews/{id}", s.handleModerateReview)
 		})
 	})
 

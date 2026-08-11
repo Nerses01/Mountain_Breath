@@ -27,6 +27,15 @@ const (
 	// "two" into a field error instead of a constraint violation.
 	ValidationOnePrimary = "one_primary_image"
 
+	// E4. ValidationTooLong carries no number: the limit belongs to the
+	// backend, but the sentence belongs to the frontend, and interpolating
+	// "4000" into a code would put one language's punctuation into the
+	// contract. The client renders "Keep it under {{max}} characters" from
+	// its own catalogue.
+	ValidationRatingRange   = "rating_range"
+	ValidationTooLong       = "too_long"
+	ValidationInvalidStatus = "invalid_status"
+
 	// A translations map keyed by a language the shop does not serve. Caught
 	// here rather than at the database, whose CHECK constraint would answer
 	// with a 500-shaped driver error instead of a field-level 400.

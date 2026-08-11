@@ -957,35 +957,97 @@ checked against the running API.
 as a join, preventing review spam.
 
 **Backend:**
-- [ ] Migration: `reviews` (product_id, user_id, rating 1–5 CHECK, title, body,
+- [x] Migration: `reviews` (product_id, user_id, rating 1–5 CHECK, title, body,
       status `pending|published|rejected`, created_at, UNIQUE(product_id,
       user_id)).
-- [ ] `products.rating_avg` + `rating_count`, recomputed when a review's status
+      `pending` is the column DEFAULT, which is what makes forgetting to
+      moderate fail closed. `user_id` is ON DELETE RESTRICT like
+      `orders.user_id`: a review is a statement by a named person, and
+      deleting the person would leave an opinion attached to nobody.
+      Two indexes for the two directions the table is read: a PARTIAL one on
+      `(product_id, created_at DESC) WHERE published` for the storefront, and
+      `(status, created_at DESC)` for the queue.
+- [x] `products.rating_avg` + `rating_count`, recomputed when a review's status
       or rating changes. Implement application-side first (inside the same
       transaction), then write up in the learning log why a trigger is the
       other option and what each costs. The list query needs the aggregate, so
       denormalizing is not optional.
-- [ ] Verified purchase: a user may review a product only if they have a
+
+      **Recomputed, never nudged** (decision #37). Adjusting a stored total
+      by one review's delta is cheaper and drifts — and is order-dependent,
+      which matters because a moderator publishes, rejects and re-publishes.
+      A stored AVERAGE rather than `sum` + `count` (decision #38) precisely
+      because the pair cannot be indexed for `ORDER BY rating_avg`, which is
+      the only reason to denormalize at all.
+- [x] Verified purchase: a user may review a product only if they have a
       `delivered` order containing one of its variants — one EXISTS query,
       enforced in the store, surfaced to the API as a domain error.
-- [ ] `GET /products/{slug}/reviews?page=`, `POST /products/{slug}/reviews`
+      403, not 404: the product exists and the caller is known; what is
+      missing is standing. `CanReview` answers BOTH halves ("have you bought
+      it" and "have you already reviewed it") in one round trip, so the UI
+      never renders a form the write path would refuse with a 409.
+- [x] `GET /products/{slug}/reviews?page=`, `POST /products/{slug}/reviews`
       (login + purchase required), `GET /admin/reviews?status=`,
       `PATCH /admin/reviews/{id}` (publish/reject).
-- [ ] `GET /products/{slug}` gains `can_review` so the UI need not guess.
-- [ ] `sort=rating` joins the sort whitelist; "Most loved" can now be defined
+      The public list PINS `status = published` server-side rather than
+      reading it from the query string — otherwise `?status=pending` would
+      publish everything the moderator has not looked at.
+      It also publishes a derived DISPLAY NAME, never the email address
+      (decision #43); the moderation queue does show the address, because
+      judging whether a review is genuine sometimes turns on who wrote it.
+- [x] `GET /products/{slug}` gains `can_review` so the UI need not guess.
+      A rendering HINT, not a permission: the store re-checks the rule,
+      because anyone can POST. Only queried for a signed-in viewer, and a
+      failure is logged rather than 500ing — this decides whether a form
+      appears, and a product page is worth more than a review box.
+- [x] `sort=rating` joins the sort whitelist; "Most loved" can now be defined
       as sales or rating — pick one and say which in the log.
-- [ ] Tests: aggregate stays correct after publish → edit → reject; a
+
+      **Decided: "Most loved" keeps meaning sales, and rating is its OWN
+      sort** (decision #39). Rating is the more literal reading of the words
+      and the wrong default — an average over few reviews is violently
+      unstable, so one five-star review would outrank a jar that has sold 148
+      times and the front page would reshuffle on every submission. Honest
+      star-ranking wants a Bayesian prior; the cheap half of it (tie-break by
+      `rating_count`) is in the ORDER BY, the expensive half is not worth it
+      for six products. Pinned by a test, because the decision lives in a
+      constant and would otherwise read as an accident.
+- [x] Tests: aggregate stays correct after publish → edit → reject; a
       non-purchaser gets 403; the unique constraint blocks a second review.
+      The aggregate test walks the whole lifecycle including re-publishing
+      and rejecting everything (`avg()` over no rows is NULL, not 0, and the
+      column is NOT NULL). Also covered: a PENDING order grants no standing,
+      standing does not leak across products, and the rune-vs-byte length
+      limit — a byte cap would allow a third fewer characters in Armenian.
 
 **Frontend:**
-- [ ] `Stars` component: accessible (`role="img"` + `aria-label="4.6 out of
+- [x] `Stars` component: accessible (`role="img"` + `aria-label="4.6 out of
       5"`), half-star rendering, one implementation used by card, detail and
       the review list.
-- [ ] Review list with pagination inside the tab; `ReviewForm` shown only when
+      **Better than half-stars:** five outlines with a filled layer clipped
+      to the exact percentage, so 4.67 renders as 4.67 rather than rounding
+      to 4.5 — no per-star branching, and any precision the backend picks
+      renders correctly. One `role="img"` for the whole row, because ten
+      glyph names announced individually are noise. The percentage is
+      rounded to two decimals: `(4.67 / 5) * 100` is `93.39999999999999` in
+      binary floating point, and that whole string was going into a style
+      attribute on every card.
+- [x] Review list with pagination inside the tab; `ReviewForm` shown only when
       `can_review`; admin moderation table.
+      The rating input is a radiogroup, not five buttons — choosing a rating
+      is choosing ONE of a set, and radios come with arrow-key navigation.
+      After submitting, the form says the review is pending rather than
+      leaving a reader to wonder why nothing appeared.
+      7 new Vitest cases (106 → 113).
 
 **Done when:** ratings everywhere come from real rows, a stranger cannot
 review, and moderation changes the public average immediately.
+✅ **Complete 2026-08-11.** Verified in a browser end to end: publishing a
+pending 2★ review through the admin queue moved that product from 5.00 (1) to
+3.50 (2) live, while a pending review left its product at 0.00 (0). Plus
+`go test ./...`, `golangci-lint` (0 issues), `npm test` (113), `tsc -b`,
+`oxlint`. Postman: 47 → 55 requests, every public assertion checked against
+the running API.
 
 ---
 

@@ -519,3 +519,119 @@ FROM (VALUES
 JOIN products src ON src.slug = v.product_slug
 JOIN products dst ON dst.slug = v.related_slug
 ON CONFLICT (product_id, related_id) DO UPDATE SET sort_order = EXCLUDED.sort_order;
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- E4: reviews
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- Seeded reviews need seeded REVIEWERS, and a reviewer needs a delivered
+-- order — the verified-purchase rule is enforced in the store, not just in
+-- the UI, so there is no shortcut here that the application would accept.
+-- This section therefore builds the whole chain: users → orders (delivered)
+-- → order_items → reviews.
+--
+-- The passwords are a fixed bcrypt hash of "seed-password-123". These are
+-- sample customers for a dev database, not accounts anyone should be able to
+-- sign in to on a real deployment — which is another reason seed.sql is not
+-- run by the compose stacks.
+
+INSERT INTO users (email, password_hash, role) VALUES
+    ('anahit@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'customer'),
+    ('vahe@example.com',   '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'customer'),
+    ('mariam@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'customer'),
+    ('sergey@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'customer')
+ON CONFLICT (email) DO NOTHING;
+
+-- One delivered order per reviewer, containing the cheapest variant of every
+-- product they review. `delivered` is the point: the store checks for that
+-- exact status, so an order in any other state grants no standing.
+INSERT INTO orders (user_id, status, total_minor)
+SELECT u.id, 'delivered', 0
+FROM users u
+WHERE u.email IN ('anahit@example.com', 'vahe@example.com',
+                  'mariam@example.com', 'sergey@example.com')
+  AND NOT EXISTS (
+      SELECT 1 FROM orders o WHERE o.user_id = u.id AND o.status = 'delivered'
+  );
+
+INSERT INTO order_items (order_id, variant_id, name_snapshot, label_snapshot,
+                         price_minor_snapshot, qty)
+SELECT o.id, v.id, p.name, v.label, v.price_minor, 1
+FROM orders o
+JOIN users u ON u.id = o.user_id
+CROSS JOIN products p
+JOIN LATERAL (
+    SELECT id, label, price_minor FROM product_variants
+    WHERE product_id = p.id ORDER BY price_minor LIMIT 1
+) v ON TRUE
+WHERE o.status = 'delivered'
+  AND u.email IN ('anahit@example.com', 'vahe@example.com',
+                  'mariam@example.com', 'sergey@example.com')
+  AND p.is_active
+  AND NOT EXISTS (
+      SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.variant_id = v.id
+  );
+
+-- The reviews themselves. A spread of statuses on purpose: `published` rows
+-- feed the storefront and the aggregate, and the two `pending` ones give the
+-- admin moderation queue something to actually moderate.
+INSERT INTO reviews (product_id, user_id, rating, title, body, status)
+SELECT p.id, u.id, v.rating, v.title, v.body, v.status
+FROM (VALUES
+    ('mountain-wildflower-honey', 'anahit@example.com', 5, 'Tastes like the meadow',
+     'Thick, unfiltered, and it crystallised in the cupboard exactly as they said it would. The warm water bath brings it straight back.', 'published'),
+    ('mountain-wildflower-honey', 'vahe@example.com', 5, 'We go through a jar a month',
+     'Bought the 1 kg after finishing the small one in two weeks. Nothing else tastes like it.', 'published'),
+    ('mountain-wildflower-honey', 'mariam@example.com', 4, 'Lovely, if pricier than the shop',
+     'Worth it for the flavour. Four stars only because I wish the 1 kg came in glass.', 'published'),
+
+    ('fresh-royal-jelly', 'anahit@example.com', 5, 'Arrived properly cold',
+     'The cold chain is real — it came in a chilled box and went straight into the fridge. Sharp taste, exactly as described.', 'published'),
+    ('fresh-royal-jelly', 'sergey@example.com', 4, 'Doing the three-week course',
+     'Too early to say much about the effect, but the quality is obvious and the instructions on the page were clear.', 'published'),
+
+    ('raw-propolis-tincture', 'vahe@example.com', 5, 'Kept a sore throat away',
+     'Ten drops in water at the first scratchy morning. Tastes medicinal, which I take as a good sign.', 'published'),
+    ('raw-propolis-tincture', 'mariam@example.com', 3, 'Works, but the taste is brutal',
+     'No complaints about the product itself. Follow their advice and chase it with honey.', 'published'),
+
+    ('bee-pollen-granules', 'sergey@example.com', 5, 'On the morning yoghurt',
+     'Started with a few granules as suggested. No reaction, and a much steadier morning than coffee gave me.', 'published'),
+
+    ('pure-beeswax-blocks', 'mariam@example.com', 5, 'Perfect for balms',
+     'Three parts oil to one part wax, exactly as their card says. Clean melt, no smell, no soot in the candles either.', 'published'),
+
+    -- Awaiting moderation: the queue needs rows, and these also prove that
+    -- pending reviews do NOT move the public average.
+    ('bee-venom-serum', 'anahit@example.com', 4, 'Careful with the patch test',
+     'Did the forearm test for a full day first, as they say to. Warm tingle, no reaction. Early days.', 'pending'),
+    ('bee-pollen-granules', 'vahe@example.com', 2, 'Not for me',
+     'No fault of theirs — I just could not get used to the taste.', 'pending')
+) AS v(product_slug, email, rating, title, body, status)
+JOIN products p ON p.slug = v.product_slug
+JOIN users u ON u.email = v.email
+ON CONFLICT (product_id, user_id) DO UPDATE
+    SET rating = EXCLUDED.rating,
+        title  = EXCLUDED.title,
+        body   = EXCLUDED.body,
+        status = EXCLUDED.status;
+
+-- The aggregate, recomputed the same way store.recomputeRating does it.
+--
+-- The seed writes reviews with plain INSERTs, bypassing the application
+-- entirely — so it also has to do the application's job of keeping the
+-- denormalized columns honest. That is the standing cost of denormalizing,
+-- stated in SQL: every writer must maintain it, and a writer that forgets is
+-- a silent bug.
+UPDATE products p
+SET rating_avg   = COALESCE(r.avg_rating, 0),
+    rating_count = COALESCE(r.n, 0)
+FROM (
+    SELECT product_id,
+           avg(rating)::numeric(3,2) AS avg_rating,
+           count(*) AS n
+    FROM reviews
+    WHERE status = 'published'
+    GROUP BY product_id
+) r
+WHERE p.id = r.product_id;

@@ -157,6 +157,12 @@ func productOrderBy(f domain.ProductFilter) string {
 		by = `pr.min_price DESC NULLS LAST, display_name`
 	case domain.SortNewest:
 		by = `p.created_at DESC, display_name`
+	case domain.SortRating:
+		// rating_count as the tiebreak, not decoration: a lone five-star
+		// review would otherwise outrank a product with fifty at 4.8. It is
+		// the cheap half of a Bayesian prior — see the note on
+		// DefaultProductSort for why the expensive half is not here.
+		by = `p.rating_avg DESC, p.rating_count DESC, display_name`
 	default: // domain.SortPopular
 		by = `p.sales_count DESC, display_name`
 	}
@@ -211,7 +217,8 @@ func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]dom
 		       ` + sqlProductDesc + `,
 		       p.image_url, p.is_active, p.created_at,
 		       COALESCE(p.badge, ''), p.badge_tone, p.sales_count,
-		       c.slug, ` + sqlCategoryName + `
+		       c.slug, ` + sqlCategoryName + `,
+		       p.rating_avg::float8, p.rating_count
 		` + productSource + `
 		WHERE ` + sqlMatchAll + `
 		ORDER BY ` + productOrderBy(f) + `
@@ -230,7 +237,8 @@ func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]dom
 		if err := rows.Scan(&p.ID, &p.CategoryID, &p.Slug, &p.Name, &p.Description,
 			&p.ImageURL, &p.IsActive, &p.CreatedAt,
 			&p.Badge, &p.BadgeTone, &p.SalesCount,
-			&p.CategorySlug, &p.CategoryName); err != nil {
+			&p.CategorySlug, &p.CategoryName,
+			&p.Rating.Average, &p.Rating.Count); err != nil {
 			return nil, 0, fmt.Errorf("scanning product row: %w", err)
 		}
 		products = append(products, p)
@@ -269,6 +277,7 @@ func (s *Store) GetProductBySlug(ctx context.Context, slug string, locale domain
 		       p.image_url, p.is_active, p.created_at,
 		       COALESCE(p.badge, ''), p.badge_tone, p.sales_count,
 		       c.slug, `+sqlCategoryName+`,
+		       p.rating_avg::float8, p.rating_count,
 		       p.lab_batch, p.is_cold_chain,
 		       COALESCE(t.disclaimer,    en.disclaimer,    ''),
 		       COALESCE(t.storage_note,  en.storage_note,  ''),
@@ -286,6 +295,7 @@ func (s *Store) GetProductBySlug(ctx context.Context, slug string, locale domain
 		&p.ImageURL, &p.IsActive, &p.CreatedAt,
 		&p.Badge, &p.BadgeTone, &p.SalesCount,
 		&p.CategorySlug, &p.CategoryName,
+		&p.Rating.Average, &p.Rating.Count,
 		&p.LabBatch, &p.IsColdChain,
 		&p.Disclaimer, &p.StorageNote, &p.HarvestNote, &p.ShippingNote)
 	if err != nil {

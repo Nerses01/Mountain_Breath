@@ -37,6 +37,12 @@ type productResponse struct {
 	CreatedAt   time.Time         `json:"created_at"`
 	Variants    []variantResponse `json:"variants"`
 
+	// The denormalized review aggregate (migration 000015). On the CARD as
+	// well as the detail, because the design puts ★★★★★ on both — which is
+	// exactly why it is a stored column rather than an aggregate query.
+	RatingAvg   float64 `json:"rating_avg"`
+	RatingCount int     `json:"rating_count"`
+
 	// The category, resolved into the requested language. category_id alone
 	// would force every client to fetch /categories and join by hand — and
 	// to get the fallback chain right a second time.
@@ -95,6 +101,12 @@ type productDetailResponse struct {
 	ShippingNote string `json:"shipping_note"`
 	LabBatch     string `json:"lab_batch"`
 	IsColdChain  bool   `json:"is_cold_chain"`
+
+	// Answers "may the current viewer leave a review?", so the UI does not
+	// reimplement the verified-purchase rule and guess. Always false for an
+	// anonymous visitor. It is a HINT for rendering — the write path checks
+	// the rule again, because anyone can POST.
+	CanReview bool `json:"can_review"`
 }
 
 func toProductDetailResponse(p domain.Product) productDetailResponse {
@@ -124,6 +136,7 @@ func toProductDetailResponse(p domain.Product) productDetailResponse {
 		ShippingNote:    p.ShippingNote,
 		LabBatch:        p.LabBatch,
 		IsColdChain:     p.IsColdChain,
+		CanReview:       p.CanReview,
 	}
 }
 
@@ -153,6 +166,7 @@ func toProductResponse(p domain.Product) productResponse {
 		Description: p.Description, ImageURL: p.ImageURL,
 		CreatedAt: p.CreatedAt, Variants: variants,
 		CategorySlug: p.CategorySlug, CategoryName: p.CategoryName,
+		RatingAvg: p.Rating.Average, RatingCount: p.Rating.Count,
 		Badge: p.Badge, BadgeTone: p.BadgeTone, Benefits: benefits,
 	}
 }
@@ -237,6 +251,20 @@ func (s *Server) handleGetProduct(w http.ResponseWriter, r *http.Request) {
 		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 		return
 	}
+
+	// Only asked for a signed-in viewer: an anonymous one cannot review
+	// anything, so the query would be a round trip whose answer is already
+	// known. A failure here is logged and swallowed rather than 500ing the
+	// page — this decides whether a form is rendered, and a product page is
+	// worth more than a review box.
+	if user, ok := userFrom(r.Context()); ok {
+		can, err := s.store.CanReview(r.Context(), user.ID, slug)
+		if err != nil {
+			s.log.Error("checking review eligibility", "slug", slug, "error", err)
+		}
+		p.CanReview = can
+	}
+
 	s.respondJSON(w, http.StatusOK, toProductDetailResponse(p))
 }
 

@@ -4,6 +4,7 @@ import { PREFIXED_LOCALES } from './i18n/locales'
 import { AdminOrdersPage } from './pages/AdminOrdersPage'
 import { AdminPage } from './pages/AdminPage'
 import { AdminProductsPage } from './pages/AdminProductsPage'
+import { AdminReviewsPage } from './pages/AdminReviewsPage'
 import { CartPage } from './pages/CartPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
@@ -54,6 +55,7 @@ function App() {
       <Route path="/admin" element={<AdminPage />} />
       <Route path="/admin/products" element={<AdminProductsPage />} />
       <Route path="/admin/orders" element={<AdminOrdersPage />} />
+      <Route path="/admin/reviews" element={<AdminReviewsPage />} />
     </Routes>
   )
 }

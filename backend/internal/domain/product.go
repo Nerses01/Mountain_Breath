@@ -125,6 +125,16 @@ type Product struct {
 	// maintained by the checkout transaction, never set by a caller.
 	SalesCount int
 
+	// Rating is the denormalized review aggregate (migration 000015), also
+	// read-only above the store: it is recomputed from the reviews table
+	// whenever a review's rating or status changes.
+	Rating RatingSummary
+
+	// CanReview answers "may the CURRENT viewer review this?", so the UI
+	// does not have to reimplement the verified-purchase rule and guess.
+	// Only populated by the detail read, and only for a signed-in viewer.
+	CanReview bool
+
 	// Benefits is the "Good for" taxonomy — many per product, hence a slice
 	// where CategoryID is a single field.
 	Benefits []Benefit
@@ -198,17 +208,35 @@ type ProductSort string
 
 const (
 	SortPopular   ProductSort = "popular"    // sales_count, the "Most loved" default
+	SortRating    ProductSort = "rating"     // rating_avg, then how many rated it
 	SortPriceAsc  ProductSort = "price_asc"  // cheapest variant, ascending
 	SortPriceDesc ProductSort = "price_desc" // cheapest variant, descending
 	SortNewest    ProductSort = "newest"     // created_at
 
 	// DefaultProductSort is what an absent or unrecognised sort resolves to
 	// — the design labels the select "Sort: Most loved".
+	//
+	// E4 DECISION: "Most loved" keeps meaning sales_count, and rating gets
+	// its OWN entry rather than taking this one over.
+	//
+	// Rating is the more literal reading of the words, and it is the wrong
+	// default: an average over few reviews is violently unstable, so one
+	// five-star review would outrank a jar that has sold 148 times, and the
+	// shop's front page would reshuffle on every submission. Ranking by
+	// rating honestly needs a Bayesian prior (weight each product's average
+	// toward the catalog mean by how few ratings it has), which is real work
+	// this six-product shop cannot justify — see the learning log.
+	//
+	// So: two sorts, each meaning exactly what it says. "Most loved" =
+	// bought most; "Best rated" = rated highest, tie-broken by how many
+	// people rated it, which is the cheap half of the same idea.
 	DefaultProductSort = SortPopular
 )
 
 // ProductSorts is the whole set, in the order the select lists them.
-var ProductSorts = []ProductSort{SortPopular, SortPriceAsc, SortPriceDesc, SortNewest}
+var ProductSorts = []ProductSort{
+	SortPopular, SortRating, SortPriceAsc, SortPriceDesc, SortNewest,
+}
 
 // ParseProductSort reports whether s named a real sort. Callers decide
 // whether an unknown value is an error or simply falls back — the same

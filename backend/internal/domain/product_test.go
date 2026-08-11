@@ -19,6 +19,7 @@ func TestParseProductSort(t *testing.T) {
 		wantOK bool
 	}{
 		{"popular", "popular", domain.SortPopular, true},
+		{"rating", "rating", domain.SortRating, true},
 		{"price ascending", "price_asc", domain.SortPriceAsc, true},
 		{"price descending", "price_desc", domain.SortPriceDesc, true},
 		{"newest", "newest", domain.SortNewest, true},
@@ -62,15 +63,34 @@ func TestProductFilterEffectiveSort(t *testing.T) {
 // that silently does nothing.
 func TestProductSortsCoversEveryConstant(t *testing.T) {
 	for _, s := range []domain.ProductSort{
-		domain.SortPopular, domain.SortPriceAsc, domain.SortPriceDesc, domain.SortNewest,
+		domain.SortPopular, domain.SortRating,
+		domain.SortPriceAsc, domain.SortPriceDesc, domain.SortNewest,
 	} {
 		parsed, ok := domain.ParseProductSort(string(s))
 		if !ok || parsed != s {
 			t.Errorf("constant %q is not in ProductSorts", s)
 		}
 	}
-	if len(domain.ProductSorts) != 4 {
+	// This count is a deliberate tripwire, and E4 tripped it: adding
+	// `rating` failed here until the list above was updated too, which is
+	// the point — a sort in the whitelist but missing from the frontend's
+	// select is a menu entry that silently does nothing.
+	if len(domain.ProductSorts) != 5 {
 		t.Errorf("ProductSorts has %d entries; update this test with the new sort",
 			len(domain.ProductSorts))
+	}
+}
+
+// "Most loved" keeps meaning sales, and rating is its own sort. Pinned as a
+// test because it is a PRODUCT decision that lives in a constant: an average
+// over few reviews is violently unstable, so making it the default would let
+// one five-star review outrank a jar that has sold 148 times, and the front
+// page would reshuffle on every submission.
+func TestDefaultSortIsPopularityNotRating(t *testing.T) {
+	if domain.DefaultProductSort != domain.SortPopular {
+		t.Errorf("default sort = %q, want popular", domain.DefaultProductSort)
+	}
+	if domain.DefaultProductSort == domain.SortRating {
+		t.Error("rating must not be the default — see the note on DefaultProductSort")
 	}
 }
