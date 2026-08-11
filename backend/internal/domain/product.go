@@ -184,12 +184,21 @@ func (p Product) PrimaryImage() (ProductImage, bool) {
 }
 
 type ProductVariant struct {
-	ID         int64
-	ProductID  int64
-	SKU        string
-	Label      string
-	PriceMinor int64 // money in minor units (e.g. 180000 = 1800.00)
-	StockQty   int
+	ID        int64
+	ProductID int64
+	SKU       string
+	Label     string
+	StockQty  int
+
+	// PriceMinor is the price in the currency this request resolved to, in
+	// that currency's minor units — 1400 is $14.00 but 5460 is 5,460 ֏.
+	// Derived from Prices; carried as a field because it is what every
+	// arithmetic path (line totals, checkout) works in.
+	PriceMinor int64
+	// Prices is the same variant priced in every active market, which is
+	// what the design's primary-plus-muted-secondary price needs. E5 replaced
+	// the single price_minor column with this; see migration 000016.
+	Prices Money
 }
 
 // ProductSort is the whitelist of orderings the Shop page's select offers.
@@ -269,11 +278,19 @@ type ProductFilter struct {
 	// second click almost always return nothing.
 	BenefitSlugs []string
 
-	// Price bounds in minor units, nil = unbounded on that side. Pointers
-	// rather than an int64 sentinel because 0 is a legitimate bound and
-	// there is no spare value to mean "unset" — the same job std::optional
-	// does in C++, done here by the fact that a pointer can be nil. They
-	// also travel to pgx as SQL NULL without any conversion.
+	// Currency decides which market's prices the query reads — and it is not
+	// only a display concern. The price slider's bounds, the price filter
+	// and the price sort are all denominated in it, and per-market prices
+	// mean the CHEAPEST product can genuinely differ between markets: a jar
+	// priced keenly in Yerevan and normally in dollars sorts differently in
+	// each. Zero value means unset, not invalid — see EffectiveCurrency.
+	Currency Currency
+
+	// Price bounds in the minor units of Currency, nil = unbounded on that
+	// side. Pointers rather than an int64 sentinel because 0 is a legitimate
+	// bound and there is no spare value to mean "unset" — the same job
+	// std::optional does in C++, done here by the fact that a pointer can be
+	// nil. They also travel to pgx as SQL NULL without any conversion.
 	PriceMinMinor *int64
 	PriceMaxMinor *int64
 
@@ -304,6 +321,17 @@ func (f ProductFilter) EffectiveLocale() Locale {
 		return DefaultLocale
 	}
 	return f.Locale
+}
+
+// EffectiveCurrency completes the trio. An unset currency reaching the store
+// would match no row in variant_effective_prices and price every product at
+// nothing — the same silent-blank failure mode EffectiveLocale exists to
+// prevent, but with money instead of names.
+func (f ProductFilter) EffectiveCurrency() Currency {
+	if f.Currency == "" {
+		return DefaultCurrency
+	}
+	return f.Currency
 }
 
 // ValidateProduct checks a product (with its variants) before creation.
@@ -347,8 +375,22 @@ func ValidateProduct(p Product) map[string]string {
 		if strings.TrimSpace(v.Label) == "" {
 			fields[fmt.Sprintf("variants[%d].label", i)] = ValidationRequired
 		}
-		if v.PriceMinor <= 0 {
-			fields[fmt.Sprintf("variants[%d].price_minor", i)] = ValidationPositive
+		// The BASE currency price is mandatory; the others are optional and
+		// fall back to a converted one (migration 000016's view). That
+		// asymmetry is deliberate: the base price is the only figure the
+		// fallback can start from, so a variant without one cannot be priced
+		// in any market at all.
+		if v.Prices[BaseCurrency] <= 0 {
+			fields[fmt.Sprintf("variants[%d].prices.%s", i, BaseCurrency)] = ValidationPositive
+		}
+		for c, minor := range v.Prices {
+			if _, ok := ParseCurrency(string(c)); !ok {
+				fields[fmt.Sprintf("variants[%d].prices.%s", i, c)] = ValidationUnknownCurrency
+				continue
+			}
+			if minor <= 0 {
+				fields[fmt.Sprintf("variants[%d].prices.%s", i, c)] = ValidationPositive
+			}
 		}
 		if v.StockQty < 0 {
 			fields[fmt.Sprintf("variants[%d].stock_qty", i)] = ValidationNotNegative

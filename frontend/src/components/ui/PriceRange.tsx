@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react'
 import { formatMoney } from '../../lib/format'
+import { useCurrency } from '../../lib/useCurrency'
 
 /**
  * The sidebar's dual price slider.
@@ -43,6 +44,9 @@ export function PriceRange({
 }) {
   const id = useId()
   const [draft, setDraft] = useState(value)
+  // The bounds arrive from the facets endpoint already denominated in the
+  // shopper's market — the slider never converts, it just labels.
+  const { currency } = useCurrency()
 
   // The URL is the source of truth: back/forward and a shared link change
   // `value` from the outside, and the thumbs have to follow. Without this
@@ -115,8 +119,8 @@ export function PriceRange({
       </div>
 
       <p className="flex justify-between text-sm text-ink-body">
-        <span>{formatMoney(draft.min)}</span>
-        <span>{formatMoney(draft.max)}</span>
+        <span>{formatMoney(draft.min, currency)}</span>
+        <span>{formatMoney(draft.max, currency)}</span>
       </p>
     </div>
   )

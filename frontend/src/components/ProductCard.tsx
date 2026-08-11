@@ -2,7 +2,7 @@ import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import type { Product } from '../api/types'
 import { useLocale } from '../i18n/useLocale'
-import { formatMoney } from '../lib/format'
+import { Price } from './ui/Price'
 import { cx } from '../lib/cx'
 import { Badge, HeartIcon, IconButton, Stars } from './ui'
 
@@ -160,15 +160,12 @@ export function ProductCard({
       )}
 
       <div className="mt-auto flex items-end justify-between gap-3 pt-2">
-        <p className="flex flex-col">
-          <span className="font-display text-lg font-extrabold text-brand-ink">
-            {hasChoice
-              ? t('catalog:priceFrom', { price: formatMoney(cheapest.price_minor) })
-              : formatMoney(cheapest?.price_minor ?? 0)}
-          </span>
-          {/* E5 adds the second currency line the mock draws under the
-              price. Nothing is faked here in the meantime. */}
-        </p>
+        <Price
+          prices={cheapest?.prices}
+          primaryMinor={cheapest?.price_minor}
+          size="lg"
+          format={hasChoice ? (price) => t('catalog:priceFrom', { price }) : undefined}
+        />
 
         <button
           type="button"

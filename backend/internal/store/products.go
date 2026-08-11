@@ -58,8 +58,9 @@ func fuzzyQuery(s string) string {
 //	$3 search text ('' = none)    $8  benefit slugs (text[], empty = all)
 //	$4 search text, cleaned       $9  price floor, minor units (NULL = none)
 //	$5 $4 with LIKE escaped       $10 price ceiling, minor units
+//	                              $11 currency
 //
-// ...and the list query adds $11 LIMIT / $12 OFFSET.
+// ...and the list query adds $12 LIMIT / $13 OFFSET.
 const (
 	// The three-level fallback: the requested locale, then English, then the
 	// pre-translation columns on products itself. The last level exists
@@ -85,6 +86,13 @@ const (
 // count(*) FILTER (WHERE …) is the aggregate FILTER clause: a per-aggregate
 // WHERE, so several differently-filtered aggregates can share one scan.
 // Without it, in_band would need its own correlated subquery.
+//
+// E5 pointed the aggregate at variant_effective_prices instead of at a
+// column on the variant, which is a bigger change than it looks: min_price,
+// the slider bounds and the price sort are now all answers to "in WHICH
+// market?". Two shops selling the same six jars can order them differently,
+// and that is correct rather than a bug — per-market pricing is exactly the
+// freedom to not be a fixed multiple of the dollar price.
 const productSource = `
 	FROM products p
 	JOIN categories c ON c.id = p.category_id
@@ -93,13 +101,15 @@ const productSource = `
 	LEFT JOIN category_translations ct  ON ct.category_id  = c.id AND ct.locale  = $6
 	LEFT JOIN category_translations cen ON cen.category_id = c.id AND cen.locale = 'en'
 	LEFT JOIN LATERAL (
-	    SELECT min(v.price_minor) AS min_price,
-	           max(v.price_minor) AS max_price,
+	    SELECT min(ep.price_minor) AS min_price,
+	           max(ep.price_minor) AS max_price,
 	           count(*) FILTER (
-	               WHERE ($9::bigint IS NULL OR v.price_minor >= $9)
-	                 AND ($10::bigint IS NULL OR v.price_minor <= $10)
+	               WHERE ($9::bigint IS NULL OR ep.price_minor >= $9)
+	                 AND ($10::bigint IS NULL OR ep.price_minor <= $10)
 	           ) AS in_band
 	    FROM product_variants v
+	    JOIN variant_effective_prices ep
+	      ON ep.variant_id = v.id AND ep.currency = $11
 	    WHERE v.product_id = p.id
 	) pr ON TRUE`
 
@@ -179,7 +189,7 @@ func productOrderBy(f domain.ProductFilter) string {
 	return by
 }
 
-// queryArgs packs the ten shared parameters in the documented order.
+// queryArgs packs the eleven shared parameters in the documented order.
 func queryArgs(f domain.ProductFilter) []any {
 	fuzzy := fuzzyQuery(f.Search)
 	locale := f.EffectiveLocale()
@@ -195,6 +205,7 @@ func queryArgs(f domain.ProductFilter) []any {
 	return []any{
 		f.CategorySlug, f.IncludeInactive, f.Search, fuzzy, escapeLike(fuzzy),
 		locale, locale.SearchConfig(), benefits, f.PriceMinMinor, f.PriceMaxMinor,
+		f.EffectiveCurrency(),
 	}
 }
 
@@ -222,7 +233,7 @@ func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]dom
 		` + productSource + `
 		WHERE ` + sqlMatchAll + `
 		ORDER BY ` + productOrderBy(f) + `
-		LIMIT $11 OFFSET $12`
+		LIMIT $12 OFFSET $13`
 
 	args := queryArgs(f)
 	rows, err := s.pool.Query(ctx, listQ, append(args, f.PerPage, f.Offset())...)
@@ -247,7 +258,7 @@ func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]dom
 		return nil, 0, fmt.Errorf("iterating product rows: %w", err)
 	}
 
-	if err := s.attachVariants(ctx, products); err != nil {
+	if err := s.attachVariants(ctx, products, f.View()); err != nil {
 		return nil, 0, err
 	}
 	if err := s.attachBenefits(ctx, products, f.EffectiveLocale()); err != nil {
@@ -264,11 +275,13 @@ func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]dom
 	return products, total, nil
 }
 
-func (s *Store) GetProductBySlug(ctx context.Context, slug string, locale domain.Locale) (domain.Product, error) {
+func (s *Store) GetProductBySlug(ctx context.Context, slug string, view domain.View) (domain.Product, error) {
+	locale := view.EffectiveLocale()
 	// The slug is deliberately NOT translated: it is the product's stable
 	// identity in the URL, so /products/wildflower-honey resolves to the same
 	// product in every language and a link shared between speakers still
-	// works. Only the display text changes.
+	// works. Only the display text changes. The same is true of the currency:
+	// a link shared between markets shows the same jar at the reader's price.
 	var p domain.Product
 	err := s.pool.QueryRow(ctx, `
 		SELECT p.id, p.category_id, p.slug,
@@ -306,7 +319,7 @@ func (s *Store) GetProductBySlug(ctx context.Context, slug string, locale domain
 	}
 
 	products := []domain.Product{p}
-	if err := s.attachVariants(ctx, products); err != nil {
+	if err := s.attachVariants(ctx, products, view); err != nil {
 		return domain.Product{}, err
 	}
 	if err := s.attachBenefits(ctx, products, locale); err != nil {
@@ -331,7 +344,19 @@ func (s *Store) GetProductBySlug(ctx context.Context, slug string, locale domain
 // attachVariants loads the variants for all given products in ONE query
 // (WHERE product_id = ANY(...)) instead of one query per product — the
 // classic N+1 problem, avoided.
-func (s *Store) attachVariants(ctx context.Context, products []domain.Product) error {
+//
+// E5 made this return one row per (variant, CURRENCY) pair rather than one
+// per variant, because the design shows two prices and the second one is not
+// derived from the first. The rows are grouped back in Go, which is why the
+// ORDER BY has to be total down to ep.currency: the loop below relies on all
+// of a variant's rows arriving consecutively.
+//
+// The join to variant_effective_prices is INNER on purpose. A variant with
+// no price in any market is not a variant with a blank price tag — it is
+// something nobody can buy, and offering it would mean an add-to-cart button
+// above a number the shop cannot honour. The view already refuses to invent
+// one (migration 000016).
+func (s *Store) attachVariants(ctx context.Context, products []domain.Product, view domain.View) error {
 	if len(products) == 0 {
 		return nil
 	}
@@ -344,24 +369,60 @@ func (s *Store) attachVariants(ctx context.Context, products []domain.Product) e
 		products[i].Variants = make([]domain.ProductVariant, 0)
 	}
 
+	// `res` is the resolved currency's row, joined a SECOND time purely to
+	// sort by: cheapest-variant-first has to mean cheapest in the market
+	// being read, and the per-currency rows cannot order themselves.
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, product_id, sku, label, price_minor, stock_qty
-		FROM product_variants
-		WHERE product_id = ANY($1)
-		ORDER BY price_minor`,
-		ids)
+		SELECT v.id, v.product_id, v.sku, v.label, v.stock_qty,
+		       ep.currency, ep.price_minor,
+		       res.price_minor AS resolved_minor
+		FROM product_variants v
+		JOIN variant_effective_prices ep ON ep.variant_id = v.id
+		LEFT JOIN variant_effective_prices res
+		       ON res.variant_id = v.id AND res.currency = $2
+		WHERE v.product_id = ANY($1)
+		ORDER BY v.product_id, res.price_minor NULLS LAST, v.id, ep.currency`,
+		ids, view.EffectiveCurrency())
 	if err != nil {
 		return fmt.Errorf("querying variants: %w", err)
 	}
 	defer rows.Close()
 
+	var current *domain.ProductVariant
 	for rows.Next() {
-		var v domain.ProductVariant
-		if err := rows.Scan(&v.ID, &v.ProductID, &v.SKU, &v.Label, &v.PriceMinor, &v.StockQty); err != nil {
+		var (
+			id, productID, priceMinor int64
+			sku, label, currency      string
+			stockQty                  int
+			// NULL when the variant has no price in the resolved currency at
+			// all — possible only for a currency with neither a shelf price
+			// nor a rate, which the storefront degrades over rather than
+			// failing on.
+			resolvedMinor *int64
+		)
+		if err := rows.Scan(&id, &productID, &sku, &label, &stockQty,
+			&currency, &priceMinor, &resolvedMinor); err != nil {
 			return fmt.Errorf("scanning variant row: %w", err)
 		}
-		p := byID[v.ProductID]
-		p.Variants = append(p.Variants, v)
+
+		// `current` is a pointer INTO a slice, which append can reallocate —
+		// the same iterator-invalidation hazard as holding a T* into a
+		// std::vector across a push_back. It is safe only because the
+		// ORDER BY guarantees every row of a variant arrives before the next
+		// append, and the pointer is retaken immediately after each one.
+		if current == nil || current.ID != id {
+			p := byID[productID]
+			p.Variants = append(p.Variants, domain.ProductVariant{
+				ID: id, ProductID: productID, SKU: sku, Label: label,
+				StockQty: stockQty,
+				Prices:   make(domain.Money, len(domain.Currencies)),
+			})
+			current = &p.Variants[len(p.Variants)-1]
+			if resolvedMinor != nil {
+				current.PriceMinor = *resolvedMinor
+			}
+		}
+		current.Prices[domain.Currency(currency)] = priceMinor
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("iterating variant rows: %w", err)

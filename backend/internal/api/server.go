@@ -25,24 +25,26 @@ type CategoryStore interface {
 }
 
 type ProductStore interface {
-	// The locale rides inside ProductFilter, which already carries every
-	// other "how should this list be shaped" option. GetProductBySlug takes
-	// it as a parameter, having no filter to put it in.
+	// The locale and currency ride inside ProductFilter, which already
+	// carries every other "how should this list be shaped" option. The
+	// single-product reads have no filter to put them in, so they take a
+	// domain.View — one value rather than two loose strings that could be
+	// passed in the wrong order.
 	ListProducts(ctx context.Context, f domain.ProductFilter) ([]domain.Product, int, error)
 	// CatalogFacets takes the same filter as the listing — the sidebar
 	// counts describe the same query the grid runs, minus paging.
 	CatalogFacets(ctx context.Context, f domain.ProductFilter) (domain.CatalogFacets, error)
-	GetProductBySlug(ctx context.Context, slug string, locale domain.Locale) (domain.Product, error)
+	GetProductBySlug(ctx context.Context, slug string, view domain.View) (domain.Product, error)
 	// ListRelated is "Often taken together": the admin's curated list, or a
 	// shared-benefit-then-popularity ranking when nothing is curated.
-	ListRelated(ctx context.Context, slug string, locale domain.Locale) ([]domain.Product, error)
+	ListRelated(ctx context.Context, slug string, view domain.View) ([]domain.Product, error)
 	// ListCuratedRelated is the same question without the fallback — what
 	// the admin actually chose, which is the only version a picker can
 	// safely pre-fill from.
-	ListCuratedRelated(ctx context.Context, slug string, locale domain.Locale) ([]domain.Product, error)
+	ListCuratedRelated(ctx context.Context, slug string, view domain.View) ([]domain.Product, error)
 	CreateProduct(ctx context.Context, p *domain.Product) error
 	UpdateProduct(ctx context.Context, p *domain.Product) error
-	UpdateVariant(ctx context.Context, variantID, priceMinor int64, stockQty int) error
+	UpdateVariant(ctx context.Context, variantID int64, prices domain.Money, stockQty int) error
 	UpdateProductImage(ctx context.Context, productID int64, imageURL string) error
 
 	// E3 editorial writes. Collections are replaced wholesale — see the note
@@ -76,16 +78,20 @@ type SessionStore interface {
 }
 
 type CartStore interface {
-	// The locale is a parameter here for the same reason it is on
-	// GetProductBySlug: the cart shows product NAMES, and a basket in the
-	// wrong language is as wrong as a catalog in the wrong language.
-	GetCart(ctx context.Context, userID int64, locale domain.Locale) ([]domain.CartItem, error)
+	// The view is a parameter here for the same reason it is on
+	// GetProductBySlug: the cart shows product NAMES and PRICES, and a
+	// basket in the wrong language — or the wrong currency — is as wrong as
+	// a catalog in the wrong language.
+	GetCart(ctx context.Context, userID int64, view domain.View) ([]domain.CartItem, error)
 	SetCartItem(ctx context.Context, userID, variantID int64, qty int) error
 	DeleteCartItem(ctx context.Context, userID, variantID int64) error
 }
 
 type OrderStore interface {
-	CreateOrder(ctx context.Context, userID int64) (domain.Order, error)
+	// The currency is what the customer is CHARGED in, so it is decided at
+	// the edge (withCurrency) and stamped on the order — not read back off
+	// the cart, which has no single currency of its own.
+	CreateOrder(ctx context.Context, userID int64, currency domain.Currency) (domain.Order, error)
 	ListOrdersByUser(ctx context.Context, userID int64) ([]domain.Order, error)
 	ListAllOrders(ctx context.Context) ([]domain.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID int64, to string) (domain.Order, error)
@@ -149,6 +155,11 @@ func (s *Server) Routes() chi.Router {
 		r.Use(s.withUser)
 		// ...and the display language, so no handler re-derives it.
 		r.Use(s.withLocale)
+		// ...and the market. After withLocale, because the currency
+		// negotiation falls back to whatever the language negotiation
+		// found — order matters here in a way it does not for the pair
+		// above.
+		r.Use(s.withCurrency)
 
 		r.Post("/auth/register", s.handleRegister)
 		r.Post("/auth/login", s.handleLogin)

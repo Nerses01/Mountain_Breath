@@ -1,3 +1,4 @@
+import type { Currency } from '../lib/currencies'
 import type {
   AdminProduct,
   AdminReview,
@@ -73,8 +74,25 @@ export function setApiLocale(locale: string) {
   apiLocale = locale
 }
 
-function withLang(path: string): string {
-  return `${path}${path.includes('?') ? '&' : '?'}lang=${apiLocale}`
+/**
+ * The market every request is made in — the same mechanism as apiLocale, and
+ * with the same caveat about query keys (see hooks.ts).
+ *
+ * It is NOT only a display concern, which is the part that surprises: the
+ * price filter's bounds, the price sort and the slider's ends are all
+ * denominated in this currency server-side, so a request that forgets it
+ * gets a correctly-shaped answer to the wrong question. And on POST /orders
+ * it decides what the customer is charged in.
+ */
+let apiCurrency = 'USD'
+
+export function setApiCurrency(currency: string) {
+  apiCurrency = currency
+}
+
+function withView(path: string): string {
+  const sep = path.includes('?') ? '&' : '?'
+  return `${path}${sep}lang=${apiLocale}&currency=${apiCurrency}`
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -151,23 +169,23 @@ function catalogQuery(params: CatalogFilterParams): URLSearchParams {
 export const api = {
   // Every READ that returns human-language text carries the locale. Writes
   // and auth do not: a POST has no display language.
-  listCategories: () => request<Category[]>(withLang('/api/v1/categories')),
+  listCategories: () => request<Category[]>(withView('/api/v1/categories')),
 
   listProducts: (params: ProductListParams = {}) => {
     const q = catalogQuery(params)
     if (params.page) q.set('page', String(params.page))
     if (params.perPage) q.set('per_page', String(params.perPage))
     const qs = q.toString()
-    return request<Paginated<Product>>(withLang(`/api/v1/products${qs ? `?${qs}` : ''}`))
+    return request<Paginated<Product>>(withView(`/api/v1/products${qs ? `?${qs}` : ''}`))
   },
 
   catalogFacets: (params: CatalogFilterParams = {}) => {
     const qs = catalogQuery(params).toString()
-    return request<CatalogFacets>(withLang(`/api/v1/catalog/facets${qs ? `?${qs}` : ''}`))
+    return request<CatalogFacets>(withView(`/api/v1/catalog/facets${qs ? `?${qs}` : ''}`))
   },
 
   getProduct: (slug: string) =>
-    request<ProductDetail>(withLang(`/api/v1/products/${encodeURIComponent(slug)}`)),
+    request<ProductDetail>(withView(`/api/v1/products/${encodeURIComponent(slug)}`)),
 
   // Its own request, not a field on the detail: the panel sits below the
   // fold and changes far less often than stock or price, so the two cache
@@ -176,7 +194,7 @@ export const api = {
   // fallback — the admin picker's pre-fill, and never the storefront's read.
   relatedProducts: (slug: string, curated = false) =>
     request<Product[]>(
-      withLang(
+      withView(
         `/api/v1/products/${encodeURIComponent(slug)}/related${curated ? '?curated=true' : ''}`,
       ),
     ),
@@ -188,7 +206,7 @@ export const api = {
   // client could ask for that would expose an unmoderated review.
   listReviews: (slug: string, page = 1) =>
     request<Paginated<Review>>(
-      withLang(`/api/v1/products/${encodeURIComponent(slug)}/reviews?page=${page}`),
+      withView(`/api/v1/products/${encodeURIComponent(slug)}/reviews?page=${page}`),
     ),
   createReview: (slug: string, review: NewReview) =>
     request<Review>(`/api/v1/products/${encodeURIComponent(slug)}/reviews`, {
@@ -216,15 +234,20 @@ export const api = {
   // cart & orders (require login). The cart carries product NAMES, so it is
   // a localized read like the catalog; order items are frozen snapshots of
   // what was bought and are not re-translated.
-  getCart: () => request<Cart>(withLang('/api/v1/cart')),
+  getCart: () => request<Cart>(withView('/api/v1/cart')),
   setCartItem: (variantId: number, qty: number) =>
-    request<Cart>('/api/v1/cart/items', {
+    // A write that answers with the whole cart, so the response is as
+    // language- and currency-shaped as the read.
+    request<Cart>(withView('/api/v1/cart/items'), {
       method: 'PUT',
       body: { variant_id: variantId, qty },
     }),
   removeCartItem: (variantId: number) =>
     request<void>(`/api/v1/cart/items/${variantId}`, { method: 'DELETE' }),
-  checkout: () => request<Order>('/api/v1/orders', { method: 'POST' }),
+  // The currency in the URL is what the customer is BILLED in — the server
+  // reads it from the request, never from a body field, so a client cannot
+  // name the cheaper of two markets for a basket priced in the dearer one.
+  checkout: () => request<Order>(withView('/api/v1/orders'), { method: 'POST' }),
   myOrders: () => request<Order[]>('/api/v1/orders'),
 
   // admin
@@ -232,15 +255,18 @@ export const api = {
     request<Category>('/api/v1/admin/categories', { method: 'POST', body: data }),
   adminOrders: () => request<Order[]>('/api/v1/admin/orders'),
   adminProducts: () =>
-    request<Paginated<AdminProduct>>('/api/v1/admin/products?per_page=100'),
+    request<Paginated<AdminProduct>>(withView('/api/v1/admin/products?per_page=100')),
   createProduct: (p: NewProduct) =>
     request<AdminProduct>('/api/v1/admin/products', { method: 'POST', body: p }),
   updateProduct: (id: number, p: UpdateProduct) =>
     request<AdminProduct>(`/api/v1/admin/products/${id}`, { method: 'PUT', body: p }),
-  updateVariant: (id: number, priceMinor: number, stockQty: number) =>
+  updateVariant: (id: number, prices: Partial<Record<Currency, number>>, stockQty: number) =>
     request<void>(`/api/v1/admin/variants/${id}`, {
       method: 'PATCH',
-      body: { price_minor: priceMinor, stock_qty: stockQty },
+      // The DESIRED STATE of this variant's prices, not a patch: a currency
+      // left out of the map is removed, which is how the admin puts a variant
+      // back on the converted fallback.
+      body: { prices, stock_qty: stockQty },
     }),
   // E3 editorial writes. All 204 No Content — the form already holds the
   // state it just sent, so echoing it back would only invite the two to

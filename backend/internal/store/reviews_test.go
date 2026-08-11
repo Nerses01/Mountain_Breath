@@ -18,8 +18,8 @@ func deliverOrderFor(t *testing.T, userID, variantID int64) {
 	ctx := context.Background()
 	var orderID int64
 	if err := testPool.QueryRow(ctx, `
-		INSERT INTO orders (user_id, status, total_minor)
-		VALUES ($1, 'delivered', 1000) RETURNING id`, userID).Scan(&orderID); err != nil {
+		INSERT INTO orders (user_id, status, total_minor, currency)
+		VALUES ($1, 'delivered', 1000, 'USD') RETURNING id`, userID).Scan(&orderID); err != nil {
 		t.Fatalf("seeding order: %v", err)
 	}
 	if _, err := testPool.Exec(ctx, `
@@ -196,8 +196,8 @@ func TestCreateReview_RequiresADeliveredPurchase(t *testing.T) {
 	variant := variantOf(t, "honey")
 	var orderID int64
 	if err := testPool.QueryRow(ctx, `
-		INSERT INTO orders (user_id, status, total_minor)
-		VALUES ($1, 'pending', 1000) RETURNING id`, stranger).Scan(&orderID); err != nil {
+		INSERT INTO orders (user_id, status, total_minor, currency)
+		VALUES ($1, 'pending', 1000, 'USD') RETURNING id`, stranger).Scan(&orderID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := testPool.Exec(ctx, `

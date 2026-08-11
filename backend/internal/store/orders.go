@@ -14,7 +14,17 @@ import (
 // CreateOrder turns the user's cart into an order — atomically. Everything
 // happens in ONE transaction: either the whole checkout succeeds, or the
 // database is left exactly as it was.
-func (s *Store) CreateOrder(ctx context.Context, userID int64) (domain.Order, error) {
+//
+// `currency` is what the customer is CHARGED in, and the order is stamped
+// with it. A cart is a live thing that can be read in either market; an
+// order is a fact about a transaction that happened in exactly one of them,
+// which is why nothing below is dual and every number that follows is
+// denominated in this one currency.
+func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.Currency) (domain.Order, error) {
+	if currency == "" {
+		currency = domain.DefaultCurrency
+	}
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return domain.Order{}, fmt.Errorf("beginning checkout tx: %w", err)
@@ -27,24 +37,35 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64) (domain.Order, er
 	// checkouts of the same variant must wait for us to finish, so stock
 	// cannot be oversold. ORDER BY gives all transactions the same locking
 	// order — the classic deadlock avoidance rule.
+	//
+	// The price arrives as a scalar SUBQUERY rather than a join, deliberately:
+	// FOR UPDATE names `v`, and keeping the priced view out of the join tree
+	// keeps the locking clause reading on exactly one table. It is also
+	// LEFT-join-shaped by nature — it may legitimately return nothing.
 	rows, err := tx.Query(ctx, `
-		SELECT ci.variant_id, ci.qty, v.stock_qty, v.price_minor, v.label, p.name, p.id
+		SELECT ci.variant_id, ci.qty, v.stock_qty, v.label, p.name, p.id,
+		       (SELECT ep.price_minor
+		          FROM variant_effective_prices ep
+		         WHERE ep.variant_id = v.id AND ep.currency = $2) AS price_minor
 		FROM cart_items ci
 		JOIN product_variants v ON v.id = ci.variant_id
 		JOIN products p ON p.id = v.product_id
 		WHERE ci.user_id = $1
 		ORDER BY ci.variant_id
 		FOR UPDATE OF v`,
-		userID)
+		userID, currency)
 	if err != nil {
 		return domain.Order{}, fmt.Errorf("locking cart variants: %w", err)
 	}
 
 	type line struct {
-		variantID  int64
-		qty        int
-		stockQty   int
-		priceMinor int64
+		variantID int64
+		qty       int
+		stockQty  int
+		// A POINTER, because the answer to "what does this cost in drams?"
+		// can genuinely be "nothing on file". Browsing degrades over that;
+		// checkout must not, so it becomes an error below rather than a zero.
+		priceMinor *int64
 		label      string
 		name       string
 		productID  int64
@@ -52,7 +73,7 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64) (domain.Order, er
 	var lines []line
 	for rows.Next() {
 		var l line
-		if err := rows.Scan(&l.variantID, &l.qty, &l.stockQty, &l.priceMinor, &l.label, &l.name, &l.productID); err != nil {
+		if err := rows.Scan(&l.variantID, &l.qty, &l.stockQty, &l.label, &l.name, &l.productID, &l.priceMinor); err != nil {
 			rows.Close()
 			return domain.Order{}, fmt.Errorf("scanning cart line: %w", err)
 		}
@@ -70,18 +91,41 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64) (domain.Order, er
 	// Validate stock under the lock — nobody can change it while we hold it.
 	var total int64
 	for _, l := range lines {
+		if l.priceMinor == nil {
+			return domain.Order{}, fmt.Errorf("%w: %s (%s) in %s",
+				domain.ErrPriceUnavailable, l.name, l.label, currency)
+		}
 		if l.stockQty < l.qty {
 			return domain.Order{}, fmt.Errorf("%w: %s (%s)", domain.ErrInsufficientStock, l.name, l.label)
 		}
-		total += l.priceMinor * int64(l.qty)
+		total += *l.priceMinor * int64(l.qty)
 	}
 
-	order := domain.Order{UserID: userID, Status: domain.OrderPending, TotalMinor: total}
+	// The rate on file at this instant, purely so the order stays reportable
+	// later. Nothing above depends on it: the total is a sum of shelf prices.
+	// No rows when the order is in the base currency — fx_rates forbids
+	// base = quote — so absence needs no separate branch.
+	var fxRate *string
 	err = tx.QueryRow(ctx, `
-		INSERT INTO orders (user_id, status, total_minor)
-		VALUES ($1, $2, $3)
+		SELECT f.rate::text
+		FROM fx_rates f
+		JOIN currencies b ON b.code = f.base AND b.is_base
+		WHERE f.quote = $1
+		ORDER BY f.as_of DESC
+		LIMIT 1`, currency).Scan(&fxRate)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return domain.Order{}, fmt.Errorf("reading fx rate: %w", err)
+	}
+
+	order := domain.Order{
+		UserID: userID, Status: domain.OrderPending, TotalMinor: total,
+		Currency: currency, FxRateUsed: fxRate,
+	}
+	err = tx.QueryRow(ctx, `
+		INSERT INTO orders (user_id, status, total_minor, currency, fx_rate_used)
+		VALUES ($1, $2, $3, $4, $5::numeric)
 		RETURNING id, created_at`,
-		userID, order.Status, total,
+		userID, order.Status, total, currency, fxRate,
 	).Scan(&order.ID, &order.CreatedAt)
 	if err != nil {
 		return domain.Order{}, fmt.Errorf("inserting order: %w", err)
@@ -101,7 +145,7 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64) (domain.Order, er
 		item.VariantID = l.variantID
 		item.Name = l.name
 		item.Label = l.label
-		item.PriceMinor = l.priceMinor
+		item.PriceMinor = *l.priceMinor // nil was rejected above
 		item.Qty = l.qty
 		order.Items = append(order.Items, item)
 
@@ -155,7 +199,7 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64) (domain.Order, er
 
 func (s *Store) ListOrdersByUser(ctx context.Context, userID int64) ([]domain.Order, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, user_id, status, total_minor, created_at
+		SELECT id, user_id, status, total_minor, created_at, currency, fx_rate_used::text
 		FROM orders
 		WHERE user_id = $1
 		ORDER BY created_at DESC`,
@@ -179,7 +223,8 @@ func (s *Store) ListOrdersByUser(ctx context.Context, userID int64) ([]domain.Or
 // customer's email joined in.
 func (s *Store) ListAllOrders(ctx context.Context) ([]domain.Order, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT o.id, o.user_id, o.status, o.total_minor, o.created_at, u.email
+		SELECT o.id, o.user_id, o.status, o.total_minor, o.created_at,
+		       o.currency, o.fx_rate_used::text, u.email
 		FROM orders o
 		JOIN users u ON u.id = o.user_id
 		ORDER BY o.created_at DESC
@@ -192,7 +237,8 @@ func (s *Store) ListAllOrders(ctx context.Context) ([]domain.Order, error) {
 	orders := make([]domain.Order, 0)
 	for rows.Next() {
 		var o domain.Order
-		if err := rows.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalMinor, &o.CreatedAt, &o.UserEmail); err != nil {
+		if err := rows.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalMinor, &o.CreatedAt,
+			&o.Currency, &o.FxRateUsed, &o.UserEmail); err != nil {
 			return nil, fmt.Errorf("scanning order row: %w", err)
 		}
 		orders = append(orders, o)
@@ -217,11 +263,11 @@ func (s *Store) UpdateOrderStatus(ctx context.Context, orderID int64, to string)
 
 	var o domain.Order
 	err = tx.QueryRow(ctx, `
-		SELECT id, user_id, status, total_minor, created_at
+		SELECT id, user_id, status, total_minor, created_at, currency, fx_rate_used::text
 		FROM orders WHERE id = $1
 		FOR UPDATE`,
 		orderID,
-	).Scan(&o.ID, &o.UserID, &o.Status, &o.TotalMinor, &o.CreatedAt)
+	).Scan(&o.ID, &o.UserID, &o.Status, &o.TotalMinor, &o.CreatedAt, &o.Currency, &o.FxRateUsed)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Order{}, domain.ErrNotFound
@@ -261,7 +307,8 @@ func scanOrders(rows pgx.Rows) ([]domain.Order, error) {
 	orders := make([]domain.Order, 0)
 	for rows.Next() {
 		var o domain.Order
-		if err := rows.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalMinor, &o.CreatedAt); err != nil {
+		if err := rows.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalMinor, &o.CreatedAt,
+			&o.Currency, &o.FxRateUsed); err != nil {
 			return nil, fmt.Errorf("scanning order row: %w", err)
 		}
 		orders = append(orders, o)

@@ -7,6 +7,7 @@ import {
 import { api, ApiError, type CatalogFilterParams, type ProductListParams } from './client'
 import type {
   EditorialInput,
+  Money,
   ImageInput,
   NewReview,
   OrderStatus,
@@ -15,6 +16,7 @@ import type {
   User,
 } from './types'
 import { useLocale } from '../i18n/useLocale'
+import { useCurrency } from '../lib/useCurrency'
 
 // TanStack Query caches by queryKey: two components asking for the same key
 // share one request and one cached result.
@@ -24,6 +26,21 @@ import { useLocale } from '../i18n/useLocale'
 // cached English response would be served for the Armanian page and only a
 // manual refetch would fix it — a caching bug that looks exactly like a
 // translation bug.
+//
+// E5 adds the currency to every key that fetches a PRICE, for exactly the
+// same reason and with exactly the same failure mode: switching to drams
+// would change the URL and not the key, so the dollar prices would stay on
+// screen until something else happened to refetch. Module state that changes
+// what a request returns must be part of that request's identity — twice
+// over now.
+//
+// `view` is the pair, named once so a key cannot accidentally carry one and
+// not the other.
+function useView(): [string, string] {
+  const { locale } = useLocale()
+  const { currency } = useCurrency()
+  return [locale, currency]
+}
 
 export function useCategories() {
   const { locale } = useLocale()
@@ -37,11 +54,11 @@ export function useCategories() {
 // the search overlay uses it to stay quiet until the term is worth a round
 // trip, the same lever useCart pulls for anonymous visitors.
 export function useProducts(params: ProductListParams, enabled = true) {
-  const { locale } = useLocale()
+  const view = useView()
   return useQuery({
     // params are part of the key — changing the category filter is a new
     // cache entry, and going back to a seen filter is instant.
-    queryKey: ['products', locale, params],
+    queryKey: ['products', ...view, params],
     queryFn: () => api.listProducts(params),
     enabled,
     // Keep the previous page on screen while the next one loads, instead of
@@ -56,18 +73,20 @@ export function useProducts(params: ProductListParams, enabled = true) {
 // its key omits page and per_page, so paging through results reuses the
 // cached facets instead of re-running the expensive counting query.
 export function useCatalogFacets(params: CatalogFilterParams) {
-  const { locale } = useLocale()
+  const view = useView()
   return useQuery({
-    queryKey: ['catalog-facets', locale, params],
+    // The currency is in here twice over: it changes the counts' price
+    // bounds AND the meaning of the min/max already inside `params`.
+    queryKey: ['catalog-facets', ...view, params],
     queryFn: () => api.catalogFacets(params),
     placeholderData: keepPreviousData,
   })
 }
 
 export function useProduct(slug: string) {
-  const { locale } = useLocale()
+  const view = useView()
   return useQuery({
-    queryKey: ['product', locale, slug],
+    queryKey: ['product', ...view, slug],
     queryFn: () => api.getProduct(slug),
   })
 }
@@ -76,13 +95,13 @@ export function useProduct(slug: string) {
 // past it does not invalidate the buy box, and so a stock change that
 // refetches the product leaves this panel alone.
 export function useRelatedProducts(slug: string, curated = false) {
-  const { locale } = useLocale()
+  const view = useView()
   return useQuery({
     // `curated` is part of the key: the two answers are different lists, and
     // sharing a key would let the storefront's computed panel be served to
     // the admin picker, which is the exact confusion the flag exists to
     // prevent.
-    queryKey: ['related', locale, slug, curated],
+    queryKey: ['related', ...view, slug, curated],
     queryFn: () => api.relatedProducts(slug, curated),
   })
 }
@@ -195,10 +214,11 @@ export function useCreateCategory() {
 // enabled: only fetch the cart when someone is logged in — an anonymous
 // visitor would just collect 401s.
 export function useCart(loggedIn: boolean) {
-  const { locale } = useLocale()
+  const view = useView()
   return useQuery({
-    // The cart carries product names, so it is a translated read too.
-    queryKey: ['cart', locale],
+    // The cart carries product names AND prices, so it is a translated read
+    // and a priced one.
+    queryKey: ['cart', ...view],
     queryFn: api.getCart,
     enabled: loggedIn,
   })
@@ -206,15 +226,15 @@ export function useCart(loggedIn: boolean) {
 
 export function useSetCartItem() {
   const qc = useQueryClient()
-  const { locale } = useLocale()
+  const view = useView()
   return useMutation({
     mutationFn: ({ variantId, qty }: { variantId: number; qty: number }) =>
       api.setCartItem(variantId, qty),
     // The response IS the updated cart — write it straight into the cache.
-    // The key must match useCart's EXACTLY, locale included: setQueryData is
-    // an exact-key write, unlike invalidateQueries, which matches by prefix.
-    // A stale ['cart'] here would silently stop updating the header count.
-    onSuccess: (cart) => qc.setQueryData(['cart', locale], cart),
+    // The key must match useCart's EXACTLY, view and all: setQueryData is an
+    // exact-key write, unlike invalidateQueries, which matches by prefix. A
+    // stale ['cart'] here would silently stop updating the header count.
+    onSuccess: (cart) => qc.setQueryData(['cart', ...view], cart),
   })
 }
 
@@ -256,8 +276,12 @@ export function useAdminOrders() {
 }
 
 export function useAdminProducts() {
+  const view = useView()
   return useQuery({
-    queryKey: ['admin-products'],
+    // The admin list shows prices too, and its editor writes back what it
+    // reads — a cached dollar figure shown under a dram heading would be
+    // saved as a dram price on the next keystroke.
+    queryKey: ['admin-products', ...view],
     queryFn: api.adminProducts,
   })
 }
@@ -351,8 +375,8 @@ export function useSaveProductRelated() {
 export function useUpdateVariant() {
   const invalidate = useInvalidateProducts()
   return useMutation({
-    mutationFn: ({ id, priceMinor, stockQty }: { id: number; priceMinor: number; stockQty: number }) =>
-      api.updateVariant(id, priceMinor, stockQty),
+    mutationFn: ({ id, prices, stockQty }: { id: number; prices: Money; stockQty: number }) =>
+      api.updateVariant(id, prices, stockQty),
     onSuccess: invalidate,
   })
 }

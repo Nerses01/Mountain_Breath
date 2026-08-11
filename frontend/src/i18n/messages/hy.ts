@@ -34,6 +34,9 @@ export const hy = {
       label: 'Լեզու',
       change: 'Փոխել լեզուն',
     },
+    currency: {
+      label: 'Արժույթ',
+    },
     itemCount_one: '{{count}} ապրանք',
     itemCount_other: '{{count}} ապրանք',
     productCount_one: '{{count}} ապրանք',

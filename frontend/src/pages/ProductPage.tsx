@@ -29,6 +29,7 @@ import {
 import { useLocale } from '../i18n/useLocale'
 import { cx } from '../lib/cx'
 import { formatMoney } from '../lib/format'
+import { Price } from '../components/ui/Price'
 
 /**
  * The design's product screen, rendered entirely from API data.
@@ -161,10 +162,14 @@ export function ProductPage() {
 
           <p className="text-lg leading-relaxed text-ink-body">{p.description}</p>
 
+          {/* The mock's baseline row: $32.00   15,300 ֏   · 25 g jar. */}
           <p className="flex flex-wrap items-baseline gap-3.5">
-            <span className="font-display text-display-md font-extrabold text-brand-ink">
-              {formatMoney(selected?.price_minor ?? 0)}
-            </span>
+            <Price
+              prices={selected?.prices}
+              primaryMinor={selected?.price_minor}
+              size="xl"
+              layout="inline"
+            />
             {selected && (
               <span className="text-sm text-ink-soft">· {selected.label}</span>
             )}
@@ -226,7 +231,7 @@ export function ProductPage() {
                     >
                       {/* The design's pill is "25 g · $32" — the size alone
                           makes a shopper compare by clicking. */}
-                      {v.label} · {formatMoney(v.price_minor)}
+                      {v.label} · {formatMoney(v.price_minor, p.currency)}
                       {out && <span className="sr-only"> — {t('catalog:outOfStock')}</span>}
                     </button>
                   )
@@ -261,7 +266,7 @@ export function ProductPage() {
                     : // The price in the button label, as the mock draws it:
                       // it is the last thing read before committing.
                       t('product:addToCartWithPrice', {
-                        price: formatMoney((selected?.price_minor ?? 0) * qty),
+                        price: formatMoney((selected?.price_minor ?? 0) * qty, p.currency),
                       })}
               </Button>
             ) : (

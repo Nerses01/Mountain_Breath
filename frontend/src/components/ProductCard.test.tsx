@@ -22,9 +22,24 @@ const product: Product = {
     { slug: 'energy', name: 'Energy' },
     { slug: 'sweetening', name: 'Sweetening' },
   ],
+  currency: 'USD',
   variants: [
-    { id: 1, sku: 'HON-500', label: '500 g', price_minor: 1400, stock_qty: 40 },
-    { id: 2, sku: 'HON-1K', label: '1 kg', price_minor: 2600, stock_qty: 6 },
+    {
+      id: 1,
+      sku: 'HON-500',
+      label: '500 g',
+      price_minor: 1400,
+      prices: { USD: 1400, AMD: 6700 },
+      stock_qty: 40,
+    },
+    {
+      id: 2,
+      sku: 'HON-1K',
+      label: '1 kg',
+      price_minor: 2600,
+      prices: { USD: 2600, AMD: 12400 },
+      stock_qty: 6,
+    },
   ],
 }
 
@@ -51,6 +66,19 @@ describe('ProductCard', () => {
     // Two variants, so the price is labelled "from" — an unlabelled $14 on a
     // product that also sells for $26 would be a lie of omission.
     expect(screen.getByText('from $14.00')).toBeInTheDocument()
+    // ...and the design's muted second line, which is a SHELF price from the
+    // other market, not $14.00 run through a rate.
+    expect(screen.getByText('6,700 ֏')).toBeInTheDocument()
+  })
+
+  it('shows only one price when the shop has none in the other market', () => {
+    renderCard({
+      ...product,
+      variants: [{ ...product.variants[0], prices: { USD: 1400 } }],
+    })
+
+    expect(screen.getByText('$14.00')).toBeInTheDocument()
+    expect(screen.queryByText(/֏/)).not.toBeInTheDocument()
   })
 
   it('renders the badge KEY through the message catalogue, not raw', () => {

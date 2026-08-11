@@ -21,6 +21,25 @@ type Order struct {
 	TotalMinor int64
 	CreatedAt  time.Time
 	Items      []OrderItem
+
+	// Currency is what the customer was actually charged in, and it is why
+	// an order shows ONE price where a product card shows two. A cart is a
+	// live thing that can be read in either market; an order is a fact about
+	// a transaction that happened in exactly one of them. TotalMinor and
+	// every item's PriceMinor are denominated in this.
+	Currency Currency
+	// FxRateUsed is how many units of Currency one unit of BaseCurrency
+	// bought at checkout, or nil when the order was in the base currency and
+	// no rate was involved. Snapshotted for the same reason prices are: it
+	// answers "what was this order worth in dollars?" next year with the
+	// rate that was true then, not with today's.
+	//
+	// A STRING, not a float64. The column is NUMERIC(18,8) — an exact
+	// decimal — and float64 cannot hold 390.00000001 exactly. Carrying the
+	// digits as text keeps the value the database stored, all the way to the
+	// JSON, where it also dodges the fact that JSON.parse turns every number
+	// into a double.
+	FxRateUsed *string
 }
 
 type OrderItem struct {

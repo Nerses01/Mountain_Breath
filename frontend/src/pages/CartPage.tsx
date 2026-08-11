@@ -3,7 +3,9 @@ import { Trans, useTranslation } from 'react-i18next'
 import { useCart, useCheckout, useMe, useRemoveCartItem, useSetCartItem } from '../api/hooks'
 import { useFieldErrors } from '../i18n/useFieldErrors'
 import { useLocale } from '../i18n/useLocale'
-import { formatPrice } from '../lib/format'
+import { formatMoney } from '../lib/format'
+import { DEFAULT_CURRENCY } from '../lib/currencies'
+import { Price } from '../components/ui/Price'
 
 export function CartPage() {
   const { t } = useTranslation()
@@ -15,6 +17,9 @@ export function CartPage() {
   const checkout = useCheckout()
   const navigate = useNavigate()
   const { formError } = useFieldErrors(checkout.error)
+  // The cart's own currency, not the switcher's, so a response that is still
+  // in flight after a switch is labelled with what it was actually priced in.
+  const currency = cart.data?.currency ?? DEFAULT_CURRENCY
 
   if (me.isPending || cart.isPending) {
     return <Shell>{t('common:state.loading')}</Shell>
@@ -73,7 +78,7 @@ export function CartPage() {
                     {it.product_name}
                   </Link>
                   <p className="text-xs text-stone-400">
-                    {it.label} · {formatPrice(it.price_minor)} {t('cart:each')}
+                    {it.label} · {formatMoney(it.price_minor, currency)} {t('cart:each')}
                   </p>
                 </div>
 
@@ -97,7 +102,7 @@ export function CartPage() {
                 </div>
 
                 <span className="w-24 text-right font-semibold text-stone-800">
-                  {formatPrice(it.line_total_minor)}
+                  {formatMoney(it.line_total_minor, currency)}
                 </span>
 
                 <button
@@ -122,9 +127,14 @@ export function CartPage() {
           <div className="mt-6 flex items-center justify-between rounded-xl border border-stone-200 bg-white p-4">
             <div>
               <p className="text-sm text-stone-500">{t('cart:total')}</p>
-              <p className="text-2xl font-bold text-stone-800">
-                {formatPrice(cart.data?.total_minor ?? 0)}
-              </p>
+              {/* Both markets, summed independently — never one converted
+                  from the other. E6 redesigns this screen; the numbers are
+                  right in the meantime. */}
+              <Price
+                prices={cart.data?.totals}
+                primaryMinor={cart.data?.total_minor}
+                size="lg"
+              />
             </div>
             <button
               type="button"

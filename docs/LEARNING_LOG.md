@@ -17,6 +17,106 @@ Template for an entry:
 
 ---
 
+## 2026-08-11 — Phase E5: money is harder than a multiplication
+
+**Worked on:** migration 000016 (`currencies`, `variant_prices`, `fx_rates`,
+the `variant_effective_prices` view, `orders.currency`/`fx_rate_used`, and the
+removal of `product_variants.price_minor`); currency negotiation at the edge;
+per-market catalog filtering, sorting and facet bounds; dual prices on the
+card, the buy box and the cart; the footer's "USD / AMD" switcher; the admin
+editor's price box per market.
+
+**Learned:**
+
+- **A price is not a property of a product.** It is a property of a
+  *(product, market)* pair. Every awkward thing about the old schema
+  dissolved once that was taken literally, and everything the phase built —
+  the join table, the view, the map in the JSON — is one sentence of
+  consequence.
+- **Per-market prices, not live conversion.** A shelf price is a business
+  decision: a shop picks a round figure and holds it. Conversion would move
+  the price tag between two page loads and print 6,743 ֏ where a human would
+  write 6,700. The rate still earns its table — as the *fallback* for a
+  market nobody has priced yet, and as the record that keeps an old order
+  reportable next year at the rate that was true then.
+- **`price_minor / 100` is a bug, not a convention.** The scale of a minor
+  unit belongs to the currency. USD has two decimals; a dram has none in
+  circulation, so its minor unit IS the dram. Every `/100` in the codebase
+  was a hidden assumption that there was only ever one currency, and the
+  compiler could not see a single one of them.
+- **Summing and converting do not commute.** Convert a total and you round
+  once; total the conversions and you round per line — and three lines that
+  each round up leave a total that disagrees with the numbers the customer
+  just added up on screen. Per-market integer prices make the disagreement
+  impossible rather than small. The domain test picks fixture prices that are
+  deliberately *not* a fixed multiple, and fails if they ever become one,
+  because a test where both answers agree proves nothing.
+- **Currency is not a display concern.** The price slider's ends, the
+  `price_asc` ordering and `min_price`/`max_price` are all denominated in it,
+  so the *cheapest product can genuinely differ between markets*. Treating it
+  as formatting would have produced a correctly-shaped answer to the wrong
+  question, silently — which is the same failure mode as E1.5's missing
+  `?lang=`.
+- **Degrade on reads, refuse on charges.** A card with no dram price shows
+  one line instead of two; `CreateOrder` returns `ErrPriceUnavailable` in the
+  same situation. The asymmetry is the rule: the alternative to failing at
+  checkout is billing someone zero.
+- **Define it once, in SQL.** Seven callers ask "what does this variant cost
+  in that currency?". `variant_effective_prices` is a plain view, so Postgres
+  inlines it and pushes `WHERE currency = $1` down into it — the same instinct
+  as E2's shared Go constants, one layer lower, where the database can hold
+  the definition.
+- **`ON currencies ((TRUE)) WHERE is_base`** — a unique index on a *constant*
+  over a filtered subset means "at most one row can have this flag". The
+  singleton form of E3's one-primary-image index.
+- **A decimal in JSON should be a string.** `fx_rate_used` is
+  `NUMERIC(18,8)`; `JSON.parse` turns every JSON number into a double. Sending
+  the digits as text is the only way the exact value survives the trip.
+- **When you must duplicate a set across layers, make the duplication
+  testable.** Go needs the currency codes (to reject `?currency=ZZZ` without a
+  query); SQL needs the properties (that is where rounding happens). E1.5 met
+  the same problem for locales and wrote a comment asking future readers to
+  keep three places in sync. A comment is a wish. `TestCurrenciesMatchTheDatabase`
+  is the version that fails a build.
+- **Language and currency are not the same shape of problem.** `/hy/shop` is
+  a different *document* — different `<html lang>`, separately shareable,
+  separately indexable — so the locale belongs in the path. A currency is a
+  lens on the same document, so it belongs in storage. It also needs a cookie,
+  because the server is the one that decides what a checkout charges.
+- **`Intl.NumberFormat` knows too much.** With `style: 'currency'` it takes
+  symbol placement from the *display locale*, so 6,700 drams renders "֏6,700"
+  for an English reader and "6 700 ֏" for an Armenian one — a price tag that
+  changes shape with the site language. Intl still does the hard part
+  (grouping, decimal places) against a pinned locale; the symbol is placed
+  from the currency's own row.
+- **"from {{price}}" is a suffix in Armenian** (`{{price}}-ից`). The `Price`
+  component takes a *callback* rather than a prefix string for exactly that
+  reason — the message decides where the word goes, not the component.
+- **Piping a file through PowerShell re-encodes it.** `Get-Content seed.sql |
+  … psql` runs the stream through the console code page, and non-ASCII either
+  double-encodes (`4 Ã— 100 g`) or is destroyed outright (46 Armenian
+  characters became 46 `?`). Nothing errors — the result is valid UTF-8, just
+  wrong. `docker compose cp` moves raw bytes and has no encoding step to get
+  wrong. Found by *looking at a rendered page*, not by a test, which is now
+  three phases running.
+
+**Questions / to revisit:**
+
+- The FX rate is a bootstrap row in the migration. A real shop wants a daily
+  feed writing a new `as_of` — trivial to add, and worth doing before the
+  fallback path prices anything a customer actually buys.
+- `rounding_step` only applies to *converted* prices right now. If E7's promo
+  discounts land as percentages, the same rounding question reappears for
+  computed amounts and the answer should come from the same column.
+- Nothing yet reads `variant_effective_prices.is_converted`. The admin screen
+  is the natural consumer: an editor ought to see which figures the shop chose
+  and which the exchange rate chose.
+- `sales_count` is currency-blind — one counter across both markets. Fine for
+  ranking; wrong the moment anyone wants revenue per market, which needs the
+  order snapshots and `fx_rate_used` rather than a counter.
+
+---
+
 ## 2026-08-11 — Phase E4: keeping a denormalized aggregate honest
 
 **Worked on:** migration 000015 (`reviews` with a status workflow and a

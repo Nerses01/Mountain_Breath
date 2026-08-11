@@ -23,10 +23,14 @@ func seedCatalog(t *testing.T, stock int) int64 {
 		), prod AS (
 			INSERT INTO products (category_id, slug, name)
 			SELECT id, 'wild-honey', 'Wild Honey' FROM cat RETURNING id
+		), variant AS (
+			INSERT INTO product_variants (product_id, sku, label, stock_qty)
+			SELECT id, 'HON-1', '700 g', $1 FROM prod
+			RETURNING id
 		)
-		INSERT INTO product_variants (product_id, sku, label, price_minor, stock_qty)
-		SELECT id, 'HON-1', '700 g', 950000, $1 FROM prod
-		RETURNING id`, stock).Scan(&variantID)
+		INSERT INTO variant_prices (variant_id, currency, price_minor)
+		SELECT id, 'USD', 950000 FROM variant
+		RETURNING variant_id`, stock).Scan(&variantID)
 	if err != nil {
 		t.Fatalf("seeding catalog: %v", err)
 	}
@@ -63,7 +67,7 @@ func TestCreateOrder_HappyPath(t *testing.T) {
 	variantID := seedCatalog(t, 10)
 	userID := seedUserWithCart(t, "buyer@test.local", variantID, 3)
 
-	order, err := s.CreateOrder(ctx, userID)
+	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD)
 	if err != nil {
 		t.Fatalf("CreateOrder: %v", err)
 	}
@@ -110,7 +114,7 @@ func TestCreateOrder_EmptyCart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := s.CreateOrder(context.Background(), userID)
+	_, err := s.CreateOrder(context.Background(), userID, domain.CurrencyUSD)
 	if !errors.Is(err, domain.ErrEmptyCart) {
 		t.Errorf("err = %v, want ErrEmptyCart", err)
 	}
@@ -126,7 +130,7 @@ func TestCreateOrder_InsufficientStock(t *testing.T) {
 	variantID := seedCatalog(t, 2)
 	userID := seedUserWithCart(t, "greedy@test.local", variantID, 5)
 
-	_, err := s.CreateOrder(context.Background(), userID)
+	_, err := s.CreateOrder(context.Background(), userID, domain.CurrencyUSD)
 	if !errors.Is(err, domain.ErrInsufficientStock) {
 		t.Errorf("err = %v, want ErrInsufficientStock", err)
 	}
@@ -167,7 +171,7 @@ func TestCreateOrder_ConcurrentCheckoutsDoNotOversell(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := s.CreateOrder(ctx, uid)
+			_, err := s.CreateOrder(ctx, uid, domain.CurrencyUSD)
 			switch {
 			case err == nil:
 				succeeded.Add(1)
@@ -216,7 +220,7 @@ func TestUpdateOrderStatus_CancelRestoresStock(t *testing.T) {
 	variantID := seedCatalog(t, 10)
 	userID := seedUserWithCart(t, "canceller@test.local", variantID, 4)
 
-	order, err := s.CreateOrder(ctx, userID)
+	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD)
 	if err != nil {
 		t.Fatalf("CreateOrder: %v", err)
 	}
@@ -259,10 +263,15 @@ func TestCreateOrder_IncrementsSalesCount(t *testing.T) {
 	// the counter once, by the summed quantity, not twice.
 	var variant2ID int64
 	if err := testPool.QueryRow(ctx0, `
-		INSERT INTO product_variants (product_id, sku, label, price_minor, stock_qty)
-		SELECT product_id, 'HON-2', '350 g', 520000, 20
-		FROM product_variants WHERE id = $1
-		RETURNING id`, variantID).Scan(&variant2ID); err != nil {
+		WITH variant AS (
+			INSERT INTO product_variants (product_id, sku, label, stock_qty)
+			SELECT product_id, 'HON-2', '350 g', 20
+			FROM product_variants WHERE id = $1
+			RETURNING id
+		)
+		INSERT INTO variant_prices (variant_id, currency, price_minor)
+		SELECT id, 'USD', 520000 FROM variant
+		RETURNING variant_id`, variantID).Scan(&variant2ID); err != nil {
 		t.Fatalf("seeding second variant: %v", err)
 	}
 
@@ -273,7 +282,7 @@ func TestCreateOrder_IncrementsSalesCount(t *testing.T) {
 		t.Fatalf("adding second cart line: %v", err)
 	}
 
-	order, err := s.CreateOrder(ctx, userID)
+	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD)
 	if err != nil {
 		t.Fatalf("CreateOrder: %v", err)
 	}

@@ -12,10 +12,16 @@ import (
 )
 
 type newVariantRequest struct {
-	SKU        string `json:"sku"`
-	Label      string `json:"label"`
-	PriceMinor int64  `json:"price_minor"`
-	StockQty   int    `json:"stock_qty"`
+	SKU   string `json:"sku"`
+	Label string `json:"label"`
+	// One price per market, keyed by ISO code: {"USD": 1400, "AMD": 6700}.
+	// The base currency is required; anything else is optional and falls
+	// back to a converted price. Replaced the scalar price_minor in E5 —
+	// a BREAKING change to this endpoint, and deliberately so: silently
+	// accepting the old field would have written a dollar figure into
+	// whatever market happened to be default.
+	Prices   map[domain.Currency]int64 `json:"prices"`
+	StockQty int                       `json:"stock_qty"`
 }
 
 // productTextRequest is one language's copy of a product. Same shape for
@@ -90,8 +96,11 @@ func toDomainTranslations(in map[string]productTextRequest) map[domain.Locale]do
 }
 
 type updateVariantRequest struct {
-	PriceMinor int64 `json:"price_minor"`
-	StockQty   int   `json:"stock_qty"`
+	// The DESIRED STATE of this variant's prices, not a patch: a currency
+	// left out is removed, which is how an admin puts a variant back on the
+	// converted fallback. See store.UpdateVariant.
+	Prices   map[domain.Currency]int64 `json:"prices"`
+	StockQty int                       `json:"stock_qty"`
 }
 
 // adminProductResponse extends the public shape with admin-only fields.
@@ -100,8 +109,8 @@ type adminProductResponse struct {
 	IsActive bool `json:"is_active"`
 }
 
-func toAdminProductResponse(p domain.Product) adminProductResponse {
-	return adminProductResponse{productResponse: toProductResponse(p), IsActive: p.IsActive}
+func toAdminProductResponse(p domain.Product, currency domain.Currency) adminProductResponse {
+	return adminProductResponse{productResponse: toProductResponse(p, currency), IsActive: p.IsActive}
 }
 
 // GET /admin/products — like the public list, but includes inactive products.
@@ -113,6 +122,8 @@ func (s *Server) handleAdminListProducts(w http.ResponseWriter, r *http.Request)
 		IncludeInactive: true,
 		Page:            intQueryParam(q.Get("page"), 1),
 		PerPage:         intQueryParam(q.Get("per_page"), 50),
+		Locale:          localeFromContext(r.Context()),
+		Currency:        currencyFromContext(r.Context()),
 	}
 	if filter.Page < 1 {
 		filter.Page = 1
@@ -129,7 +140,7 @@ func (s *Server) handleAdminListProducts(w http.ResponseWriter, r *http.Request)
 	}
 	items := make([]adminProductResponse, 0, len(products))
 	for _, p := range products {
-		items = append(items, toAdminProductResponse(p))
+		items = append(items, toAdminProductResponse(p, filter.EffectiveCurrency()))
 	}
 	s.respondJSON(w, http.StatusOK, paginated[adminProductResponse]{
 		Items: items, Page: filter.Page, PerPage: filter.PerPage, Total: total,
@@ -165,7 +176,7 @@ func (s *Server) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, v := range req.Variants {
 		product.Variants = append(product.Variants, domain.ProductVariant{
-			SKU: v.SKU, Label: v.Label, PriceMinor: v.PriceMinor, StockQty: v.StockQty,
+			SKU: v.SKU, Label: v.Label, Prices: v.Prices, StockQty: v.StockQty,
 		})
 	}
 
@@ -178,7 +189,7 @@ func (s *Server) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 		s.respondProductError(w, err)
 		return
 	}
-	s.respondJSON(w, http.StatusCreated, toAdminProductResponse(product))
+	s.respondJSON(w, http.StatusCreated, toAdminProductResponse(product, currencyFromContext(r.Context())))
 }
 
 // PUT /admin/products/{id} — full update of mutable fields (slug immutable:
@@ -239,11 +250,11 @@ func (s *Server) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
 		s.respondProductError(w, err)
 		return
 	}
-	s.respondJSON(w, http.StatusOK, toAdminProductResponse(product))
+	s.respondJSON(w, http.StatusOK, toAdminProductResponse(product, currencyFromContext(r.Context())))
 }
 
-// PATCH /admin/variants/{id} — price and stock, the two fields that change
-// in daily shop operation.
+// PATCH /admin/variants/{id} — prices and stock, the fields that change in
+// daily shop operation.
 func (s *Server) handleUpdateVariant(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
@@ -261,19 +272,31 @@ func (s *Server) handleUpdateVariant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Same rules as ValidateProduct applies to a new variant, restated for
+	// one variant: the base price must be there and positive, the others
+	// must at least be currencies the shop knows.
 	fields := make(map[string]string)
-	if req.PriceMinor <= 0 {
-		fields["price_minor"] = "must be positive"
+	if req.Prices[domain.BaseCurrency] <= 0 {
+		fields["prices."+string(domain.BaseCurrency)] = domain.ValidationPositive
+	}
+	for c, minor := range req.Prices {
+		if _, ok := domain.ParseCurrency(string(c)); !ok {
+			fields["prices."+string(c)] = domain.ValidationUnknownCurrency
+			continue
+		}
+		if minor <= 0 {
+			fields["prices."+string(c)] = domain.ValidationPositive
+		}
 	}
 	if req.StockQty < 0 {
-		fields["stock_qty"] = "must not be negative"
+		fields["stock_qty"] = domain.ValidationNotNegative
 	}
 	if len(fields) > 0 {
 		s.respondValidationError(w, fields)
 		return
 	}
 
-	if err := s.store.UpdateVariant(r.Context(), id, req.PriceMinor, req.StockQty); err != nil {
+	if err := s.store.UpdateVariant(r.Context(), id, req.Prices, req.StockQty); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			s.respondError(w, http.StatusNotFound, "not_found", "no such variant")
 			return

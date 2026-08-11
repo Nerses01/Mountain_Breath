@@ -59,10 +59,10 @@ func (s *Store) CreateProduct(ctx context.Context, p *domain.Product) error {
 	for i := range p.Variants {
 		v := &p.Variants[i]
 		err = tx.QueryRow(ctx, `
-			INSERT INTO product_variants (product_id, sku, label, price_minor, stock_qty)
-			VALUES ($1, $2, $3, $4, $5)
+			INSERT INTO product_variants (product_id, sku, label, stock_qty)
+			VALUES ($1, $2, $3, $4)
 			RETURNING id`,
-			p.ID, v.SKU, v.Label, v.PriceMinor, v.StockQty,
+			p.ID, v.SKU, v.Label, v.StockQty,
 		).Scan(&v.ID)
 		if err != nil {
 			if mapped := mapProductConstraint(err); mapped != nil {
@@ -71,6 +71,9 @@ func (s *Store) CreateProduct(ctx context.Context, p *domain.Product) error {
 			return fmt.Errorf("inserting variant %q: %w", v.SKU, err)
 		}
 		v.ProductID = p.ID
+		if err := upsertVariantPrices(ctx, tx, v.ID, v.Prices); err != nil {
+			return err
+		}
 	}
 
 	if err := upsertProductTranslations(ctx, tx, p); err != nil {
@@ -176,15 +179,66 @@ func (s *Store) UpdateProductImage(ctx context.Context, productID int64, imageUR
 	return nil
 }
 
-func (s *Store) UpdateVariant(ctx context.Context, variantID, priceMinor int64, stockQty int) error {
-	tag, err := s.pool.Exec(ctx, `
-		UPDATE product_variants SET price_minor = $1, stock_qty = $2 WHERE id = $3`,
-		priceMinor, stockQty, variantID)
+// UpdateVariant sets stock and the whole price set at once.
+//
+// The prices are replaced WHOLESALE — every currency the caller sent is
+// written, every currency it omitted is deleted. A per-currency PATCH would
+// be friendlier to a script and much worse for a form: the admin's price
+// editor sends what the boxes currently say, and if omitting AMD meant
+// "leave it alone" there would be no way to *remove* an AMD price and let it
+// fall back to conversion again. "The request describes the desired state"
+// is the same PUT-shaped promise the cart's set-quantity endpoint makes.
+func (s *Store) UpdateVariant(ctx context.Context, variantID int64, prices domain.Money, stockQty int) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("beginning update-variant tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(ctx,
+		`UPDATE product_variants SET stock_qty = $1 WHERE id = $2`, stockQty, variantID)
 	if err != nil {
 		return fmt.Errorf("updating variant: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return domain.ErrNotFound
+	}
+
+	if err := upsertVariantPrices(ctx, tx, variantID, prices); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("committing update-variant: %w", err)
+	}
+	return nil
+}
+
+// upsertVariantPrices makes variant_prices match `prices` exactly.
+//
+// Upsert-then-delete rather than delete-then-insert, so the variant is never
+// momentarily unpriced — the same reasoning as upsertProductTranslations,
+// and it matters more here because an empty window would make the product
+// briefly unbuyable rather than briefly untranslated.
+func upsertVariantPrices(ctx context.Context, tx pgx.Tx, variantID int64, prices domain.Money) error {
+	kept := make([]string, 0, len(prices))
+	for currency, minor := range prices {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO variant_prices (variant_id, currency, price_minor)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (variant_id, currency)
+			DO UPDATE SET price_minor = EXCLUDED.price_minor`,
+			variantID, currency, minor); err != nil {
+			return fmt.Errorf("upserting %s price for variant %d: %w", currency, variantID, err)
+		}
+		kept = append(kept, string(currency))
+	}
+
+	// Removing a shelf price is a real edit: it puts the variant back on the
+	// converted fallback rather than leaving a stale figure behind.
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM variant_prices WHERE variant_id = $1 AND currency <> ALL($2::text[])`,
+		variantID, kept); err != nil {
+		return fmt.Errorf("pruning prices for variant %d: %w", variantID, err)
 	}
 	return nil
 }

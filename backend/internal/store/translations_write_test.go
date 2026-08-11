@@ -133,7 +133,7 @@ func TestProductTranslationsRoundTrip(t *testing.T) {
 		CategoryID: cat.ID, Slug: "wildflower-honey",
 		Name: "Wildflower Honey", Description: "Raw honey", IsActive: true,
 		Variants: []domain.ProductVariant{
-			{SKU: "HON-1", Label: "350 g", PriceMinor: 520000, StockQty: 5},
+			{SKU: "HON-1", Label: "350 g", Prices: domain.Money{domain.CurrencyUSD: 520000}, StockQty: 5},
 		},
 		Translations: map[domain.Locale]domain.ProductText{
 			domain.LocaleRU: {Name: "Цветочный мёд", Description: "Сырой мёд"},
@@ -144,7 +144,7 @@ func TestProductTranslationsRoundTrip(t *testing.T) {
 	}
 
 	// Written text must come back through the READ path in the same language.
-	ru, err := s.GetProductBySlug(ctx, "wildflower-honey", domain.LocaleRU)
+	ru, err := s.GetProductBySlug(ctx, "wildflower-honey", domain.View{Locale: domain.LocaleRU})
 	if err != nil {
 		t.Fatalf("reading ru: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestProductTranslationsRoundTrip(t *testing.T) {
 	}
 
 	// An untranslated language still falls back rather than blanking.
-	hy, err := s.GetProductBySlug(ctx, "wildflower-honey", domain.LocaleHY)
+	hy, err := s.GetProductBySlug(ctx, "wildflower-honey", domain.View{Locale: domain.LocaleHY})
 	if err != nil {
 		t.Fatalf("reading hy: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestUpdateProductUpsertsTranslations(t *testing.T) {
 	p := domain.Product{
 		CategoryID: cat.ID, Slug: "honey-jar", Name: "Honey Jar", IsActive: true,
 		Variants: []domain.ProductVariant{
-			{SKU: "HJ-1", Label: "350 g", PriceMinor: 100, StockQty: 1},
+			{SKU: "HJ-1", Label: "350 g", Prices: domain.Money{domain.CurrencyUSD: 100}, StockQty: 1},
 		},
 		Translations: map[domain.Locale]domain.ProductText{
 			domain.LocaleRU: {Name: "Банка мёда"},

@@ -32,6 +32,9 @@ export const en = {
       label: 'Language',
       change: 'Change language',
     },
+    currency: {
+      label: 'Currency',
+    },
     // ICU plural: i18next picks _one / _other from the count automatically,
     // which is why this is not string concatenation. Russian needs a third
     // form (_few) and Armenian's rules differ again — exactly the class of

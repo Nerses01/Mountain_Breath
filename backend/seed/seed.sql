@@ -231,27 +231,69 @@ ON CONFLICT (product_id, benefit_id) DO NOTHING;
 -- states the design never draws (§6 exception 2), and a dev database where
 -- nothing is ever out of stock is a dev database where that state is never
 -- looked at.
-INSERT INTO product_variants (product_id, sku, label, price_minor, stock_qty)
-SELECT p.id, v.sku, v.label, v.price_minor, v.stock_qty
+INSERT INTO product_variants (product_id, sku, label, stock_qty)
+SELECT p.id, v.sku, v.label, v.stock_qty
 FROM (VALUES
-    ('mountain-wildflower-honey', 'HON-WLD-500', '500 g',     1400, 40),
-    ('mountain-wildflower-honey', 'HON-WLD-1000', '1 kg',     2600, 18),
-    ('pure-beeswax-blocks',       'WAX-BLK-4X100', '4 × 100 g', 900, 25),
-    ('pure-beeswax-blocks',       'WAX-BLK-10X100', '10 × 100 g', 2000, 8),
-    ('raw-propolis-tincture',     'PRO-TNC-30',  '30 ml',     1900, 30),
-    ('raw-propolis-tincture',     'PRO-TNC-100', '100 ml',    5800, 9),
-    ('fresh-royal-jelly',         'RJL-FRS-25',  '25 g',      3200, 14),
-    ('fresh-royal-jelly',         'RJL-FRS-50',  '50 g',      5800, 6),
-    ('fresh-royal-jelly',         'RJL-FRS-100', '100 g',    10500, 0),
-    ('bee-pollen-granules',       'POL-GRN-250', '250 g',     1600, 35),
-    ('bee-pollen-granules',       'POL-GRN-500', '500 g',     2900, 12),
-    ('bee-venom-serum',           'VEN-SRM-15',  '15 ml',     2800, 20)
-) AS v(product_slug, sku, label, price_minor, stock_qty)
+    ('mountain-wildflower-honey', 'HON-WLD-500', '500 g',     40),
+    ('mountain-wildflower-honey', 'HON-WLD-1000', '1 kg',     18),
+    ('pure-beeswax-blocks',       'WAX-BLK-4X100', '4 × 100 g', 25),
+    ('pure-beeswax-blocks',       'WAX-BLK-10X100', '10 × 100 g', 8),
+    ('raw-propolis-tincture',     'PRO-TNC-30',  '30 ml',     30),
+    ('raw-propolis-tincture',     'PRO-TNC-100', '100 ml',     9),
+    ('fresh-royal-jelly',         'RJL-FRS-25',  '25 g',      14),
+    ('fresh-royal-jelly',         'RJL-FRS-50',  '50 g',       6),
+    ('fresh-royal-jelly',         'RJL-FRS-100', '100 g',      0),
+    ('bee-pollen-granules',       'POL-GRN-250', '250 g',     35),
+    ('bee-pollen-granules',       'POL-GRN-500', '500 g',     12),
+    ('bee-venom-serum',           'VEN-SRM-15',  '15 ml',     20)
+) AS v(product_slug, sku, label, stock_qty)
 JOIN products p ON p.slug = v.product_slug
 ON CONFLICT (sku) DO UPDATE
     SET label = EXCLUDED.label,
-        price_minor = EXCLUDED.price_minor,
         stock_qty = EXCLUDED.stock_qty;
+
+-- ── E5: one shelf price per market ───────────────────────────────────────
+--
+-- The price left product_variants in migration 000016 and became a row per
+-- (variant, currency). Both columns come from the mock's own table, with the
+-- same caveat as the dollar figures: §1.1 confirmed every number in the
+-- design is placeholder, so these are shaped like real prices rather than
+-- being real ones. What they DO demonstrate is the model — the AMD column is
+-- not the USD column times a rate, and the shop is free to price a jar
+-- keenly in one market and normally in the other.
+INSERT INTO variant_prices (variant_id, currency, price_minor)
+SELECT v.id, p.currency, p.price_minor
+FROM (VALUES
+    ('HON-WLD-500',    'USD',  1400), ('HON-WLD-500',    'AMD',  6700),
+    ('HON-WLD-1000',   'USD',  2600), ('HON-WLD-1000',   'AMD', 12400),
+    ('WAX-BLK-4X100',  'USD',   900), ('WAX-BLK-4X100',  'AMD',  4300),
+    ('WAX-BLK-10X100', 'USD',  2000), ('WAX-BLK-10X100', 'AMD',  9600),
+    ('PRO-TNC-30',     'USD',  1900), ('PRO-TNC-30',     'AMD',  9100),
+    -- PRO-TNC-100 is deliberately left WITHOUT a dram price: it is the one
+    -- variant that exercises the converted fallback, so the shop shows a
+    -- computed 22,620 ֏ next to its round-numbered neighbours. Same argument
+    -- as RJL-FRS-100's zero stock above — a dev database where every path is
+    -- perfectly configured is one where the fallback is never looked at.
+    ('PRO-TNC-100',    'USD',  5800),
+    ('RJL-FRS-25',     'USD',  3200), ('RJL-FRS-25',     'AMD', 15300),
+    ('RJL-FRS-50',     'USD',  5800), ('RJL-FRS-50',     'AMD', 27700),
+    ('RJL-FRS-100',    'USD', 10500), ('RJL-FRS-100',    'AMD', 50000),
+    ('POL-GRN-250',    'USD',  1600), ('POL-GRN-250',    'AMD',  7600),
+    ('POL-GRN-500',    'USD',  2900), ('POL-GRN-500',    'AMD', 13900),
+    ('VEN-SRM-15',     'USD',  2800), ('VEN-SRM-15',     'AMD', 13400)
+) AS p(sku, currency, price_minor)
+JOIN product_variants v ON v.sku = p.sku
+ON CONFLICT (variant_id, currency) DO UPDATE
+    SET price_minor = EXCLUDED.price_minor;
+
+-- Convergence, not tidiness: if an earlier run (or an admin experimenting in
+-- dev) gave the 100 ml tincture a dram price, re-running the seed has to take
+-- it away again, or the file stops describing the state it produces.
+DELETE FROM variant_prices vp
+USING product_variants v
+WHERE vp.variant_id = v.id
+  AND vp.currency = 'AMD'
+  AND v.sku = 'PRO-TNC-100';
 
 -- ══════════════════════════════════════════════════════════════════════════
 -- E3: the product page's editorial half
@@ -545,8 +587,8 @@ ON CONFLICT (email) DO NOTHING;
 -- One delivered order per reviewer, containing the cheapest variant of every
 -- product they review. `delivered` is the point: the store checks for that
 -- exact status, so an order in any other state grants no standing.
-INSERT INTO orders (user_id, status, total_minor)
-SELECT u.id, 'delivered', 0
+INSERT INTO orders (user_id, status, total_minor, currency)
+SELECT u.id, 'delivered', 0, 'USD'
 FROM users u
 WHERE u.email IN ('anahit@example.com', 'vahe@example.com',
                   'mariam@example.com', 'sergey@example.com')
@@ -560,9 +602,16 @@ SELECT o.id, v.id, p.name, v.label, v.price_minor, 1
 FROM orders o
 JOIN users u ON u.id = o.user_id
 CROSS JOIN products p
+-- "Cheapest variant" is now a question with a market attached, and these
+-- orders are stamped USD, so the effective price view is asked in USD.
 JOIN LATERAL (
-    SELECT id, label, price_minor FROM product_variants
-    WHERE product_id = p.id ORDER BY price_minor LIMIT 1
+    SELECT pv.id, pv.label, ep.price_minor
+    FROM product_variants pv
+    JOIN variant_effective_prices ep
+      ON ep.variant_id = pv.id AND ep.currency = o.currency
+    WHERE pv.product_id = p.id
+    ORDER BY ep.price_minor
+    LIMIT 1
 ) v ON TRUE
 WHERE o.status = 'delivered'
   AND u.email IN ('anahit@example.com', 'vahe@example.com',

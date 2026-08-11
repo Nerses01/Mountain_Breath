@@ -33,6 +33,9 @@ export const ru = {
       label: 'Язык',
       change: 'Сменить язык',
     },
+    currency: {
+      label: 'Валюта',
+    },
     itemCount_one: '{{count}} товар',
     itemCount_few: '{{count}} товара',
     itemCount_many: '{{count}} товаров',

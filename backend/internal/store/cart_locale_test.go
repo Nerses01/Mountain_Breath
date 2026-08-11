@@ -31,7 +31,7 @@ func TestGetCart_ResolvesNamesInTheRequestedLocale(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hy, err := s.GetCart(ctx, userID, domain.LocaleHY)
+	hy, err := s.GetCart(ctx, userID, domain.View{Locale: domain.LocaleHY})
 	if err != nil {
 		t.Fatalf("GetCart: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestGetCart_ResolvesNamesInTheRequestedLocale(t *testing.T) {
 
 	// Russian has no translation here, so it falls back to English rather
 	// than rendering an empty line in the basket.
-	ru, err := s.GetCart(ctx, userID, domain.LocaleRU)
+	ru, err := s.GetCart(ctx, userID, domain.View{Locale: domain.LocaleRU})
 	if err != nil {
 		t.Fatal(err)
 	}

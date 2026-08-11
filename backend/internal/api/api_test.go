@@ -55,6 +55,12 @@ type fakeStore struct {
 	moderatedID      int64
 	moderatedStatus  string
 	canReview        bool
+
+	// E5. lastCurrency is the currency middleware'"'"'s answer as the store saw
+	// it — the only way a handler test can prove the ?currency / cookie /
+	// Accept-Language chain reached the query rather than being dropped.
+	lastCurrency domain.Currency
+	cart         []domain.CartItem
 }
 
 func newFakeStore() *fakeStore {
@@ -94,8 +100,9 @@ func (f *fakeStore) CatalogFacets(_ context.Context, filter domain.ProductFilter
 	return f.facets, nil
 }
 
-func (f *fakeStore) GetProductBySlug(_ context.Context, slug string, locale domain.Locale) (domain.Product, error) {
-	f.lastLocale = locale
+func (f *fakeStore) GetProductBySlug(_ context.Context, slug string, view domain.View) (domain.Product, error) {
+	f.lastLocale = view.EffectiveLocale()
+	f.lastCurrency = view.EffectiveCurrency()
 	for _, p := range f.products {
 		if p.Slug == slug {
 			return p, nil
@@ -142,13 +149,15 @@ func (f *fakeStore) UpdateProductImage(_ context.Context, productID int64, image
 	return domain.ErrNotFound
 }
 
-func (f *fakeStore) ListRelated(_ context.Context, _ string, locale domain.Locale) ([]domain.Product, error) {
-	f.lastLocale = locale
+func (f *fakeStore) ListRelated(_ context.Context, _ string, view domain.View) ([]domain.Product, error) {
+	f.lastLocale = view.EffectiveLocale()
+	f.lastCurrency = view.EffectiveCurrency()
 	return f.related, nil
 }
 
-func (f *fakeStore) ListCuratedRelated(_ context.Context, _ string, locale domain.Locale) ([]domain.Product, error) {
-	f.lastLocale = locale
+func (f *fakeStore) ListCuratedRelated(_ context.Context, _ string, view domain.View) ([]domain.Product, error) {
+	f.lastLocale = view.EffectiveLocale()
+	f.lastCurrency = view.EffectiveCurrency()
 	f.curatedRelatedAsked = true
 	return f.curatedRelated, nil
 }
@@ -202,11 +211,12 @@ func (f *fakeStore) SaveProductRelated(_ context.Context, _ int64, relatedIDs []
 	return nil
 }
 
-func (f *fakeStore) UpdateVariant(_ context.Context, variantID, priceMinor int64, stockQty int) error {
+func (f *fakeStore) UpdateVariant(_ context.Context, variantID int64, prices domain.Money, stockQty int) error {
 	for i := range f.products {
 		for j := range f.products[i].Variants {
 			if f.products[i].Variants[j].ID == variantID {
-				f.products[i].Variants[j].PriceMinor = priceMinor
+				f.products[i].Variants[j].Prices = prices
+				f.products[i].Variants[j].PriceMinor = prices[domain.DefaultCurrency]
 				f.products[i].Variants[j].StockQty = stockQty
 				return nil
 			}
@@ -274,13 +284,18 @@ func (f *fakeStore) DeleteSession(_ context.Context, token string) error {
 
 // --- CartStore / OrderStore (unused by these tests) ---
 
-func (f *fakeStore) GetCart(_ context.Context, _ int64, _ domain.Locale) ([]domain.CartItem, error) {
-	return nil, nil
+func (f *fakeStore) GetCart(_ context.Context, _ int64, view domain.View) ([]domain.CartItem, error) {
+	f.lastCurrency = view.EffectiveCurrency()
+	return f.cart, nil
 }
 func (f *fakeStore) SetCartItem(_ context.Context, _, _ int64, _ int) error { return nil }
 func (f *fakeStore) DeleteCartItem(_ context.Context, _, _ int64) error     { return nil }
-func (f *fakeStore) CreateOrder(_ context.Context, _ int64) (domain.Order, error) {
-	return domain.Order{}, domain.ErrEmptyCart
+func (f *fakeStore) CreateOrder(_ context.Context, _ int64, currency domain.Currency) (domain.Order, error) {
+	f.lastCurrency = currency
+	if len(f.cart) == 0 {
+		return domain.Order{}, domain.ErrEmptyCart
+	}
+	return domain.Order{ID: 1, Status: domain.OrderPending, Currency: currency}, nil
 }
 func (f *fakeStore) ListOrdersByUser(_ context.Context, _ int64) ([]domain.Order, error) {
 	return nil, nil

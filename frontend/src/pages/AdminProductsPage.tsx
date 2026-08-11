@@ -13,13 +13,37 @@ import {
 } from '../api/hooks'
 import type { AdminProduct, NewVariantInput, ProductVariant } from '../api/types'
 import { AdminNav } from '../components/AdminNav'
-import { formatPrice } from '../lib/format'
+import { formatMoney, inputToMinor, minorToInput } from '../lib/format'
+import { CURRENCIES, type Currency } from '../lib/currencies'
+import type { Money } from '../api/types'
 import { ProductContentEditor } from './admin/ProductContentEditor'
 
 // Admins type prices in major units ("1500.00"); the API speaks minor units.
-// The conversion lives at this edge and nowhere else.
-function toMinor(price: string): number {
-  return Math.round(parseFloat(price.replace(',', '.')) * 100)
+// E5 moved the conversion into lib/format, because the SCALE now depends on
+// the currency — a dram field has no decimals, so the old ×100 was wrong for
+// half the boxes on this screen.
+
+// A price box per market. Empty means "no shelf price here" and, for
+// anything but the base currency, is a legitimate choice: it puts the
+// variant back on the converted fallback.
+type PriceDraft = Partial<Record<Currency, string>>
+
+function draftToMoney(draft: PriceDraft): Money {
+  const out: Money = {}
+  for (const c of CURRENCIES) {
+    const typed = draft[c]?.trim()
+    if (typed) out[c] = inputToMinor(typed, c)
+  }
+  return out
+}
+
+function moneyToDraft(prices: Money): PriceDraft {
+  const out: PriceDraft = {}
+  for (const c of CURRENCIES) {
+    const minor = prices[c]
+    if (minor !== undefined) out[c] = minorToInput(minor, c)
+  }
+  return out
 }
 
 export function AdminProductsPage() {
@@ -53,11 +77,11 @@ export function AdminProductsPage() {
 interface VariantDraft {
   sku: string
   label: string
-  price: string // major units as typed; converted on submit
+  prices: PriceDraft // major units as typed, per market; converted on submit
   stock: string
 }
 
-const emptyVariant: VariantDraft = { sku: '', label: '', price: '', stock: '0' }
+const emptyVariant: VariantDraft = { sku: '', label: '', prices: {}, stock: '0' }
 
 function CreateProductForm() {
   const categories = useCategories()
@@ -95,7 +119,7 @@ function CreateProductForm() {
         (v): NewVariantInput => ({
           sku: v.sku,
           label: v.label,
-          price_minor: v.price ? toMinor(v.price) : 0,
+          prices: draftToMoney(v.prices),
           stock_qty: Number(v.stock) || 0,
         }),
       ),
@@ -179,10 +203,20 @@ function CreateProductForm() {
         <p className="text-sm font-medium text-stone-600">Variants</p>
         <FieldError message={fieldErr('variants')} />
         {variants.map((v, i) => (
-          <div key={i} className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-6" key={i}>
             <Input placeholder="SKU" value={v.sku} onChange={(x) => setVariant(i, { sku: x })} error={fieldErr(`variants[${i}].sku`)} />
             <Input placeholder="Label (250 g)" value={v.label} onChange={(x) => setVariant(i, { label: x })} error={fieldErr(`variants[${i}].label`)} />
-            <Input placeholder="Price (1500.00)" value={v.price} onChange={(x) => setVariant(i, { price: x })} error={fieldErr(`variants[${i}].price_minor`)} />
+            {/* One box per market. USD is required; leaving AMD blank is a
+                real choice — it prices the variant by conversion instead. */}
+            {CURRENCIES.map((c) => (
+              <Input
+                key={c}
+                placeholder={`Price ${c}`}
+                value={v.prices[c] ?? ''}
+                onChange={(x) => setVariant(i, { prices: { ...v.prices, [c]: x } })}
+                error={fieldErr(`variants[${i}].prices.${c}`)}
+              />
+            ))}
             <Input placeholder="Stock" value={v.stock} onChange={(x) => setVariant(i, { stock: x })} error={fieldErr(`variants[${i}].stock_qty`)} />
             <button
               type="button"
@@ -296,24 +330,32 @@ function ProductRow({ product }: { product: AdminProduct }) {
 
 function VariantEditor({ variant }: { variant: ProductVariant }) {
   const update = useUpdateVariant()
-  const [price, setPrice] = useState((variant.price_minor / 100).toFixed(2))
+  const [prices, setPrices] = useState<PriceDraft>(() => moneyToDraft(variant.prices))
   const [stock, setStock] = useState(String(variant.stock_qty))
 
+  // Compared as MONEY, not as strings: "14.00" and "14" are the same price,
+  // and a dirty flag that disagreed would leave a save button showing after
+  // a save.
+  const edited = draftToMoney(prices)
   const dirty =
-    toMinor(price) !== variant.price_minor || Number(stock) !== variant.stock_qty
+    CURRENCIES.some((c) => edited[c] !== variant.prices[c]) ||
+    Number(stock) !== variant.stock_qty
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-lg bg-stone-50 px-3 py-2 text-sm">
       <span className="w-24 font-medium text-stone-700">{variant.label}</span>
       <span className="w-28 text-xs text-stone-400">{variant.sku}</span>
-      <label className="flex items-center gap-1">
-        <span className="text-xs text-stone-400">price</span>
-        <input
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          className="w-24 rounded border border-stone-300 px-2 py-1 text-right"
-        />
-      </label>
+      {CURRENCIES.map((c) => (
+        <label key={c} className="flex items-center gap-1">
+          <span className="text-xs text-stone-400">{c}</span>
+          <input
+            value={prices[c] ?? ''}
+            onChange={(e) => setPrices({ ...prices, [c]: e.target.value })}
+            aria-label={`${variant.sku} price in ${c}`}
+            className="w-24 rounded border border-stone-300 px-2 py-1 text-right"
+          />
+        </label>
+      ))}
       <label className="flex items-center gap-1">
         <span className="text-xs text-stone-400">stock</span>
         <input
@@ -327,7 +369,7 @@ function VariantEditor({ variant }: { variant: ProductVariant }) {
           type="button"
           disabled={update.isPending}
           onClick={() =>
-            update.mutate({ id: variant.id, priceMinor: toMinor(price), stockQty: Number(stock) || 0 })
+            update.mutate({ id: variant.id, prices: edited, stockQty: Number(stock) || 0 })
           }
           className="rounded bg-emerald-700 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
         >
@@ -335,7 +377,14 @@ function VariantEditor({ variant }: { variant: ProductVariant }) {
         </button>
       )}
       {!dirty && (
-        <span className="text-xs text-stone-300">{formatPrice(variant.price_minor)}</span>
+        // What the STOREFRONT shows, which for a variant with no shelf price
+        // in a market is the converted figure — so the admin can see at a
+        // glance which numbers they chose and which the rate chose.
+        <span className="text-xs text-stone-300">
+          {CURRENCIES.filter((c) => variant.prices[c] !== undefined)
+            .map((c) => formatMoney(variant.prices[c]!, c))
+            .join(' · ')}
+        </span>
       )}
     </div>
   )

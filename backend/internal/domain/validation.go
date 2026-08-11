@@ -36,6 +36,11 @@ const (
 	ValidationTooLong       = "too_long"
 	ValidationInvalidStatus = "invalid_status"
 
+	// E5. A prices map keyed by a currency the shop does not sell in — the
+	// same class of error as an unsupported locale, and caught the same way,
+	// before the foreign key on variant_prices can turn it into a 500.
+	ValidationUnknownCurrency = "unknown_currency"
+
 	// A translations map keyed by a language the shop does not serve. Caught
 	// here rather than at the database, whose CHECK constraint would answer
 	// with a 500-shaped driver error instead of a field-level 400.

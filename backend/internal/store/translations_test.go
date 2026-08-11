@@ -22,8 +22,13 @@ func seedTranslatable(t *testing.T) *store.Store {
 		SELECT id, 'wildflower-honey', 'Wildflower Honey', 'Raw honey from alpine fields'
 		FROM categories WHERE slug = 'honey';
 
-		INSERT INTO product_variants (product_id, sku, label, price_minor, stock_qty)
-		SELECT id, 'HON-1', '350 g', 520000, 10 FROM products WHERE slug = 'wildflower-honey';
+		WITH variant AS (
+			INSERT INTO product_variants (product_id, sku, label, stock_qty)
+			SELECT id, 'HON-1', '350 g', 10 FROM products WHERE slug = 'wildflower-honey'
+			RETURNING id
+		)
+		INSERT INTO variant_prices (variant_id, currency, price_minor)
+		SELECT id, 'USD', 520000 FROM variant;
 
 		-- English translations, as migration 000007's backfill would create.
 		INSERT INTO category_translations (category_id, locale, name)
@@ -82,7 +87,7 @@ func TestGetProductBySlugTranslates(t *testing.T) {
 	s := seedTranslatable(t)
 	ctx := context.Background()
 
-	ru, err := s.GetProductBySlug(ctx, "wildflower-honey", domain.LocaleRU)
+	ru, err := s.GetProductBySlug(ctx, "wildflower-honey", domain.View{Locale: domain.LocaleRU})
 	if err != nil {
 		t.Fatalf("getting product: %v", err)
 	}
@@ -95,7 +100,7 @@ func TestGetProductBySlugTranslates(t *testing.T) {
 		t.Errorf("slug changed with locale: %q", ru.Slug)
 	}
 
-	hy, err := s.GetProductBySlug(ctx, "wildflower-honey", domain.LocaleHY)
+	hy, err := s.GetProductBySlug(ctx, "wildflower-honey", domain.View{Locale: domain.LocaleHY})
 	if err != nil {
 		t.Fatalf("getting product: %v", err)
 	}

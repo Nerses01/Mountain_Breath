@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useCatalogFacets } from '../../api/hooks'
 import { useLocale } from '../../i18n/useLocale'
 import { Button } from '../ui/Button'
+import { CurrencySwitcher } from '../ui/CurrencySwitcher'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 
 /**
@@ -14,10 +15,10 @@ import { LanguageSwitcher } from '../ui/LanguageSwitcher'
  * measures 4.2:1 against the bark background and fails AA (token block in
  * src/index.css has the table).
  *
- * The language switcher sits in the bottom bar beside the slot E5's currency
- * switcher will take — following the design's own habit of putting
- * locale-shaped controls there ("USD / AMD") rather than inventing a header
- * position the mock gives no guidance for.
+ * The language and currency switchers sit in the bottom bar, where the mock
+ * puts "USD / AMD" — following the design's own habit of keeping
+ * locale-shaped controls there rather than inventing a header position it
+ * gives no guidance for.
  */
 export function SiteFooter() {
   const { t } = useTranslation()
@@ -115,6 +116,7 @@ export function SiteFooter() {
           <div className="flex flex-wrap items-center gap-6">
             <span>{t('footer:legal.terms')}</span>
             <span>{t('footer:legal.privacy')}</span>
+            <CurrencySwitcher />
             <LanguageSwitcher />
           </div>
         </div>

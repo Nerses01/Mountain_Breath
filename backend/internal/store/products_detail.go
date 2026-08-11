@@ -152,8 +152,8 @@ const relatedLimit = 4
 // better signal — "often taken together" is a claim about what the things do,
 // not about which shelf they sit on. Products sharing nothing still appear,
 // last, so the panel is never empty while the shop has other products.
-func (s *Store) ListRelated(ctx context.Context, slug string, locale domain.Locale) ([]domain.Product, error) {
-	curated, err := s.ListCuratedRelated(ctx, slug, locale)
+func (s *Store) ListRelated(ctx context.Context, slug string, view domain.View) ([]domain.Product, error) {
+	curated, err := s.ListCuratedRelated(ctx, slug, view)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +161,7 @@ func (s *Store) ListRelated(ctx context.Context, slug string, locale domain.Loca
 		return curated, nil
 	}
 
-	return s.relatedProducts(ctx, slug, locale, `
+	return s.relatedProducts(ctx, slug, view, `
 		JOIN products src ON src.slug = $1
 		LEFT JOIN LATERAL (
 		    -- How many of this product's benefits the source product also
@@ -184,8 +184,8 @@ func (s *Store) ListRelated(ctx context.Context, slug string, locale domain.Loca
 // it were curated, and saving it would silently freeze a dynamic panel into
 // a static one. Worse, a picker that starts empty for a product that IS
 // curated invites an admin to wipe the curation by saving.
-func (s *Store) ListCuratedRelated(ctx context.Context, slug string, locale domain.Locale) ([]domain.Product, error) {
-	return s.relatedProducts(ctx, slug, locale, `
+func (s *Store) ListCuratedRelated(ctx context.Context, slug string, view domain.View) ([]domain.Product, error) {
+	return s.relatedProducts(ctx, slug, view, `
 		JOIN product_related pr ON pr.related_id = p.id
 		JOIN products src ON src.id = pr.product_id AND src.slug = $1
 		WHERE p.is_active
@@ -195,7 +195,8 @@ func (s *Store) ListCuratedRelated(ctx context.Context, slug string, locale doma
 // relatedProducts runs one of the two strategies above. The `tail` is a
 // compile-time constant supplied by the caller — the same
 // constants-not-user-input rule the catalog queries follow.
-func (s *Store) relatedProducts(ctx context.Context, slug string, locale domain.Locale, tail string) ([]domain.Product, error) {
+func (s *Store) relatedProducts(ctx context.Context, slug string, view domain.View, tail string) ([]domain.Product, error) {
+	locale := view.EffectiveLocale()
 	q := `
 		SELECT p.id, p.category_id, p.slug,
 		       ` + sqlProductName + `,
@@ -236,7 +237,7 @@ func (s *Store) relatedProducts(ctx context.Context, slug string, locale domain.
 	}
 
 	// The card needs a price and a benefit line, exactly like the shop grid.
-	if err := s.attachVariants(ctx, products); err != nil {
+	if err := s.attachVariants(ctx, products, view); err != nil {
 		return nil, err
 	}
 	if err := s.attachBenefits(ctx, products, locale); err != nil {

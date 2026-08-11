@@ -184,6 +184,12 @@ answered earlier than it needs to be.
       `variant_prices` table brought forward. Decide which when E2 starts;
       seeding twice is the cheaper mistake than migrating a live price column.
       *(Decided 2026-08-05.)*
+      **Settled 2026-08-11:** E2 seeded USD against the old column and E5
+      backfilled — the first branch, and the cheap mistake it predicted. The
+      migration moved every price into `variant_prices` and DROPPED
+      `product_variants.price_minor` in the same step rather than keeping a
+      synced copy, which cost one extra piece of work (a price box per market
+      in the admin editor) and bought one source of truth per number.
 - [ ] **3. Content storage.** "Our hive"/"Benefits"/"Journal" as markdown in
       the repo (versioned with the code, zero backend) or DB-backed so the
       family edits without a deploy? E9 recommends markdown for v1. Now a
@@ -1061,38 +1067,100 @@ pricing vs. FX conversion, currencies with different minor units, snapshotting
 rates for auditability.
 
 **Backend:**
-- [ ] Migration: `currencies` (code, symbol, minor_exponent, rounding_step) —
+- [x] Migration: `currencies` (code, symbol, minor_exponent, rounding_step) —
       USD has 2 decimals, AMD is priced in whole drams. The existing
       `formatPrice` assumption that everything is `/100` breaks here.
-- [ ] Migration: `variant_prices` (variant_id, currency, price_minor,
+      *(Plus `symbol_position` and `is_base`. The first because the design
+      writes "$14.00" and "6,700 ֏" — placement belongs to the currency, not
+      to the reader's language, and `Intl` would take it from the display
+      locale. The second because "the currency prices are authored in" is a
+      fact the schema needs: it is enforced by a unique index on a constant,
+      `ON currencies ((TRUE)) WHERE is_base`.)*
+- [x] Migration: `variant_prices` (variant_id, currency, price_minor,
       PK(variant_id, currency)). **Chosen over live FX conversion** because a
       shelf price is a business decision, not a derived number: a shop sets a
       round price per market and holds it, rather than letting a fluctuating
       rate move the price tag between page loads. (The mock's own figures hint
       at the same habit, but they are placeholder — see §1.1 — so they are an
       illustration, not the argument.)
-- [ ] Migration: `fx_rates` (base, quote, rate, as_of) as the *fallback* for a
-      currency with no explicit price, and for reporting.
-- [ ] Currency resolution per request: `?currency=` → cookie → `Accept-Language`
+- [x] Migration: `fx_rates` (base, quote, rate, as_of) as the *fallback* for a
+      currency with no explicit price, and for reporting. A bootstrap row ships
+      with the migration, because without one an added currency would silently
+      hide products rather than fail.
+- [x] Currency resolution per request: `?currency=` → cookie → `Accept-Language`
       → default; validated against the allowed set, never trusted raw.
-- [ ] Orders snapshot `currency` and `fx_rate_used` alongside the existing
-      price snapshots — decision #3's reasoning extended one step.
-- [ ] Migrate `product_variants.price_minor` into `variant_prices` and keep the
-      column until the admin UI is converted, then drop it.
-- [ ] Tests: totals reconcile in each currency; AMD rounds to whole drams; an
+      *One change: step three consumes the ALREADY-RESOLVED locale rather than
+      re-reading the header, so `?lang=hy` and the `mb_locale` cookie steer the
+      market guess too. That makes middleware order load-bearing —
+      `withCurrency` must run after `withLocale`.*
+- [x] Orders snapshot `currency` and `fx_rate_used` alongside the existing
+      price snapshots — decision #3's reasoning extended one step. The rate is
+      NULL for a base-currency order (an explicit "not applicable", not a
+      decorative 1.0) and crosses the wire as a **string**, because
+      `NUMERIC(18,8)` does not survive `JSON.parse`.
+- [x] ~~Migrate `product_variants.price_minor` into `variant_prices` and keep
+      the column until the admin UI is converted, then drop it.~~
+      **Converted the admin UI in the same phase and dropped the column now.**
+      Keeping a synced copy would have been two sources of truth for one
+      number, and they drift the first time somebody updates only one. The cost
+      was paid where the plan expected — the variant editor grew a price box
+      per market — rather than deferred into a phase that would inherit the
+      drift.
+- [x] Tests: totals reconcile in each currency; AMD rounds to whole drams; an
       unknown currency code is rejected, not silently defaulted.
+      *Plus the three the model made necessary: a shelf price beats the rate,
+      the cheapest product differs between markets (so sorting and filtering
+      are per-currency), and checkout REFUSES a market it cannot price rather
+      than charging zero.*
 
 **Frontend:**
-- [ ] `CurrencyProvider` + switcher in the footer bar, persisted in
+- [x] `CurrencyProvider` + switcher in the footer bar, persisted in
       `localStorage` *and* a cookie so the server sees the same choice.
-- [ ] Replace `formatPrice` with `formatMoney(minor, currency)` built on
+- [x] Replace `formatPrice` with `formatMoney(minor, currency)` built on
       `Intl.NumberFormat`, driven by `minor_exponent` — no `/100` anywhere.
-- [ ] `Price` component rendering the primary amount plus the muted secondary,
+      *Not with `style: 'currency'`: that takes symbol placement from the
+      display locale, so a dram price would change shape with the site
+      language. Intl formats the number; the symbol is placed from the
+      currency row.*
+- [x] `Price` component rendering the primary amount plus the muted secondary,
       used by card, product, cart, checkout and order history.
-- [ ] Update the existing `format.test.ts` for the new signature.
+      *Order history excepted, deliberately: an order carries ONE currency and
+      no second price — see the finding below.*
+- [x] Update the existing `format.test.ts` for the new signature.
 
 **Done when:** switching currency changes every price on the site, an order
 records what it was charged in, and no total is ever off by a rounding step.
+✅ Verified in the browser: the shop grid, the buy box and the cart all show a
+primary and a muted secondary; `sort=price_asc` reorders between markets; a
+checkout in drams stamps the order AMD 28,700 with rate 390.00000000, which is
+*not* the $60.00 basket converted (23,400).
+
+**Findings while building:**
+
+- **The currency is not a display concern**, and this is the thing that would
+  have been got wrong by treating it as one. The price slider's bounds, the
+  `price_asc` ordering and `min_price`/`max_price` are all denominated in it,
+  so per-market pricing means the CHEAPEST PRODUCT can differ between markets.
+  A frontend-only currency would have produced a correctly-shaped answer to
+  the wrong question, with nothing failing.
+- **Reads degrade, charges refuse.** A variant with no dram price shows one
+  line instead of two; the same variant at checkout is `ErrPriceUnavailable`
+  → 409. The alternative to failing there is billing someone zero.
+- **A cart is dual, an order is not.** A cart is a live thing that can be read
+  in either market; an order is a record of what was actually charged, and
+  printing a converted alternative beside it invites "but you billed me the
+  other number". This is why `Price` is not used in order history.
+- **"from {{price}}" is a SUFFIX in Armenian** (`{{price}}-ից`), so `Price`
+  takes a formatting callback rather than a prefix string — the message
+  decides where the word goes.
+- **The documented seed command corrupts UTF-8 on this host.** Piping
+  `seed.sql` through PowerShell re-encodes the stream through the console code
+  page: the `×` in "4 × 100 g" double-encoded in dev, and in the local-prod
+  database 46 Armenian characters had been replaced by 46 `?` — irreversibly,
+  in an earlier session, with nothing reporting an error. CLAUDE.md now
+  documents `docker compose cp` + `psql -f`, which moves raw bytes. Found by
+  looking at a rendered page; the third phase running where the defect that
+  mattered was invisible to the test suite.
 
 ---
 

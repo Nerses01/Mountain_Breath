@@ -94,6 +94,6 @@ describe('catalog requests carry the active locale', () => {
     renderHookAt('/ru/products/honey', () => useProduct('honey'))
 
     await waitFor(() => expect(urls.length).toBeGreaterThan(0))
-    expect(urls[0]).toBe('/api/v1/products/honey?lang=ru')
+    expect(urls[0]).toBe('/api/v1/products/honey?lang=ru&currency=USD')
   })
 })

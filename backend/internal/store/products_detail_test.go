@@ -187,7 +187,7 @@ func TestProductImages_AltFollowsLocale(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hy, err := s.GetProductBySlug(ctx, "honey", domain.LocaleHY)
+	hy, err := s.GetProductBySlug(ctx, "honey", domain.View{Locale: domain.LocaleHY})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +197,7 @@ func TestProductImages_AltFollowsLocale(t *testing.T) {
 
 	// Russian was never written, so it falls back to English rather than
 	// leaving a screen reader with nothing to announce.
-	ru, err := s.GetProductBySlug(ctx, "honey", domain.LocaleRU)
+	ru, err := s.GetProductBySlug(ctx, "honey", domain.View{Locale: domain.LocaleRU})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestProductEditorial_ReplacePerLocaleAndListFallback(t *testing.T) {
 		t.Fatalf("SaveProductEditorial: %v", err)
 	}
 
-	en, err := s.GetProductBySlug(ctx, "honey", domain.LocaleEN)
+	en, err := s.GetProductBySlug(ctx, "honey", domain.View{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +241,7 @@ func TestProductEditorial_ReplacePerLocaleAndListFallback(t *testing.T) {
 		t.Errorf("English highlights = %+v", en.Highlights)
 	}
 
-	hy, err := s.GetProductBySlug(ctx, "honey", domain.LocaleHY)
+	hy, err := s.GetProductBySlug(ctx, "honey", domain.View{Locale: domain.LocaleHY})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +262,7 @@ func TestProductEditorial_ReplacePerLocaleAndListFallback(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	en, err = s.GetProductBySlug(ctx, "honey", domain.LocaleEN)
+	en, err = s.GetProductBySlug(ctx, "honey", domain.View{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +270,7 @@ func TestProductEditorial_ReplacePerLocaleAndListFallback(t *testing.T) {
 		t.Errorf("after shortening: %+v — replace, not merge", en.Highlights)
 	}
 	// ...and the untouched locale is untouched.
-	hy, _ = s.GetProductBySlug(ctx, "honey", domain.LocaleHY)
+	hy, _ = s.GetProductBySlug(ctx, "honey", domain.View{Locale: domain.LocaleHY})
 	if len(hy.Highlights) != 2 {
 		t.Errorf("editing English changed the Armenian list: %+v", hy.Highlights)
 	}
@@ -291,7 +291,7 @@ func TestListRelated_CuratedBeatsFallback(t *testing.T) {
 	// With nothing curated, the fallback ranks by SHARED BENEFITS then
 	// popularity. jelly is energy+skin; honey shares energy (sales 100),
 	// pollen shares energy (70), wax shares skin (10).
-	got, err := s.ListRelated(ctx, "jelly", domain.LocaleEN)
+	got, err := s.ListRelated(ctx, "jelly", domain.View{})
 	if err != nil {
 		t.Fatalf("ListRelated: %v", err)
 	}
@@ -311,7 +311,7 @@ func TestListRelated_CuratedBeatsFallback(t *testing.T) {
 	if err := s.SaveProductRelated(ctx, jelly, []int64{wax}); err != nil {
 		t.Fatalf("SaveProductRelated: %v", err)
 	}
-	got, err = s.ListRelated(ctx, "jelly", domain.LocaleEN)
+	got, err = s.ListRelated(ctx, "jelly", domain.View{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,7 +344,7 @@ func TestSaveProductRelated_DropsSelfReferences(t *testing.T) {
 		t.Fatalf("SaveProductRelated: %v", err)
 	}
 
-	got, err := s.ListRelated(ctx, "jelly", domain.LocaleEN)
+	got, err := s.ListRelated(ctx, "jelly", domain.View{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,7 +388,7 @@ func TestListProducts_LeavesEditorialEmpty(t *testing.T) {
 	}
 
 	// ...while the detail read does load it.
-	detail, err := s.GetProductBySlug(ctx, "honey", domain.LocaleEN)
+	detail, err := s.GetProductBySlug(ctx, "honey", domain.View{})
 	if err != nil {
 		t.Fatal(err)
 	}

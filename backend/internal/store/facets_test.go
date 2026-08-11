@@ -44,18 +44,27 @@ func seedHive(t *testing.T) {
 		t.Fatalf("seeding products: %v", err)
 	}
 
+	// E5 split "a variant" from "a variant's price", so seeding one now means
+	// writing two tables. A data-modifying CTE keeps the tuples in ONE place:
+	// the leading `v` names them, `inserted` writes the variants and hands
+	// back the generated ids with RETURNING, and the final statement joins
+	// the two back together on SKU.
 	if _, err := testPool.Exec(ctx, `
-		INSERT INTO product_variants (product_id, sku, label, price_minor, stock_qty)
-		SELECT p.id, v.sku, v.label, v.price, 10
-		FROM (VALUES
-		    ('honey',  'HON-500', '500 g', 1400),
+		WITH v(product_slug, sku, label, price) AS (VALUES
+		    ('honey',  'HON-500', '500 g', 1400::bigint),
 		    ('honey',  'HON-1K',  '1 kg',  2600),
 		    ('wax',    'WAX-400', '400 g',  900),
 		    ('jelly',  'RJL-25',  '25 g',  3200),
 		    ('jelly',  'RJL-50',  '50 g',  5800),
 		    ('pollen', 'POL-250', '250 g', 1600)
-		) AS v(product_slug, sku, label, price)
-		JOIN products p ON p.slug = v.product_slug`); err != nil {
+		), inserted AS (
+		    INSERT INTO product_variants (product_id, sku, label, stock_qty)
+		    SELECT p.id, v.sku, v.label, 10
+		    FROM v JOIN products p ON p.slug = v.product_slug
+		    RETURNING id, sku
+		)
+		INSERT INTO variant_prices (variant_id, currency, price_minor)
+		SELECT i.id, 'USD', v.price FROM inserted i JOIN v ON v.sku = i.sku`); err != nil {
 		t.Fatalf("seeding variants: %v", err)
 	}
 
@@ -331,7 +340,7 @@ func TestListProducts_AttachesBadgeAndBenefits(t *testing.T) {
 	}
 
 	// A product with no badge reads as empty, not as a scan error on NULL.
-	pollen, err := s.GetProductBySlug(ctx, "pollen", domain.LocaleEN)
+	pollen, err := s.GetProductBySlug(ctx, "pollen", domain.View{})
 	if err != nil {
 		t.Fatalf("GetProductBySlug: %v", err)
 	}
@@ -386,7 +395,7 @@ func TestListProducts_CarriesResolvedCategory(t *testing.T) {
 	}
 
 	// Detail reads take the same path.
-	detail, err := s.GetProductBySlug(ctx, "honey", domain.LocaleRU)
+	detail, err := s.GetProductBySlug(ctx, "honey", domain.View{Locale: domain.LocaleRU})
 	if err != nil {
 		t.Fatal(err)
 	}

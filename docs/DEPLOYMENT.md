@@ -120,7 +120,13 @@ Open `https://shop.example.com` — certificate and redirect are automatic
 (Caddy). Then seed the catalog and create your admin:
 
 ```bash
-cat backend/seed/seed.sql | docker compose -f deploy/docker-compose.prod.yml exec -T postgres psql -U mb -d mountain_breath
+# COPY the file in; do not pipe it. Piping runs the stream through the shell's
+# encoding — on a Windows host that silently mangles every non-ASCII byte, so
+# the Armenian and Russian translations land as mojibake or as literal '?'.
+# Nothing errors: the result is valid UTF-8, just wrong. `cp` moves raw bytes.
+docker compose -f deploy/docker-compose.prod.yml cp backend/seed/seed.sql postgres:/tmp/seed.sql
+docker compose -f deploy/docker-compose.prod.yml exec -T postgres \
+  psql -U mb -d mountain_breath -v ON_ERROR_STOP=1 -f /tmp/seed.sql
 # register your account through the website UI first, then:
 docker compose -f deploy/docker-compose.prod.yml exec postgres \
   psql -U mb -d mountain_breath -c "UPDATE users SET role='admin' WHERE email='you@example.com';"

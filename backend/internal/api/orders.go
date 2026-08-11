@@ -26,6 +26,17 @@ type orderResponse struct {
 	CreatedAt  time.Time           `json:"created_at"`
 	UserEmail  string              `json:"user_email,omitempty"` // admin view only
 	Items      []orderItemResponse `json:"items"`
+
+	// An order carries ONE currency and no second price, which is the
+	// deliberate difference from every other money-bearing response in this
+	// API. A cart can be read in either market; an order is a record of what
+	// was actually charged, and showing a converted alternative next to it
+	// would invite "but you charged me the other number".
+	Currency domain.Currency `json:"currency"`
+	// A decimal as a STRING (see domain.Order.FxRateUsed): JSON numbers are
+	// doubles in every mainstream parser, and this one is NUMERIC(18,8).
+	// Omitted entirely for a base-currency order, where no rate applied.
+	FxRateUsed *string `json:"fx_rate_used,omitempty"`
 }
 
 func toOrderResponse(o domain.Order) orderResponse {
@@ -38,6 +49,7 @@ func toOrderResponse(o domain.Order) orderResponse {
 	return orderResponse{
 		ID: o.ID, Status: o.Status, TotalMinor: o.TotalMinor,
 		CreatedAt: o.CreatedAt, UserEmail: o.UserEmail, Items: items,
+		Currency: o.Currency, FxRateUsed: o.FxRateUsed,
 	}
 }
 
@@ -45,7 +57,11 @@ func toOrderResponse(o domain.Order) orderResponse {
 func (s *Server) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 	user, _ := userFrom(r.Context())
 
-	order, err := s.store.CreateOrder(r.Context(), user.ID)
+	// The currency comes from the EDGE, never from the request body. A client
+	// that could name what it pays in could name the cheaper of two markets
+	// for a basket priced in the dearer one — the same reason E6 will make
+	// the server own every number on the checkout screen.
+	order, err := s.store.CreateOrder(r.Context(), user.ID, currencyFromContext(r.Context()))
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrEmptyCart):
@@ -53,6 +69,11 @@ func (s *Server) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, domain.ErrInsufficientStock):
 			// err carries the product name; safe and useful for the customer
 			s.respondError(w, http.StatusConflict, "insufficient_stock", err.Error())
+		case errors.Is(err, domain.ErrPriceUnavailable):
+			// 409, not 500: the shop is misconfigured for this market, not
+			// broken. The message names the product so the customer can drop
+			// it or switch currency, and so the family can fix the price.
+			s.respondError(w, http.StatusConflict, "price_unavailable", err.Error())
 		default:
 			s.log.Error("creating order", "error", err)
 			s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")

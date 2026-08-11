@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useProducts } from '../../api/hooks'
 import { useLocale } from '../../i18n/useLocale'
 import { useDebouncedValue } from '../../lib/useDebounce'
-import { formatMoney } from '../../lib/format'
+import { Price } from '../ui/Price'
 import { SearchIcon } from '../ui'
 
 /**
@@ -118,7 +118,13 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
                       {p.name}
                     </span>
                     <span className="shrink-0 text-sm text-ink-muted">
-                      {p.variants[0] && formatMoney(p.variants[0].price_minor)}
+                      {p.variants[0] && (
+                        <Price
+                          prices={p.variants[0].prices}
+                          primaryMinor={p.variants[0].price_minor}
+                          size="sm"
+                        />
+                      )}
                     </span>
                   </Link>
                 </li>

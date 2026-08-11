@@ -12,11 +12,26 @@ import (
 )
 
 type variantResponse struct {
-	ID         int64  `json:"id"`
-	SKU        string `json:"sku"`
-	Label      string `json:"label"`
-	PriceMinor int64  `json:"price_minor"`
-	StockQty   int    `json:"stock_qty"`
+	ID    int64  `json:"id"`
+	SKU   string `json:"sku"`
+	Label string `json:"label"`
+
+	// PriceMinor is the price in the currency this request resolved to, in
+	// THAT currency's minor units — so 1400 is $14.00 and 5460 is 5,460 ֏.
+	// A client that divides by 100 is now wrong half the time; see
+	// frontend/src/lib/currencies.ts.
+	//
+	// Kept alongside Prices rather than replaced by it because it names the
+	// one number the rest of the page computes with (line totals, the
+	// "from" price, the sort the server already applied). Prices is for
+	// DISPLAY — the design's muted second line.
+	PriceMinor int64 `json:"price_minor"`
+	// Prices is the same variant in every market the shop serves, keyed by
+	// ISO code. Not derived from PriceMinor by a rate: per-market prices are
+	// set independently, which is the whole point of variant_prices.
+	Prices map[domain.Currency]int64 `json:"prices"`
+
+	StockQty int `json:"stock_qty"`
 }
 
 // benefitResponse is one "Good for" chip. Slug travels alongside name
@@ -56,6 +71,12 @@ type productResponse struct {
 	BadgeTone string `json:"badge_tone"`
 
 	Benefits []benefitResponse `json:"benefits"`
+
+	// Currency names what price_minor is denominated in — on the PRODUCT and
+	// not only on the envelope, so a card that has been passed around a
+	// component tree still knows how to render itself. Cheap: one three-byte
+	// string per product.
+	Currency domain.Currency `json:"currency"`
 
 	// products.sales_count is deliberately NOT here. It orders the list
 	// server-side, and that is all a shopper needs from it — publishing it
@@ -109,7 +130,7 @@ type productDetailResponse struct {
 	CanReview bool `json:"can_review"`
 }
 
-func toProductDetailResponse(p domain.Product) productDetailResponse {
+func toProductDetailResponse(p domain.Product, currency domain.Currency) productDetailResponse {
 	images := make([]imageResponse, 0, len(p.Images))
 	for _, img := range p.Images {
 		images = append(images, imageResponse{
@@ -126,7 +147,7 @@ func toProductDetailResponse(p domain.Product) productDetailResponse {
 	}
 
 	return productDetailResponse{
-		productResponse: toProductResponse(p),
+		productResponse: toProductResponse(p, currency),
 		Images:          images,
 		Highlights:      highlights,
 		UsageCards:      cards,
@@ -149,12 +170,12 @@ type paginated[T any] struct {
 	Total   int `json:"total"`
 }
 
-func toProductResponse(p domain.Product) productResponse {
+func toProductResponse(p domain.Product, currency domain.Currency) productResponse {
 	variants := make([]variantResponse, 0, len(p.Variants))
 	for _, v := range p.Variants {
 		variants = append(variants, variantResponse{
 			ID: v.ID, SKU: v.SKU, Label: v.Label,
-			PriceMinor: v.PriceMinor, StockQty: v.StockQty,
+			PriceMinor: v.PriceMinor, Prices: v.Prices, StockQty: v.StockQty,
 		})
 	}
 	benefits := make([]benefitResponse, 0, len(p.Benefits))
@@ -168,6 +189,7 @@ func toProductResponse(p domain.Product) productResponse {
 		CategorySlug: p.CategorySlug, CategoryName: p.CategoryName,
 		RatingAvg: p.Rating.Average, RatingCount: p.Rating.Count,
 		Badge: p.Badge, BadgeTone: p.BadgeTone, Benefits: benefits,
+		Currency: currency,
 	}
 }
 
@@ -187,6 +209,10 @@ func productFilterFromQuery(r *http.Request) domain.ProductFilter {
 		CategorySlug: q.Get("category"),
 		Search:       q.Get("q"),
 		Locale:       localeFromContext(r.Context()),
+		// The price bounds below are in THIS currency's minor units, which
+		// is why it has to be parsed before them: ?max_price=2000 means $20
+		// in one market and 2,000 ֏ in another.
+		Currency: currencyFromContext(r.Context()),
 		// Repeated params, not a comma-separated list: ?benefit=energy&
 		// benefit=skin. url.Values is already a map to a SLICE, so this is
 		// what the standard library hands us for free, and it needs no
@@ -231,7 +257,7 @@ func (s *Server) handleListProducts(w http.ResponseWriter, r *http.Request) {
 
 	items := make([]productResponse, 0, len(products))
 	for _, p := range products {
-		items = append(items, toProductResponse(p))
+		items = append(items, toProductResponse(p, filter.EffectiveCurrency()))
 	}
 	s.respondJSON(w, http.StatusOK, paginated[productResponse]{
 		Items: items, Page: filter.Page, PerPage: filter.PerPage, Total: total,
@@ -241,7 +267,8 @@ func (s *Server) handleListProducts(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetProduct(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 
-	p, err := s.store.GetProductBySlug(r.Context(), slug, localeFromContext(r.Context()))
+	view := viewFromContext(r.Context())
+	p, err := s.store.GetProductBySlug(r.Context(), slug, view)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			s.respondError(w, http.StatusNotFound, "not_found", "no such product")
@@ -265,7 +292,7 @@ func (s *Server) handleGetProduct(w http.ResponseWriter, r *http.Request) {
 		p.CanReview = can
 	}
 
-	s.respondJSON(w, http.StatusOK, toProductDetailResponse(p))
+	s.respondJSON(w, http.StatusOK, toProductDetailResponse(p, view.EffectiveCurrency()))
 }
 
 // GET /products/{slug}/related — "Often taken together".
@@ -276,7 +303,7 @@ func (s *Server) handleGetProduct(w http.ResponseWriter, r *http.Request) {
 // lets the frontend cache the two under different keys.
 func (s *Server) handleRelatedProducts(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
-	locale := localeFromContext(r.Context())
+	view := viewFromContext(r.Context())
 
 	// ?curated=true asks ONLY for what the admin curated, with no computed
 	// fallback. The admin's picker needs that distinction and the storefront
@@ -288,9 +315,9 @@ func (s *Server) handleRelatedProducts(w http.ResponseWriter, r *http.Request) {
 		err      error
 	)
 	if r.URL.Query().Get("curated") == "true" {
-		products, err = s.store.ListCuratedRelated(r.Context(), slug, locale)
+		products, err = s.store.ListCuratedRelated(r.Context(), slug, view)
 	} else {
-		products, err = s.store.ListRelated(r.Context(), slug, locale)
+		products, err = s.store.ListRelated(r.Context(), slug, view)
 	}
 	if err != nil {
 		s.log.Error("listing related products", "slug", slug, "error", err)
@@ -302,7 +329,7 @@ func (s *Server) handleRelatedProducts(w http.ResponseWriter, r *http.Request) {
 	// page, and the page itself already 404s if the product is missing.
 	items := make([]productResponse, 0, len(products))
 	for _, p := range products {
-		items = append(items, toProductResponse(p))
+		items = append(items, toProductResponse(p, view.EffectiveCurrency()))
 	}
 	s.respondJSON(w, http.StatusOK, items)
 }

@@ -2,6 +2,19 @@
 // fields, exactly as JSON arrives). If the backend contract changes, change
 // it here too — the compiler then points at every affected component.
 
+import type { Currency } from '../lib/currencies'
+
+/**
+ * An amount in every market the shop could price it in — the wire shape of
+ * Go's domain.Money.
+ *
+ * Partial, and that is load-bearing: a variant priced only in dollars, with
+ * no exchange rate on file, arrives with one entry. Anything reading a
+ * currency out of this must cope with `undefined`, which is exactly the
+ * discipline a plain `Record<Currency, number>` would remove.
+ */
+export type Money = Partial<Record<Currency, number>>
+
 export interface Category {
   id: number
   slug: string
@@ -14,8 +27,15 @@ export interface ProductVariant {
   id: number
   sku: string
   label: string
-  price_minor: number
   stock_qty: number
+  /**
+   * The price in the response's `currency`, in THAT currency's minor units —
+   * 1400 is $14.00 but 6700 is 6,700 ֏. Nothing may divide this by 100; use
+   * formatMoney, which takes the scale from the currency.
+   */
+  price_minor: number
+  /** The same variant in every market, for the design's muted second line. */
+  prices: Money
 }
 
 // Badge keys the backend's CHECK constraint allows (migration 000009). A
@@ -57,6 +77,8 @@ export interface Product {
   badge: BadgeKey | ''
   badge_tone: 'honey' | 'dark' | 'outline'
   benefits: Benefit[]
+  /** What every variant's `price_minor` on this product is denominated in. */
+  currency: Currency
 }
 
 // --- Reviews (E4) -------------------------------------------------------
@@ -188,15 +210,26 @@ export interface CartItem {
   product_name: string
   product_slug: string
   label: string
-  price_minor: number
   stock_qty: number
   qty: number
+  /** Both denominated in the cart's `currency`. */
+  price_minor: number
   line_total_minor: number
+  /** The same line in every market. */
+  prices: Money
+  line_totals: Money
 }
 
 export interface Cart {
   items: CartItem[]
+  currency: Currency
   total_minor: number
+  /**
+   * The basket summed independently in each market — never converted from
+   * one to another, because rounding a sum is not the sum of roundings.
+   * A market any line cannot be priced in is absent rather than understated.
+   */
+  totals: Money
 }
 
 export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
@@ -215,6 +248,19 @@ export interface Order {
   created_at: string
   user_email?: string // present in admin responses only
   items: OrderItem[]
+  /**
+   * What the customer was actually charged in. An order carries ONE currency
+   * and no second price — unlike a cart, which is a live thing that can be
+   * read in either market. Showing a converted alternative beside a charge
+   * invites "but you billed me the other number".
+   */
+  currency: Currency
+  /**
+   * The base→order-currency rate at checkout, as an exact decimal STRING
+   * (NUMERIC(18,8) server-side; JSON numbers are doubles). Absent for a
+   * base-currency order, where no rate applied.
+   */
+  fx_rate_used?: string
 }
 
 // Admin shapes: the public product plus admin-only fields.
@@ -225,7 +271,12 @@ export interface AdminProduct extends Product {
 export interface NewVariantInput {
   sku: string
   label: string
-  price_minor: number
+  /**
+   * One price per market. The base currency (USD) is required; any other is
+   * optional and falls back to a converted price. Replaced the scalar
+   * price_minor in E5.
+   */
+  prices: Money
   stock_qty: number
 }
 

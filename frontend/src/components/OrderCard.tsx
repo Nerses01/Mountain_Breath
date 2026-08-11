@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import type { Order, OrderStatus } from '../api/types'
-import { formatPrice } from '../lib/format'
+import { formatMoney } from '../lib/format'
 
 const statusStyles: Record<OrderStatus, string> = {
   pending: 'bg-amber-100 text-amber-800',
@@ -40,14 +40,21 @@ export function OrderCard({ order, children }: { order: Order; children?: React.
             <span className="text-stone-600">
               {it.qty} × {it.name} <span className="text-stone-400">({it.label})</span>
             </span>
-            <span className="text-stone-700">{formatPrice(it.price_minor * it.qty)}</span>
+            {/* The ORDER's currency, not the shopper's current one: an order
+                is a record of what was charged, and switching the footer
+                switcher must not re-denominate a receipt. */}
+            <span className="text-stone-700">
+              {formatMoney(it.price_minor * it.qty, order.currency)}
+            </span>
           </li>
         ))}
       </ul>
 
       <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-3">
         <span className="text-sm text-stone-500">Total</span>
-        <span className="font-bold text-stone-800">{formatPrice(order.total_minor)}</span>
+        <span className="font-bold text-stone-800">
+          {formatMoney(order.total_minor, order.currency)}
+        </span>
       </div>
 
       {children}
