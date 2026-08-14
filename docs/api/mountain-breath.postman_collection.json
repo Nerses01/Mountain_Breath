@@ -40,6 +40,10 @@
       "key": "pendingReviewId",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "lastOrderId",
+      "value": ""
     }
   ],
   "item": [
@@ -2718,7 +2722,7 @@
                 "cart"
               ]
             },
-            "description": "The logged-in user's cart with live prices/stock and computed totals. 401 anonymous.\n\nSince E5 it also carries `currency` (what `total_minor` and every `price_minor` are denominated in) and `totals`, the basket summed INDEPENDENTLY in each market. Nothing here is converted: a market that any single line cannot be priced in is absent from `totals` rather than being understated."
+            "description": "The logged-in user's cart with live prices/stock and computed totals. 401 anonymous.\n\nSince E5 it also carries `currency` (what `total_minor` and every `price_minor` are denominated in) and `totals`, the basket summed INDEPENDENTLY in each market. Nothing here is converted: a market that any single line cannot be priced in is absent from `totals` rather than being understated.\n\nE6: the response now QUOTES the checkout — `subtotal_minor`, `shipping_minor` (with `has_cold_chain` naming the chilled surcharge when it applies) and `total_minor` = subtotal + shipping, plus the per-market `subtotals`/`shipping`/`totals` maps. The quote uses the same domain arithmetic CreateOrder charges with, so the number the customer reads is the number the shop honours."
           },
           "event": [
             {
@@ -2730,11 +2734,10 @@
                   "    pm.response.to.have.status(200);",
                   "});",
                   "",
-                  "pm.test(\"has items, a currency and per-market totals\", () => {",
+                  "pm.test(\"the quote balances\", () => {",
                   "    const body = pm.response.json();",
                   "    pm.expect(body.items).to.be.an(\"array\");",
-                  "    pm.expect(body.total_minor).to.be.a(\"number\");",
-                  "    pm.expect(body.currency).to.be.a(\"string\");",
+                  "    pm.expect(body.subtotal_minor + body.shipping_minor).to.eql(body.total_minor);",
                   "    pm.expect(body.totals).to.be.an(\"object\");",
                   "});"
                 ]
@@ -2831,7 +2834,12 @@
           "name": "Checkout (create order)",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
               "raw": "{{apiV1}}/orders",
               "host": [
@@ -2841,7 +2849,16 @@
                 "orders"
               ]
             },
-            "description": "Turns the cart into an order atomically: stock validated under row locks, decremented, prices snapshotted, cart cleared. 409 empty_cart / insufficient_stock. NOTE: run 'Set cart item' first so the cart is not empty.\n\nE5: the order is stamped with the currency the REQUEST resolved to (?currency= > mb_currency cookie > Accept-Language > USD) and with the fx rate on file at that moment. The client never names the currency in the body — a client that could would name the cheaper of two markets for a basket priced in the dearer one. `fx_rate_used` is an exact decimal STRING, and absent entirely for a USD order."
+            "description": "Turns the current cart into an order — one transaction, ordered row locks, oversell-proof (Phase 5), stamped with the request-resolved currency (E5).\n\nE6: the request grew a BODY — the customer's choices, and deliberately nothing else. There is no money in it: the server computes subtotal (locked shelf prices), shipping (shipping_rates for the order currency, cold-chain surcharge if any chilled item), the contained VAT and the total. A body that smuggles \"total_minor\" is refused with 400 invalid_json before any handler code runs (DisallowUnknownFields). Card numbers are also never accepted — the provider integration is Phase 11, and card data belongs on the provider's servers.\n\nThe address is snapshotted onto the order (flat columns, no FK) and upserted into the customer's address book in the same transaction, so the next checkout pre-fills.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"address\": {\n        \"first_name\": \"Anahit\",\n        \"last_name\": \"Sargsyan\",\n        \"phone\": \"+374 91 000000\",\n        \"street\": \"14 Abovyan St, apt 6\",\n        \"city\": \"Yerevan\",\n        \"postal_code\": \"0009\",\n        \"country\": \"AM\"\n    },\n    \"payment_method\": \"bank_transfer\",\n    \"delivery_note\": \"Ring twice\",\n    \"leave_with_neighbour\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           },
           "event": [
             {
@@ -2849,15 +2866,22 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"status is 201 or 409 (empty cart)\", () => {",
+                  "pm.test(\"status is 201 (or 409 on an empty cart)\", () => {",
                   "    pm.expect([201, 409]).to.include(pm.response.code);",
                   "});",
                   "",
                   "if (pm.response.code === 201) {",
-                  "    pm.test(\"order is pending with items\", () => {",
-                  "        const body = pm.response.json();",
-                  "        pm.expect(body.status).to.eql(\"pending\");",
-                  "        pm.expect(body.items.length).to.be.above(0);",
+                  "    const order = pm.response.json();",
+                  "    pm.collectionVariables.set(\"lastOrderId\", order.id);",
+                  "    pm.test(\"the five figures balance\", () => {",
+                  "        pm.expect(order.subtotal_minor + order.shipping_minor - order.discount_minor)",
+                  "            .to.eql(order.total_minor);",
+                  "        pm.expect(order.tax_minor).to.be.at.most(order.subtotal_minor);",
+                  "    });",
+                  "    pm.test(\"address snapshot and payment recorded\", () => {",
+                  "        pm.expect(order.ship_to.city).to.eql(\"Yerevan\");",
+                  "        pm.expect(order.payment_method).to.eql(\"bank_transfer\");",
+                  "        pm.expect(order.payment_status).to.eql(\"unpaid\");",
                   "    });",
                   "}"
                 ]
@@ -3316,6 +3340,230 @@
         }
       ],
       "description": "Every price in the design is shown in two currencies, and an order is charged in exactly one of them.\n\nThe model: a price is not a property of a product, it is a property of a (product, market) pair. `variant_prices` holds one row per pair; `fx_rates` is only the FALLBACK for a market the shop has not priced by hand, plus the record that keeps an old order reportable. Totals are summed independently in each market and never converted, because rounding a sum is not the sum of roundings."
+    },
+    {
+      "name": "Checkout (Phase E6)",
+      "item": [
+        {
+          "name": "Get order by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/orders/{{lastOrderId}}",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "orders",
+                "{{lastOrderId}}"
+              ]
+            },
+            "description": "The confirmation page's read — run 'Checkout (create order)' first, which saves the id. Owner or admin only; anyone else gets 404, deliberately NOT 403: an order is private data, and a 403 would confirm to an id-enumerator that the order exists and is somebody's. (Compare E4, where a non-purchaser reviewing a PUBLIC product rightly gets 403 — the resource there is public and only the action is denied.)"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const order = pm.response.json();",
+                  "pm.test(\"carries the frozen snapshot\", () => {",
+                  "    pm.expect(order.ship_to).to.be.an(\"object\");",
+                  "    pm.expect(order.currency).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Saved address for pre-filling",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/account/address",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "account",
+                "address"
+              ]
+            },
+            "description": "The default address the last checkout saved. 404 for a first-time customer, which the form renders as EMPTY, not as an error. Note the two lifetimes: this row follows the customer's edits; the copy on each order does not."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200 or 404 (first-time customer)\", () => {",
+                  "    pm.expect([200, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A smuggled total is refused (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/orders",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "description": "THE test of the phase's security design: the client never sends money. The request shape has no money field, and DisallowUnknownFields turns a body that tries into a 400 before any handler code runs — the total is not ignored, the request is refused.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"address\": {\n        \"first_name\": \"Anahit\",\n        \"last_name\": \"Sargsyan\",\n        \"phone\": \"+374 91 000000\",\n        \"street\": \"14 Abovyan St, apt 6\",\n        \"city\": \"Yerevan\",\n        \"postal_code\": \"0009\",\n        \"country\": \"AM\"\n    },\n    \"payment_method\": \"bank_transfer\",\n    \"delivery_note\": \"Ring twice\",\n    \"leave_with_neighbour\": true,\n    \"total_minor\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test(\"refused as unknown JSON\", () => {",
+                  "    pm.expect(pm.response.json().error.code).to.eql(\"invalid_json\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Missing address fields come back at once (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/orders",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "description": "Every gap in ONE response, keyed by the JSON path the form posts (`address.postal_code`) so the React form attaches each message to its input — the same convention as `variants[0].sku` since Phase 6.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"address\": {\"first_name\": \"A\"},\n    \"payment_method\": \"card\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test(\"field keys are JSON paths\", () => {",
+                  "    const fields = pm.response.json().error.fields;",
+                  "    pm.expect(fields).to.have.property(\"address.last_name\");",
+                  "    pm.expect(fields).to.have.property(\"address.street\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cash on delivery in dollars (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/orders?currency=USD",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "currency",
+                  "value": "USD"
+                }
+              ]
+            },
+            "description": "The design's own words made a rule: \"Cash — on delivery, AMD only\". A courier collecting dollars in Yerevan is not a thing, so the domain rejects the pairing as a field error the client can FIX (switch currency, or pick another method). E5 made the rule expressible by giving every order a currency.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"address\": {\n        \"first_name\": \"Anahit\",\n        \"last_name\": \"Sargsyan\",\n        \"phone\": \"+374 91 000000\",\n        \"street\": \"14 Abovyan St, apt 6\",\n        \"city\": \"Yerevan\",\n        \"postal_code\": \"0009\",\n        \"country\": \"AM\"\n    },\n    \"payment_method\": \"cash_on_delivery\",\n    \"delivery_note\": \"Ring twice\",\n    \"leave_with_neighbour\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test(\"names the fixable rule\", () => {",
+                  "    pm.expect(pm.response.json().error.fields.payment_method)",
+                  "        .to.eql(\"cash_is_amd_only\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Screen 05: a checkout that collects an address and produces an itemised order.\n\nThe model in one paragraph: the client sends CHOICES (address, payment method, note); the server computes every figure — subtotal from locked shelf prices, shipping from per-currency rate rows (base waived over the free threshold, the cold-chain surcharge never), VAT contained in the subtotal per \"Prices include VAT\", and a CHECK constraint holding subtotal + shipping − discount = total on every row, forever. The address is snapshotted onto the order exactly as prices are: an order is a closed record, and nothing the customer later edits may reach into it."
     }
   ]
 }

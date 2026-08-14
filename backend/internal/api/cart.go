@@ -28,14 +28,30 @@ type cartItemResponse struct {
 }
 
 type cartResponse struct {
-	Items      []cartItemResponse `json:"items"`
-	Currency   domain.Currency    `json:"currency"`
-	TotalMinor int64              `json:"total_minor"`
-	// Totals is the basket summed INDEPENDENTLY in each market, never
-	// converted from one to another — see domain.Money.AddTo for why that
-	// distinction is the whole point. A market that any line cannot be
-	// priced in is absent rather than understated.
-	Totals map[domain.Currency]int64 `json:"totals"`
+	Items    []cartItemResponse `json:"items"`
+	Currency domain.Currency    `json:"currency"`
+
+	// E6 renamed the MEANING of total_minor: it is now subtotal + shipping,
+	// because that is what "Total" on the design's summary card says, and a
+	// client rendering "Total" next to a number that silently omitted
+	// shipping would be lying one screen before checkout told the truth.
+	// subtotal_minor is the old sum-of-lines.
+	SubtotalMinor int64 `json:"subtotal_minor"`
+	ShippingMinor int64 `json:"shipping_minor"`
+	TotalMinor    int64 `json:"total_minor"`
+
+	// True when any line is a chilled product — the flag behind the
+	// "Chilled shipping" label, so the client names the fee correctly
+	// without re-deriving the rule.
+	HasColdChain bool `json:"has_cold_chain"`
+
+	// The same three figures in every market, summed INDEPENDENTLY, never
+	// converted — see domain.Money.AddTo for why that distinction is the
+	// whole point. A market any line cannot be priced in is absent rather
+	// than understated.
+	Subtotals map[domain.Currency]int64 `json:"subtotals"`
+	Shipping  map[domain.Currency]int64 `json:"shipping"`
+	Totals    map[domain.Currency]int64 `json:"totals"`
 }
 
 type setCartItemRequest struct {
@@ -43,7 +59,9 @@ type setCartItemRequest struct {
 	Qty       int   `json:"qty"`
 }
 
-func toCartResponse(items []domain.CartItem, currency domain.Currency) cartResponse {
+func toCartResponse(items []domain.CartItem, currency domain.Currency,
+	rates map[domain.Currency]domain.ShippingRate) cartResponse {
+
 	resp := cartResponse{
 		Items:    make([]cartItemResponse, 0, len(items)),
 		Currency: currency,
@@ -62,8 +80,18 @@ func toCartResponse(items []domain.CartItem, currency domain.Currency) cartRespo
 			LineTotals:     it.LineTotals(),
 		})
 	}
-	resp.TotalMinor = domain.CartTotalMinor(items)
-	resp.Totals = domain.CartTotals(items)
+
+	// One arithmetic for the number the customer reads and the number the
+	// checkout will charge: QuoteCart here, ComputeTotals in CreateOrder,
+	// both built on the same ShippingFor.
+	quote := domain.QuoteCart(items, rates)
+	resp.HasColdChain = quote.HasColdChain
+	resp.Subtotals = quote.SubtotalMinor
+	resp.Shipping = quote.ShippingMinor
+	resp.Totals = quote.TotalMinor
+	resp.SubtotalMinor = quote.SubtotalMinor[currency]
+	resp.ShippingMinor = quote.ShippingMinor[currency]
+	resp.TotalMinor = quote.TotalMinor[currency]
 	return resp
 }
 
@@ -77,7 +105,13 @@ func (s *Server) handleGetCart(w http.ResponseWriter, r *http.Request) {
 		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 		return
 	}
-	s.respondJSON(w, http.StatusOK, toCartResponse(items, view.EffectiveCurrency()))
+	rates, err := s.store.ShippingRates(r.Context())
+	if err != nil {
+		s.log.Error("loading shipping rates", "error", err)
+		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
+	s.respondJSON(w, http.StatusOK, toCartResponse(items, view.EffectiveCurrency(), rates))
 }
 
 // PUT /cart/items — idempotent "set quantity" semantics: sending the same
@@ -124,7 +158,13 @@ func (s *Server) handleSetCartItem(w http.ResponseWriter, r *http.Request) {
 		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 		return
 	}
-	s.respondJSON(w, http.StatusOK, toCartResponse(items, view.EffectiveCurrency()))
+	rates, err := s.store.ShippingRates(r.Context())
+	if err != nil {
+		s.log.Error("loading shipping rates", "error", err)
+		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
+	s.respondJSON(w, http.StatusOK, toCartResponse(items, view.EffectiveCurrency(), rates))
 }
 
 func (s *Server) handleDeleteCartItem(w http.ResponseWriter, r *http.Request) {

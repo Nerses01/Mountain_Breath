@@ -11,6 +11,20 @@ import (
 	"github.com/Nerses01/Mountain_Breath/backend/internal/store"
 )
 
+// testCheckout is a complete, valid checkout input for tests whose subject
+// is NOT the checkout itself (stock, counters, currency). Tests about the
+// checkout build their own.
+func testCheckout() domain.CheckoutInput {
+	return domain.CheckoutInput{
+		Address: domain.Address{
+			FirstName: "Anahit", LastName: "Sargsyan", Phone: "+374 91 000000",
+			Street: "14 Abovyan St, apt 6", City: "Yerevan",
+			PostalCode: "0009", Country: "AM",
+		},
+		PaymentMethod: domain.PayCard,
+	}
+}
+
 // seedCatalog inserts one product with one variant and returns the variant id.
 func seedCatalog(t *testing.T, stock int) int64 {
 	t.Helper()
@@ -67,7 +81,7 @@ func TestCreateOrder_HappyPath(t *testing.T) {
 	variantID := seedCatalog(t, 10)
 	userID := seedUserWithCart(t, "buyer@test.local", variantID, 3)
 
-	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD)
+	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, testCheckout())
 	if err != nil {
 		t.Fatalf("CreateOrder: %v", err)
 	}
@@ -114,7 +128,7 @@ func TestCreateOrder_EmptyCart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := s.CreateOrder(context.Background(), userID, domain.CurrencyUSD)
+	_, err := s.CreateOrder(context.Background(), userID, domain.CurrencyUSD, testCheckout())
 	if !errors.Is(err, domain.ErrEmptyCart) {
 		t.Errorf("err = %v, want ErrEmptyCart", err)
 	}
@@ -130,7 +144,7 @@ func TestCreateOrder_InsufficientStock(t *testing.T) {
 	variantID := seedCatalog(t, 2)
 	userID := seedUserWithCart(t, "greedy@test.local", variantID, 5)
 
-	_, err := s.CreateOrder(context.Background(), userID, domain.CurrencyUSD)
+	_, err := s.CreateOrder(context.Background(), userID, domain.CurrencyUSD, testCheckout())
 	if !errors.Is(err, domain.ErrInsufficientStock) {
 		t.Errorf("err = %v, want ErrInsufficientStock", err)
 	}
@@ -171,7 +185,7 @@ func TestCreateOrder_ConcurrentCheckoutsDoNotOversell(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := s.CreateOrder(ctx, uid, domain.CurrencyUSD)
+			_, err := s.CreateOrder(ctx, uid, domain.CurrencyUSD, testCheckout())
 			switch {
 			case err == nil:
 				succeeded.Add(1)
@@ -220,7 +234,7 @@ func TestUpdateOrderStatus_CancelRestoresStock(t *testing.T) {
 	variantID := seedCatalog(t, 10)
 	userID := seedUserWithCart(t, "canceller@test.local", variantID, 4)
 
-	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD)
+	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, testCheckout())
 	if err != nil {
 		t.Fatalf("CreateOrder: %v", err)
 	}
@@ -282,7 +296,7 @@ func TestCreateOrder_IncrementsSalesCount(t *testing.T) {
 		t.Fatalf("adding second cart line: %v", err)
 	}
 
-	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD)
+	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, testCheckout())
 	if err != nil {
 		t.Fatalf("CreateOrder: %v", err)
 	}

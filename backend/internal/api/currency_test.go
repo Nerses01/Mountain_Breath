@@ -210,7 +210,9 @@ func TestProductResponseCarriesBothMarkets(t *testing.T) {
 
 // An order is charged in ONE currency, and the client does not get to name
 // it. A body that tried would be rejected as unknown JSON; this proves the
-// edge-resolved value is what the store is told.
+// edge-resolved value is what the store is told. (The body itself is E6's
+// checkout shape — cash on delivery, which is legal precisely because the
+// resolved currency IS drams.)
 func TestCheckoutChargesTheResolvedCurrency(t *testing.T) {
 	fake := newFakeStore()
 	fake.cart = []domain.CartItem{{
@@ -219,7 +221,13 @@ func TestCheckoutChargesTheResolvedCurrency(t *testing.T) {
 	}}
 	cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleCustomer})
 
-	rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/orders?currency=AMD", "", cookie)
+	body := `{
+		"address": {"first_name": "Anahit", "last_name": "Sargsyan",
+		            "phone": "+374 91 000000", "street": "14 Abovyan St",
+		            "city": "Yerevan", "postal_code": "0009", "country": "AM"},
+		"payment_method": "cash_on_delivery"
+	}`
+	rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/orders?currency=AMD", body, cookie)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d (%s)", rec.Code, rec.Body.String())
 	}
@@ -245,7 +253,9 @@ func TestCheckoutChargesTheResolvedCurrency(t *testing.T) {
 }
 
 // The cart totals every market separately, and the response says which one
-// the flat total_minor belongs to.
+// the flat total_minor belongs to. Since E6 the totals INCLUDE shipping —
+// quoted per market from shipping_rates, never converted — and the
+// subtotals keep the old sum-of-lines meaning.
 func TestCartResponseTotalsEachMarket(t *testing.T) {
 	fake := newFakeStore()
 	fake.cart = []domain.CartItem{
@@ -262,18 +272,27 @@ func TestCartResponseTotalsEachMarket(t *testing.T) {
 	}
 
 	var got struct {
-		Currency   string           `json:"currency"`
-		TotalMinor int64            `json:"total_minor"`
-		Totals     map[string]int64 `json:"totals"`
+		Currency      string           `json:"currency"`
+		SubtotalMinor int64            `json:"subtotal_minor"`
+		ShippingMinor int64            `json:"shipping_minor"`
+		TotalMinor    int64            `json:"total_minor"`
+		Subtotals     map[string]int64 `json:"subtotals"`
+		Totals        map[string]int64 `json:"totals"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
 
-	if got.Currency != "AMD" || got.TotalMinor != 28700 {
-		t.Errorf("resolved total = %d %s, want 28700 AMD", got.TotalMinor, got.Currency)
+	// 28,700 ֏ of lines + the 1,900 ֏ base rate (under the 33,500 free
+	// threshold, nothing cold-chain in this basket).
+	if got.Currency != "AMD" || got.SubtotalMinor != 28700 ||
+		got.ShippingMinor != 1900 || got.TotalMinor != 30600 {
+		t.Errorf("resolved quote = %d + %d = %d %s, want 28700 + 1900 = 30600 AMD",
+			got.SubtotalMinor, got.ShippingMinor, got.TotalMinor, got.Currency)
 	}
-	if got.Totals["AMD"] != 28700 || got.Totals["USD"] != 6000 {
-		t.Errorf("totals = %v, want AMD 28700 and USD 6000", got.Totals)
+	// The dollar column is quoted with the DOLLAR rate ($4 base), not the
+	// dram fee converted.
+	if got.Subtotals["USD"] != 6000 || got.Totals["USD"] != 6400 {
+		t.Errorf("USD quote = %d → %d, want 6000 → 6400", got.Subtotals["USD"], got.Totals["USD"])
 	}
 }

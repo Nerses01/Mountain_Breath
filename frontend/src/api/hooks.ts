@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query'
 import { api, ApiError, type CatalogFilterParams, type ProductListParams } from './client'
 import type {
+  Address,
   EditorialInput,
   Money,
   ImageInput,
@@ -252,11 +253,14 @@ export function useCheckout() {
     mutationFn: api.checkout,
     onSuccess: () => {
       // Checkout changes a lot of server state: cart emptied, order added,
-      // stock decremented (affects product lists and detail pages).
+      // stock decremented (affects product lists and detail pages) — and
+      // since E6 the address book gained the form's address, which is what
+      // the NEXT checkout pre-fills from.
       qc.invalidateQueries({ queryKey: ['cart'] })
       qc.invalidateQueries({ queryKey: ['orders'] })
       qc.invalidateQueries({ queryKey: ['products'] })
       qc.invalidateQueries({ queryKey: ['product'] })
+      qc.invalidateQueries({ queryKey: ['default-address'] })
     },
   })
 }
@@ -265,6 +269,35 @@ export function useMyOrders() {
   return useQuery({
     queryKey: ['orders'],
     queryFn: api.myOrders,
+  })
+}
+
+// The confirmation page's read. No locale or currency in the key: an order
+// is a frozen record — its snapshots do not change with the viewer's
+// language or market, so one cache entry serves every view of it.
+export function useOrder(id: number) {
+  return useQuery({
+    queryKey: ['orders', id],
+    queryFn: () => api.getOrder(id),
+    enabled: Number.isFinite(id) && id > 0,
+  })
+}
+
+// The saved address for pre-filling the checkout form. 404 (first-time
+// customer) resolves to null — an empty form is a normal state, not an error,
+// the same mapping useMe applies to 401.
+export function useDefaultAddress(enabled: boolean) {
+  return useQuery<Address | null>({
+    queryKey: ['default-address'],
+    queryFn: async () => {
+      try {
+        return await api.defaultAddress()
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null
+        throw e
+      }
+    },
+    enabled,
   })
 }
 

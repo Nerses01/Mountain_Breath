@@ -40,6 +40,21 @@ type Order struct {
 	// JSON, where it also dodges the fact that JSON.parse turns every number
 	// into a double.
 	FxRateUsed *string
+
+	// E6. The frozen copy of where this order went — see the comment on
+	// migration 000017 for why it is columns, not a reference into the
+	// editable address book. Nil for orders that predate checkout-with-
+	// address; the API requires it on every new one.
+	ShipTo             *Address
+	DeliveryNote       string
+	LeaveWithNeighbour bool
+
+	// The five-figure breakdown; Totals.TotalMinor and the legacy TotalMinor
+	// field above carry the same number (the store scans both from one
+	// column).
+	Totals        OrderTotals
+	PaymentMethod string
+	PaymentStatus string
 }
 
 type OrderItem struct {

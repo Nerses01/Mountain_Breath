@@ -1,11 +1,10 @@
-import { Link, useNavigate } from 'react-router'
+import { Link } from 'react-router'
 import { Trans, useTranslation } from 'react-i18next'
-import { useCart, useCheckout, useMe, useRemoveCartItem, useSetCartItem } from '../api/hooks'
-import { useFieldErrors } from '../i18n/useFieldErrors'
+import { useCart, useMe, useRemoveCartItem, useSetCartItem } from '../api/hooks'
 import { useLocale } from '../i18n/useLocale'
 import { formatMoney } from '../lib/format'
 import { DEFAULT_CURRENCY } from '../lib/currencies'
-import { Price } from '../components/ui/Price'
+import { OrderSummary } from '../components/checkout/OrderSummary'
 
 export function CartPage() {
   const { t } = useTranslation()
@@ -14,9 +13,6 @@ export function CartPage() {
   const cart = useCart(!!me.data)
   const setItem = useSetCartItem()
   const removeItem = useRemoveCartItem()
-  const checkout = useCheckout()
-  const navigate = useNavigate()
-  const { formError } = useFieldErrors(checkout.error)
   // The cart's own currency, not the switcher's, so a response that is still
   // in flight after a switch is labelled with what it was actually priced in.
   const currency = cart.data?.currency ?? DEFAULT_CURRENCY
@@ -118,35 +114,25 @@ export function CartPage() {
             ))}
           </ul>
 
-          {formError && (
-            <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
-              {formError}
-            </p>
-          )}
-
-          <div className="mt-6 flex items-center justify-between rounded-xl border border-stone-200 bg-white p-4">
-            <div>
-              <p className="text-sm text-stone-500">{t('cart:total')}</p>
-              {/* Both markets, summed independently — never one converted
-                  from the other. E6 redesigns this screen; the numbers are
-                  right in the meantime. */}
-              <Price
-                prices={cart.data?.totals}
-                primaryMinor={cart.data?.total_minor}
-                size="lg"
+          {/* E6: the one-click checkout became a page. The cart's job is
+              now the DESIGNED summary card — same component, same
+              server-computed figures as the checkout's sidebar — and a link
+              into the flow that collects the address. */}
+          {cart.data && (
+            <div className="mt-6 max-w-md">
+              <OrderSummary
+                cart={cart.data}
+                action={
+                  <Link
+                    to={localePath('/checkout')}
+                    className="rounded-full bg-brand px-8 py-4 text-center font-display font-bold text-ink-on-dark transition hover:bg-brand-ink"
+                  >
+                    {t('cart:goToCheckout')}
+                  </Link>
+                }
               />
             </div>
-            <button
-              type="button"
-              disabled={checkout.isPending}
-              onClick={() =>
-                checkout.mutate(undefined, { onSuccess: () => navigate('/orders') })
-              }
-              className="rounded-lg bg-emerald-700 px-8 py-3 font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
-            >
-              {checkout.isPending ? t('cart:placingOrder') : t('cart:checkout')}
-            </button>
-          </div>
+          )}
         </>
       )}
     </Shell>

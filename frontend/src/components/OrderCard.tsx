@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import type { Order, OrderStatus } from '../api/types'
+import { Link } from 'react-router'
 import { formatMoney } from '../lib/format'
+import { useLocale } from '../i18n/useLocale'
 
 const statusStyles: Record<OrderStatus, string> = {
   pending: 'bg-amber-100 text-amber-800',
@@ -21,12 +23,17 @@ export function StatusBadge({ status }: { status: OrderStatus }) {
 
 export function OrderCard({ order, children }: { order: Order; children?: React.ReactNode }) {
   const { t } = useTranslation()
+  const { localePath } = useLocale()
   return (
     <article className="rounded-xl border border-stone-200 bg-white p-5">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="font-semibold text-stone-800">
+        {/* E6 gave each order a page; the card's number is the way in. */}
+        <Link
+          to={localePath(`/orders/${order.id}`)}
+          className="font-semibold text-stone-800 hover:text-emerald-800 hover:underline"
+        >
           {t('account:orderNumber', { id: order.id })}
-        </span>
+        </Link>
         <StatusBadge status={order.status} />
         {order.user_email && <span className="text-xs text-stone-400">{order.user_email}</span>}
         <span className="ml-auto text-xs text-stone-400">

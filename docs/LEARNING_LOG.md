@@ -17,6 +17,105 @@ Template for an entry:
 
 ---
 
+## 2026-08-14 — Phase E6: the server owns every number
+
+**Worked on:** migration 000017 (`addresses`, order snapshot columns, the
+five-figure money breakdown with its balance CHECK, `payment_method`/
+`payment_status`, per-currency `shipping_rates`); `POST /orders` with a real
+body; `GET /orders/{id}`; the cart's shipping quote; the designed checkout
+screen with its own chrome, hand-rolled validation and the shared
+`OrderSummary`; the confirmation page; the Playwright journey extended
+through an address.
+
+**Learned:**
+
+- **A snapshot is a design pattern, and this was its third application.**
+  Prices froze in Phase 5, the currency in E5, the address now — same
+  sentence every time: an order is a closed record, and nothing the customer
+  can later edit may reach into it. The tell that it is a pattern and not a
+  trick: the address table and the snapshot columns hold the same seven
+  fields and there is deliberately NO foreign key between them. The test
+  edits the address book after checkout and asserts the order did not move.
+- **A CHECK constraint is the database's assert().** `subtotal + shipping −
+  discount = total` is enforced on every row, forever, including rows written
+  by a future bug or by someone in psql at midnight. It caught its first
+  victim the day it landed — a hand-written test fixture inserting
+  `total_minor = 1000` over defaulted zeros. That is the constraint working,
+  not the constraint being annoying.
+- **Contained VAT is division by 120, not multiplication by 20%.** "Prices
+  include VAT" means the shelf price already holds the tax, so the invoice
+  figure is `subtotal × rate / (100 + rate)` — a 120-dram subtotal contains
+  20 of tax, where the naive `× 20%` says 24 and overstates by a sixth.
+  Integer arithmetic, round-half-up, one function owning the rounding so
+  every invoice line agrees.
+- **"The client never sends money" has a stronger form than ignoring.** The
+  request struct simply has no money field, and `DisallowUnknownFields`
+  turns a body that smuggles `total_minor` into a 400 before any handler
+  code runs. Refused beats ignored: an ignored field lets the client believe
+  it worked. The same reasoning keeps card numbers out of the API entirely —
+  a stub that stores card data buys PCI scope for nothing.
+- **Method and status are different facts.** A bank transfer is `confirmed`
+  before it is `paid`; a cash order is `delivered` at the moment it stops
+  being `unpaid`. Folding payment into the order state machine would have
+  encoded a false dependency; two columns encode the truth.
+- **Fees are shelf prices too.** `shipping_rates` is keyed (method,
+  currency) with no conversion fallback — E5's argument applied to delivery:
+  the family sets 1,900 ֏, not $4-times-a-rate. And the free-shipping
+  threshold waives only the BASE; the mock's own cart charges chilled
+  shipping past $70, because the cold box costs real money either way. Read
+  §1.4 closely enough and the design is a requirements document.
+- **The quote and the charge must be one arithmetic.** `QuoteCart` (cart
+  page, checkout sidebar) and `ComputeTotals` (the transaction) share
+  `ShippingFor`; an integration test places an order and fails if the number
+  the customer read differs from the number charged. Two implementations of
+  money arithmetic is how the "but the cart said…" ticket is born.
+- **404 and 403 trade places when the resource is private.** E4 gave a
+  non-purchaser 403 — the product is public, only the action was denied.
+  Someone else's ORDER is 404: a 403 would confirm to an id-enumerator that
+  the order exists and is somebody's, which is the very fact being fished
+  for. The pair is now the project's rule of thumb.
+- **Validation can mirror across the wire.** The client checks presence with
+  the server's own field keys (`address.postal_code`), so local errors and
+  server errors land on the same inputs through one rendering path; the
+  richer rules (cash-is-AMD-only) come only from the server, which is the
+  authority anyway. No form library needed yet — the plan asked for the
+  decision to be noted, and the note lives on the CheckoutPage doc comment.
+- **A shared SQL constant can hide a query that only breaks in its variant
+  shape.** `orderColumns` served four single-table reads perfectly and broke
+  the fifth — the admin listing JOINs `users`, whose own `id` made every
+  bare column ambiguous (42702), and /admin/orders 500ed in the running
+  shop. Aliasing the *other* table does not fix ambiguity (an alias renames
+  it; its columns stay in the namespace) — qualifying the shared columns
+  does, and costs nothing in the single-table queries. The suite missed it
+  for a nameable reason: handler tests run on the fake store, which cannot
+  mis-parse SQL, and no integration test called `ListAllOrders`. Fourth
+  phase running where the defect that mattered surfaced only in the running
+  app — but this one's lesson is sharper: every store method with its OWN
+  SQL shape needs its own integration test, however thin.
+- **Testing Library normalizes the DOM's text but not your matcher.** The
+  price's non-breaking space collapses to a plain space in the element's
+  normalized text, so `getByText('15,300 ֏')` finds nothing while
+  `getByText('15,300 ֏')` (plain space) matches. An hour of "but the string
+  IS in the innerHTML" went into that sentence.
+
+**Questions / to revisit:**
+
+- The E7 discount slots are already plumbed (`discount_minor` in the CHECK,
+  the parameter in `ComputeTotals`, the row in the receipt) but always zero.
+  E7's pure `domain.Price` calculator should REPLACE the inline arithmetic in
+  `CreateOrder`, not sit beside it — one calculator for every screen is that
+  phase's own headline.
+- `GET /account/address` returns one default. When E8 builds the account
+  page, the book becomes a list (`is_default` is already modelled); the
+  checkout then grows an address picker over `address_id`.
+- The step indicator marks steps 1–2 together on the single checkout page.
+  If a future phase splits the page into real steps, the indicator's state
+  model is already there (`step: 1 | 3`).
+- Order emails ("your order is in") are conspicuously absent — E9's
+  newsletter infrastructure is probably where mail enters the project.
+
+---
+
 ## 2026-08-11 — Phase E5: money is harder than a multiplication
 
 **Worked on:** migration 000016 (`currencies`, `variant_prices`, `fx_rates`,

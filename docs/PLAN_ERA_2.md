@@ -137,13 +137,21 @@ Worth resolving before the copy is treated as canonical:
       supplies, so the contradiction never reaches the database — but it does
       mean **no price in §1.1's table is authoritative**, only the product
       names, categories, sizes, badges and benefits are.
-- [ ] The cart totals are internally consistent ($62 + $6 − $4 = $64), and
+- [x] The cart totals are internally consistent ($62 + $6 − $4 = $64), and
       "$8 away from free shipping" on a $62 subtotal implies a **$70
       threshold** — but chilled shipping is still charged, so the threshold
-      presumably applies to standard shipping only. Confirm the rule (E7).
-- [ ] "Prices include VAT" sits next to a separate discount line. Decide
+      presumably applies to standard shipping only. ~~Confirm the rule (E7).~~
+      **Confirmed and built in E6:** `shipping_rates.free_over_minor` waives
+      only the BASE; the cold-chain surcharge survives it, exactly as this
+      cart charges $6 chilled shipping past $70. E7 inherits the rule, it
+      does not decide it.
+- [x] "Prices include VAT" sits next to a separate discount line. ~~Decide
       whether VAT is contained in the displayed price (Armenian retail
-      convention) and only broken out on the invoice — E6 assumes yes.
+      convention) and only broken out on the invoice — E6 assumes yes.~~
+      **Decided yes in E6:** `tax_minor = subtotal × 20/120`, shown on the
+      receipt as "Includes VAT" and deliberately absent from the
+      `subtotal + shipping − discount = total` CHECK — adding it would
+      charge it twice.
 - The design shows `+374` phone, Yerevan address and **ArCa** card network:
   Armenia is the primary market, which supports the Idram / Ameriabank vPOS
   research already parked in Phase 11. *(observation, not a decision to make)*
@@ -1174,46 +1182,111 @@ server rules, why the server must own every number, snapshotting addresses,
 modelling tax that is contained in the price.
 
 **Backend:**
-- [ ] Migration: `addresses` (user_id, first_name, last_name, phone, street,
+- [x] Migration: `addresses` (user_id, first_name, last_name, phone, street,
       city, postal_code, country, is_default) for the address book, **plus
       snapshot columns on `orders`** — an order must not change when the
       customer later edits their address, exactly as prices are snapshotted.
-- [ ] Migration: `orders.subtotal_minor`, `shipping_minor`, `discount_minor`,
+      *Scoped to ONE default row per user for now (the checkout upserts it,
+      the next checkout pre-fills from it); "several named addresses" is
+      E8's account page. Deliberately NO foreign key from orders to
+      addresses — the snapshot is the point.*
+- [x] Migration: `orders.subtotal_minor`, `shipping_minor`, `discount_minor`,
       `tax_minor`, `total_minor` with a CHECK that
       `subtotal + shipping − discount = total` (tax is *contained* in
-      subtotal per "Prices include VAT" — confirm in §1.4 first).
-- [ ] Migration: `orders.payment_method` (`card|bank_transfer|cash_on_delivery`)
+      subtotal per "Prices include VAT" — §1.4 confirmed below). A second
+      CHECK pins the containment: `tax ≤ subtotal`. The balance CHECK caught
+      its first hand-written imbalanced INSERT (a test fixture) the day it
+      landed.
+- [x] Migration: `orders.payment_method` (`card|bank_transfer|cash_on_delivery`)
       and `payment_status` (`unpaid|paid|refunded`). Card stays a stub; the
-      real provider remains Phase 11 work.
-- [ ] Shipping: `shipping_rates` (method, base_minor, cold_chain_surcharge,
-      free_over_minor) rather than constants in code — the family will change
-      these without a deploy.
-- [ ] `POST /orders` grows a request body (address or address_id, payment
+      real provider remains Phase 11 work. *Every method lands `unpaid` —
+      the two columns are orthogonal facts, not one state machine: a bank
+      transfer is confirmed before it is paid, and a cash order is delivered
+      at the moment it stops being unpaid.*
+- [x] Shipping: ~~`shipping_rates` (method, base_minor, cold_chain_surcharge,
+      free_over_minor)~~ **keyed `(method, currency)`** — E5 made fees
+      per-market shelf prices like everything else, with no conversion
+      fallback: a market without a rate row cannot be charged at all
+      (`ErrPriceUnavailable`, the same refuse-on-charge rule as variant
+      prices). Rates rather than constants in code — the family will change
+      these without a deploy, which is also why the store does NOT cache
+      them in Go.
+- [x] `POST /orders` grows a request body (address, payment
       method, delivery note, "leave with the neighbour"). It keeps the single
-      transaction and the ordered `FOR UPDATE` locks — the oversell test must
-      still pass unchanged.
-- [ ] **The client never sends money.** It sends items, address and method; the
-      server computes and returns every figure. Add an API test that proves a
-      client-supplied total is ignored.
-- [ ] Field-level validation reusing the existing `fields` envelope with JSON
+      transaction and the ordered `FOR UPDATE` locks — the oversell test
+      passes unchanged. *`address_id` is deferred with the address book's
+      list (E8); the inline address is upserted as the default in the same
+      transaction.*
+- [x] **The client never sends money.** It sends address and method; the
+      server computes and returns every figure. The API test proves a
+      client-supplied total is REFUSED (400 via `DisallowUnknownFields`),
+      which is stronger than ignored — an ignored field lets the client
+      believe it worked. Card numbers are never accepted either: a stub
+      that stores card data buys PCI scope for nothing.
+- [x] Field-level validation reusing the existing `fields` envelope with JSON
       paths the form can attach to (`address.postal_code`).
-- [ ] Tests: totals arithmetic table-driven in the domain; a cash-on-delivery
+- [x] Tests: totals arithmetic table-driven in the domain; a cash-on-delivery
       order lands `unpaid`; address snapshot survives an address edit.
+      *Plus: the cold-chain surcharge survives free shipping; the cart's
+      quote equals the checkout's charge; one default address per user
+      upserts rather than accumulates; "cash is AMD-only" as a field error.*
 
 **Frontend:**
-- [ ] `CheckoutPage` at `/checkout`: step indicator (Details → Payment → Done),
+- [x] `CheckoutPage` at `/checkout`: step indicator (Details → Payment → Done),
       Contact section, Delivery address section, Payment method cards, card
-      fields (stub), summary sidebar with line items.
-- [ ] Keep validation hand-rolled to mirror the backend's field keys — the
+      fields (stub), summary sidebar with line items. *Rendered under its own
+      minimal chrome outside Layout, as the mock draws it: the one page the
+      shop wants no wandering from is the one with the money on it. The card
+      stub fields are decorative-disabled with the truth stated underneath —
+      a state the mock never drew (§6 exception 2).*
+- [x] Keep validation hand-rolled to mirror the backend's field keys — the
       project has deliberately avoided form libraries; revisit only if this
-      hurts. Note the decision either way.
-- [ ] `OrderSummary` component shared by cart and checkout.
-- [ ] `/orders/:id` confirmation and detail view with the full breakdown.
-- [ ] Extend the Playwright journey: browse → add → checkout **with an
-      address** → confirmation → order visible.
+      hurts. **Decision noted (on the CheckoutPage doc comment): client
+      checks presence only, with the server's own keys, so local and server
+      errors land on the same inputs through one rendering path; richer
+      rules (cash-is-AMD-only) come from the server, which is the authority
+      anyway. Nothing here needed a library.**
+- [x] `OrderSummary` component shared by cart and checkout — one rendering of
+      one server-computed quote, so there is no seam for the two screens'
+      numbers to disagree in.
+- [x] `/orders/:id` confirmation and detail view with the full breakdown.
+      *One page for both jobs; the "order placed" banner rides on router
+      state, not the URL, so a refresh shows the receipt without
+      re-announcing a thank-you that was true once.*
+- [x] Extend the Playwright journey: browse → add → checkout **with an
+      address** → confirmation → order visible. *Including the empty-submit
+      client-side failure on the way.*
 
 **Done when:** a real order carries an address, a method and five money fields
 that reconcile, and the checkout screen's numbers come from the server.
+✅ Verified in the browser, in drams: a chilled royal-jelly order quoted
+15,300 + 4,800 (base 1,900 + cold-chain 2,900) = 20,100 ֏ on the cart,
+charged exactly that at checkout, landed `cash_on_delivery`/`unpaid` with the
+address snapshot and 2,550 ֏ of contained VAT — and the next checkout
+pre-filled the saved street.
+
+**§1.4 answered along the way:** VAT is contained in the displayed price
+(Armenian retail convention) — `tax_minor` is carved out as
+`subtotal × 20/120`, shown on the receipt as "Includes VAT", and absent from
+the balance CHECK. And the free-shipping threshold applies to the BASE rate
+only: the cold-chain surcharge survives it, which is §1.4's own cart ($6
+chilled shipping on a subtotal past $70) read literally.
+
+**Findings while building:**
+
+- **404 and 403 trade places when the resource is private.** E4 gave a
+  non-purchaser 403 because the product is public and only the action was
+  denied. Someone else's order is 404: a 403 would confirm to an
+  id-enumerator that the order exists and is somebody's — the very fact
+  being fished for.
+- **The cart's `total_minor` changed meaning** (now subtotal + shipping),
+  because a line labelled "Total" that silently omits shipping is a lie one
+  screen before checkout tells the truth. Clients written against the old
+  meaning read the new field names (`subtotal_minor`) instead.
+- **Testing Library normalizes the DOM's text but not the matcher**: the
+  price's non-breaking space collapses to a plain space on the element side
+  only, so the test must query with a plain space. An hour of "but the
+  string IS in the innerHTML".
 
 ---
 

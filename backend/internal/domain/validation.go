@@ -41,6 +41,13 @@ const (
 	// before the foreign key on variant_prices can turn it into a 500.
 	ValidationUnknownCurrency = "unknown_currency"
 
+	// E6. Codes, not sentences, as always — the second one exists because
+	// "cash on delivery is AMD-only" is a rule the customer can FIX (switch
+	// currency, or pick another method), so the message the client renders
+	// for it must say more than "invalid".
+	ValidationInvalidPaymentMethod = "invalid_payment_method"
+	ValidationCashIsAMDOnly        = "cash_is_amd_only"
+
 	// A translations map keyed by a language the shop does not serve. Caught
 	// here rather than at the database, whose CHECK constraint would answer
 	// with a 500-shaped driver error instead of a field-level 400.

@@ -29,7 +29,7 @@ const foreignKeyViolation = "23503"
 func (s *Store) GetCart(ctx context.Context, userID int64, view domain.View) ([]domain.CartItem, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT ci.variant_id, COALESCE(t.name, en.name, p.name), p.slug,
-		       v.label, v.stock_qty, ci.qty,
+		       v.label, v.stock_qty, ci.qty, p.is_cold_chain,
 		       ep.currency, ep.price_minor,
 		       res.price_minor AS resolved_minor
 		FROM cart_items ci
@@ -52,12 +52,13 @@ func (s *Store) GetCart(ctx context.Context, userID int64, view domain.View) ([]
 	var current *domain.CartItem
 	for rows.Next() {
 		var (
-			variantID, priceMinor            int64
-			name, slug, label, currency      string
-			stockQty, qty                    int
-			resolvedMinor                    *int64
+			variantID, priceMinor       int64
+			name, slug, label, currency string
+			stockQty, qty               int
+			isColdChain                 bool
+			resolvedMinor               *int64
 		)
-		if err := rows.Scan(&variantID, &name, &slug, &label, &stockQty, &qty,
+		if err := rows.Scan(&variantID, &name, &slug, &label, &stockQty, &qty, &isColdChain,
 			&currency, &priceMinor, &resolvedMinor); err != nil {
 			return nil, fmt.Errorf("scanning cart row: %w", err)
 		}
@@ -65,7 +66,7 @@ func (s *Store) GetCart(ctx context.Context, userID int64, view domain.View) ([]
 		if current == nil || current.VariantID != variantID {
 			items = append(items, domain.CartItem{
 				VariantID: variantID, ProductName: name, ProductSlug: slug,
-				Label: label, StockQty: stockQty, Qty: qty,
+				Label: label, StockQty: stockQty, Qty: qty, IsColdChain: isColdChain,
 				Prices: make(domain.Money, len(domain.Currencies)),
 			})
 			current = &items[len(items)-1]

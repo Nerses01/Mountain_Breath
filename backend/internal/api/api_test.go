@@ -61,6 +61,12 @@ type fakeStore struct {
 	// Accept-Language chain reached the query rather than being dropped.
 	lastCurrency domain.Currency
 	cart         []domain.CartItem
+
+	// E6 checkout.
+	lastCheckout   domain.CheckoutInput
+	orders         []domain.Order
+	shippingRates  map[domain.Currency]domain.ShippingRate
+	defaultAddress *domain.Address
 }
 
 func newFakeStore() *fakeStore {
@@ -290,12 +296,46 @@ func (f *fakeStore) GetCart(_ context.Context, _ int64, view domain.View) ([]dom
 }
 func (f *fakeStore) SetCartItem(_ context.Context, _, _ int64, _ int) error { return nil }
 func (f *fakeStore) DeleteCartItem(_ context.Context, _, _ int64) error     { return nil }
-func (f *fakeStore) CreateOrder(_ context.Context, _ int64, currency domain.Currency) (domain.Order, error) {
+func (f *fakeStore) CreateOrder(_ context.Context, _ int64, currency domain.Currency, in domain.CheckoutInput) (domain.Order, error) {
 	f.lastCurrency = currency
+	f.lastCheckout = in
 	if len(f.cart) == 0 {
 		return domain.Order{}, domain.ErrEmptyCart
 	}
-	return domain.Order{ID: 1, Status: domain.OrderPending, Currency: currency}, nil
+	return domain.Order{
+		ID: 1, Status: domain.OrderPending, Currency: currency,
+		ShipTo: &in.Address, PaymentMethod: in.PaymentMethod,
+		PaymentStatus: domain.PaymentUnpaid,
+	}, nil
+}
+
+func (f *fakeStore) GetOrder(_ context.Context, orderID int64) (domain.Order, error) {
+	for _, o := range f.orders {
+		if o.ID == orderID {
+			return o, nil
+		}
+	}
+	return domain.Order{}, domain.ErrNotFound
+}
+
+func (f *fakeStore) ShippingRates(_ context.Context) (map[domain.Currency]domain.ShippingRate, error) {
+	if f.shippingRates != nil {
+		return f.shippingRates, nil
+	}
+	// The migration's bootstrap rows, so cart tests quote realistic money
+	// without every test constructing a rate table.
+	free := func(n int64) *int64 { return &n }
+	return map[domain.Currency]domain.ShippingRate{
+		domain.CurrencyUSD: {BaseMinor: 400, ColdChainSurchargeMinor: 600, FreeOverMinor: free(7000)},
+		domain.CurrencyAMD: {BaseMinor: 1900, ColdChainSurchargeMinor: 2900, FreeOverMinor: free(33500)},
+	}, nil
+}
+
+func (f *fakeStore) DefaultAddress(_ context.Context, _ int64) (domain.Address, error) {
+	if f.defaultAddress == nil {
+		return domain.Address{}, domain.ErrNotFound
+	}
+	return *f.defaultAddress, nil
 }
 func (f *fakeStore) ListOrdersByUser(_ context.Context, _ int64) ([]domain.Order, error) {
 	return nil, nil

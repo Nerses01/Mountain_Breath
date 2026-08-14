@@ -266,7 +266,7 @@ func TestCreateOrder_SnapshotsTheCurrencyAndTheRate(t *testing.T) {
 	})
 	userID := seedUserWithCart(t, "amd-buyer@test.local", variantID, 3)
 
-	order, err := s.CreateOrder(ctx, userID, domain.CurrencyAMD)
+	order, err := s.CreateOrder(ctx, userID, domain.CurrencyAMD, testCheckout())
 	if err != nil {
 		t.Fatalf("CreateOrder: %v", err)
 	}
@@ -275,9 +275,13 @@ func TestCreateOrder_SnapshotsTheCurrencyAndTheRate(t *testing.T) {
 		t.Errorf("order currency = %q, want AMD", order.Currency)
 	}
 	// Charged from the AMD shelf price — 7,600 × 3, not the dollar price
-	// converted.
-	if order.TotalMinor != 22800 {
-		t.Errorf("total = %d, want 22800", order.TotalMinor)
+	// converted — plus the AMD rate card's 1,900 base (E6): under the
+	// 33,500 free-shipping threshold, nothing chilled in the basket.
+	if order.Totals.SubtotalMinor != 22800 {
+		t.Errorf("subtotal = %d, want 22800", order.Totals.SubtotalMinor)
+	}
+	if order.TotalMinor != 24700 {
+		t.Errorf("total = %d, want 24700 (22800 + 1900 shipping)", order.TotalMinor)
 	}
 	if order.Items[0].PriceMinor != 7600 {
 		t.Errorf("item snapshot = %d, want 7600", order.Items[0].PriceMinor)
@@ -292,15 +296,17 @@ func TestCreateOrder_SnapshotsTheCurrencyAndTheRate(t *testing.T) {
 	// A base-currency order involves no rate, and says so with NULL rather
 	// than with a decorative 1.0.
 	userID2 := seedUserWithCart(t, "usd-buyer@test.local", variantID, 1)
-	usdOrder, err := s.CreateOrder(ctx, userID2, domain.CurrencyUSD)
+	usdOrder, err := s.CreateOrder(ctx, userID2, domain.CurrencyUSD, testCheckout())
 	if err != nil {
 		t.Fatalf("CreateOrder(USD): %v", err)
 	}
 	if usdOrder.FxRateUsed != nil {
 		t.Errorf("fx_rate_used = %q for a USD order, want nil", *usdOrder.FxRateUsed)
 	}
-	if usdOrder.TotalMinor != 1600 {
-		t.Errorf("USD total = %d, want 1600", usdOrder.TotalMinor)
+	// $16 of pollen + the $4 USD base rate — each market ships at ITS OWN
+	// rate card, not the other's fee converted.
+	if usdOrder.TotalMinor != 2000 {
+		t.Errorf("USD total = %d, want 2000 (1600 + 400 shipping)", usdOrder.TotalMinor)
 	}
 }
 
@@ -335,7 +341,7 @@ func TestCreateOrder_RefusesAMarketItCannotPrice(t *testing.T) {
 		t.Fatal("the view invented a EUR price with no shelf price and no rate")
 	}
 
-	_, err := s.CreateOrder(ctx, userID, "EUR")
+	_, err := s.CreateOrder(ctx, userID, "EUR", testCheckout())
 	if !errors.Is(err, domain.ErrPriceUnavailable) {
 		t.Fatalf("CreateOrder in EUR: err = %v, want ErrPriceUnavailable", err)
 	}

@@ -6,6 +6,8 @@ import { AdminPage } from './pages/AdminPage'
 import { AdminProductsPage } from './pages/AdminProductsPage'
 import { AdminReviewsPage } from './pages/AdminReviewsPage'
 import { CartPage } from './pages/CartPage'
+import { CheckoutPage } from './pages/CheckoutPage'
+import { OrderDetailPage } from './pages/OrderDetailPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { OrdersPage } from './pages/OrdersPage'
@@ -29,6 +31,7 @@ function storefrontRoutes() {
     <Route key="login" path="login" element={<LoginPage />} />,
     <Route key="cart" path="cart" element={<CartPage />} />,
     <Route key="orders" path="orders" element={<OrdersPage />} />,
+    <Route key="order" path="orders/:id" element={<OrderDetailPage />} />,
   ]
 }
 
@@ -40,6 +43,10 @@ function App() {
       <Route path="/" element={<Layout />}>
         {storefrontRoutes()}
       </Route>
+      {/* Checkout sits OUTSIDE Layout: the design gives it its own minimal
+          chrome (logo, steps, "Secure") and no site nav — the one page the
+          shop wants no wandering from is the one with the money on it. */}
+      <Route path="/checkout" element={<CheckoutPage />} />
 
       {/* The other languages are enumerated rather than matched with a
           `/:locale` param. A param would happily match `/cart` and treat
@@ -48,6 +55,9 @@ function App() {
         <Route key={code} path={`/${code}`} element={<Layout />}>
           {storefrontRoutes()}
         </Route>
+      ))}
+      {PREFIXED_LOCALES.map((code) => (
+        <Route key={`${code}-checkout`} path={`/${code}/checkout`} element={<CheckoutPage />} />
       ))}
 
       {/* Admin keeps its own chrome: no storefront header or footer, and no

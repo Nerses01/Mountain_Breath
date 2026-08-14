@@ -12,6 +12,11 @@ type CartItem struct {
 	StockQty    int
 	Qty         int
 
+	// IsColdChain rides along from the product (E3) because shipping needs
+	// it: one chilled jar anywhere in the basket adds the cold-chain
+	// surcharge to the whole parcel.
+	IsColdChain bool
+
 	// PriceMinor is the unit price in the currency this request resolved to
 	// — the number the arithmetic on this screen uses.
 	PriceMinor int64

@@ -1,6 +1,8 @@
 import type { Currency } from '../lib/currencies'
 import type {
+  Address,
   AdminProduct,
+  CheckoutInput,
   AdminReview,
   ApiErrorBody,
   NewReview,
@@ -247,8 +249,14 @@ export const api = {
   // The currency in the URL is what the customer is BILLED in — the server
   // reads it from the request, never from a body field, so a client cannot
   // name the cheaper of two markets for a basket priced in the dearer one.
-  checkout: () => request<Order>(withView('/api/v1/orders'), { method: 'POST' }),
+  // The body carries the customer's CHOICES and no money (E6).
+  checkout: (input: CheckoutInput) =>
+    request<Order>(withView('/api/v1/orders'), { method: 'POST', body: input }),
   myOrders: () => request<Order[]>('/api/v1/orders'),
+  getOrder: (id: number) => request<Order>(`/api/v1/orders/${id}`),
+  // 404 means "no saved address yet" — a first checkout — and the caller
+  // renders an empty form for it rather than an error.
+  defaultAddress: () => request<Address>('/api/v1/account/address'),
 
   // admin
   createCategory: (data: NewCategory) =>

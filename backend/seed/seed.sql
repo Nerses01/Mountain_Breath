@@ -587,8 +587,11 @@ ON CONFLICT (email) DO NOTHING;
 -- One delivered order per reviewer, containing the cheapest variant of every
 -- product they review. `delivered` is the point: the store checks for that
 -- exact status, so an order in any other state grants no standing.
-INSERT INTO orders (user_id, status, total_minor, currency)
-SELECT u.id, 'delivered', 0, 'USD'
+-- payment_method is explicit because migration 000017 deliberately dropped
+-- its default — precisely so an INSERT that forgets it fails like this one
+-- did on a fresh database, instead of silently guessing.
+INSERT INTO orders (user_id, status, total_minor, currency, payment_method)
+SELECT u.id, 'delivered', 0, 'USD', 'card'
 FROM users u
 WHERE u.email IN ('anahit@example.com', 'vahe@example.com',
                   'mariam@example.com', 'sergey@example.com')

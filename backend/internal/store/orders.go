@@ -20,7 +20,13 @@ import (
 // order is a fact about a transaction that happened in exactly one of them,
 // which is why nothing below is dual and every number that follows is
 // denominated in this one currency.
-func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.Currency) (domain.Order, error) {
+//
+// E6 added `in` — the customer's CHOICES (address, method, note), already
+// validated by the API layer. Note what the function still computes for
+// itself: the subtotal from locked shelf prices, the shipping from the
+// rates table, the totals from domain arithmetic. Nothing in `in` is money,
+// so nothing a client sends can change what is charged.
+func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.Currency, in domain.CheckoutInput) (domain.Order, error) {
 	if currency == "" {
 		currency = domain.DefaultCurrency
 	}
@@ -44,6 +50,7 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 	// LEFT-join-shaped by nature — it may legitimately return nothing.
 	rows, err := tx.Query(ctx, `
 		SELECT ci.variant_id, ci.qty, v.stock_qty, v.label, p.name, p.id,
+		       p.is_cold_chain,
 		       (SELECT ep.price_minor
 		          FROM variant_effective_prices ep
 		         WHERE ep.variant_id = v.id AND ep.currency = $2) AS price_minor
@@ -59,9 +66,10 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 	}
 
 	type line struct {
-		variantID int64
-		qty       int
-		stockQty  int
+		variantID   int64
+		qty         int
+		stockQty    int
+		isColdChain bool
 		// A POINTER, because the answer to "what does this cost in drams?"
 		// can genuinely be "nothing on file". Browsing degrades over that;
 		// checkout must not, so it becomes an error below rather than a zero.
@@ -73,7 +81,8 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 	var lines []line
 	for rows.Next() {
 		var l line
-		if err := rows.Scan(&l.variantID, &l.qty, &l.stockQty, &l.label, &l.name, &l.productID, &l.priceMinor); err != nil {
+		if err := rows.Scan(&l.variantID, &l.qty, &l.stockQty, &l.label, &l.name, &l.productID,
+			&l.isColdChain, &l.priceMinor); err != nil {
 			rows.Close()
 			return domain.Order{}, fmt.Errorf("scanning cart line: %w", err)
 		}
@@ -89,7 +98,8 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 	}
 
 	// Validate stock under the lock — nobody can change it while we hold it.
-	var total int64
+	var subtotal int64
+	var hasColdChain bool
 	for _, l := range lines {
 		if l.priceMinor == nil {
 			return domain.Order{}, fmt.Errorf("%w: %s (%s) in %s",
@@ -98,8 +108,29 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 		if l.stockQty < l.qty {
 			return domain.Order{}, fmt.Errorf("%w: %s (%s)", domain.ErrInsufficientStock, l.name, l.label)
 		}
-		total += *l.priceMinor * int64(l.qty)
+		subtotal += *l.priceMinor * int64(l.qty)
+		hasColdChain = hasColdChain || l.isColdChain
 	}
+
+	// Shipping, read INSIDE the transaction like everything else the order
+	// depends on. A market with no rate row cannot be charged shipping,
+	// which means it cannot be charged at all — same refusal, same sentinel,
+	// as a variant with no price.
+	var rate domain.ShippingRate
+	err = tx.QueryRow(ctx, `
+		SELECT base_minor, cold_chain_surcharge_minor, free_over_minor
+		FROM shipping_rates
+		WHERE method = 'standard' AND currency = $1`, currency,
+	).Scan(&rate.BaseMinor, &rate.ColdChainSurchargeMinor, &rate.FreeOverMinor)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Order{}, fmt.Errorf("%w: no shipping rate in %s",
+				domain.ErrPriceUnavailable, currency)
+		}
+		return domain.Order{}, fmt.Errorf("reading shipping rate: %w", err)
+	}
+
+	totals := domain.ComputeTotals(subtotal, rate.ShippingFor(subtotal, hasColdChain), 0)
 
 	// The rate on file at this instant, purely so the order stays reportable
 	// later. Nothing above depends on it: the total is a sum of shelf prices.
@@ -118,17 +149,43 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 	}
 
 	order := domain.Order{
-		UserID: userID, Status: domain.OrderPending, TotalMinor: total,
+		UserID: userID, Status: domain.OrderPending, TotalMinor: totals.TotalMinor,
 		Currency: currency, FxRateUsed: fxRate,
+		ShipTo: &in.Address, DeliveryNote: in.DeliveryNote,
+		LeaveWithNeighbour: in.LeaveWithNeighbour,
+		Totals:             totals,
+		PaymentMethod:      in.PaymentMethod,
+		// Every method lands unpaid — card is a stub until Phase 11, a bank
+		// transfer has not cleared, and cash has not been handed over. The
+		// admin flips it; the column exists so that flip is a recorded fact.
+		PaymentStatus: domain.PaymentUnpaid,
 	}
 	err = tx.QueryRow(ctx, `
-		INSERT INTO orders (user_id, status, total_minor, currency, fx_rate_used)
-		VALUES ($1, $2, $3, $4, $5::numeric)
+		INSERT INTO orders (user_id, status, total_minor, currency, fx_rate_used,
+		                    subtotal_minor, shipping_minor, discount_minor, tax_minor,
+		                    payment_method, payment_status,
+		                    ship_first_name, ship_last_name, ship_phone, ship_street,
+		                    ship_city, ship_postal_code, ship_country,
+		                    delivery_note, leave_with_neighbour)
+		VALUES ($1, $2, $3, $4, $5::numeric,
+		        $6, $7, $8, $9, $10, $11,
+		        $12, $13, $14, $15, $16, $17, $18, $19, $20)
 		RETURNING id, created_at`,
-		userID, order.Status, total, currency, fxRate,
+		userID, order.Status, totals.TotalMinor, currency, fxRate,
+		totals.SubtotalMinor, totals.ShippingMinor, totals.DiscountMinor, totals.TaxMinor,
+		order.PaymentMethod, order.PaymentStatus,
+		in.Address.FirstName, in.Address.LastName, in.Address.Phone, in.Address.Street,
+		in.Address.City, in.Address.PostalCode, in.Address.Country,
+		in.DeliveryNote, in.LeaveWithNeighbour,
 	).Scan(&order.ID, &order.CreatedAt)
 	if err != nil {
 		return domain.Order{}, fmt.Errorf("inserting order: %w", err)
+	}
+
+	// The address book, updated in the SAME transaction: if the order fails,
+	// the book does not learn a half-checked-out address.
+	if err := upsertDefaultAddress(ctx, tx, userID, in.Address); err != nil {
+		return domain.Order{}, err
 	}
 
 	for _, l := range lines {
@@ -197,9 +254,59 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 	return order, nil
 }
 
+// orderColumns is the one list every order read shares — E4's "same
+// predicate by construction" rule applied to a SELECT list, after E6 grew it
+// to twenty-odd columns and three hand-copied variants stopped being
+// reviewable.
+//
+// Every column is QUALIFIED with the table name, and that is a bug fix, not
+// style: the admin listing joins users, whose own `id` made a bare `id`
+// ambiguous — Postgres 42702 on every /admin/orders request. Aliasing the
+// OTHER table does not help (the alias renames it, it does not remove its
+// columns from the namespace); only qualifying these does. Qualified names
+// cost nothing in the single-table queries, so the shared constant carries
+// them everywhere. Found in the RUNNING shop, not by the suite — the fake
+// store cannot mis-parse SQL, and no integration test called ListAllOrders;
+// TestListAllOrders now does.
+const orderColumns = `orders.id, orders.user_id, orders.status,
+	orders.total_minor, orders.created_at,
+	orders.currency, orders.fx_rate_used::text,
+	orders.subtotal_minor, orders.shipping_minor, orders.discount_minor,
+	orders.tax_minor, orders.payment_method, orders.payment_status,
+	orders.ship_first_name, orders.ship_last_name, orders.ship_phone,
+	orders.ship_street, orders.ship_city, orders.ship_postal_code,
+	orders.ship_country, orders.delivery_note, orders.leave_with_neighbour`
+
+// scanOrder reads one row of orderColumns (plus whatever the caller
+// appended) into a domain.Order. The ship_* columns are nullable — orders
+// made before E6 genuinely had no address — so they scan into pointers and
+// only a complete row becomes a ShipTo.
+func scanOrder(row pgx.Row, extra ...any) (domain.Order, error) {
+	var o domain.Order
+	var first, last, phone, street, city, postal, country *string
+	dest := []any{&o.ID, &o.UserID, &o.Status, &o.TotalMinor, &o.CreatedAt,
+		&o.Currency, &o.FxRateUsed,
+		&o.Totals.SubtotalMinor, &o.Totals.ShippingMinor,
+		&o.Totals.DiscountMinor, &o.Totals.TaxMinor,
+		&o.PaymentMethod, &o.PaymentStatus,
+		&first, &last, &phone, &street, &city, &postal, &country,
+		&o.DeliveryNote, &o.LeaveWithNeighbour}
+	if err := row.Scan(append(dest, extra...)...); err != nil {
+		return domain.Order{}, err
+	}
+	o.Totals.TotalMinor = o.TotalMinor
+	if street != nil {
+		o.ShipTo = &domain.Address{
+			FirstName: *first, LastName: *last, Phone: *phone,
+			Street: *street, City: *city, PostalCode: *postal, Country: *country,
+		}
+	}
+	return o, nil
+}
+
 func (s *Store) ListOrdersByUser(ctx context.Context, userID int64) ([]domain.Order, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, user_id, status, total_minor, created_at, currency, fx_rate_used::text
+		SELECT `+orderColumns+`
 		FROM orders
 		WHERE user_id = $1
 		ORDER BY created_at DESC`,
@@ -223,11 +330,10 @@ func (s *Store) ListOrdersByUser(ctx context.Context, userID int64) ([]domain.Or
 // customer's email joined in.
 func (s *Store) ListAllOrders(ctx context.Context) ([]domain.Order, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT o.id, o.user_id, o.status, o.total_minor, o.created_at,
-		       o.currency, o.fx_rate_used::text, u.email
-		FROM orders o
-		JOIN users u ON u.id = o.user_id
-		ORDER BY o.created_at DESC
+		SELECT `+orderColumns+`, u.email
+		FROM orders
+		JOIN users u ON u.id = orders.user_id
+		ORDER BY orders.created_at DESC
 		LIMIT 200`)
 	if err != nil {
 		return nil, fmt.Errorf("querying all orders: %w", err)
@@ -236,11 +342,12 @@ func (s *Store) ListAllOrders(ctx context.Context) ([]domain.Order, error) {
 
 	orders := make([]domain.Order, 0)
 	for rows.Next() {
-		var o domain.Order
-		if err := rows.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalMinor, &o.CreatedAt,
-			&o.Currency, &o.FxRateUsed, &o.UserEmail); err != nil {
+		var email string
+		o, err := scanOrder(rows, &email)
+		if err != nil {
 			return nil, fmt.Errorf("scanning order row: %w", err)
 		}
+		o.UserEmail = email
 		orders = append(orders, o)
 	}
 	if err := rows.Err(); err != nil {
@@ -261,13 +368,11 @@ func (s *Store) UpdateOrderStatus(ctx context.Context, orderID int64, to string)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	var o domain.Order
-	err = tx.QueryRow(ctx, `
-		SELECT id, user_id, status, total_minor, created_at, currency, fx_rate_used::text
+	o, err := scanOrder(tx.QueryRow(ctx, `
+		SELECT `+orderColumns+`
 		FROM orders WHERE id = $1
 		FOR UPDATE`,
-		orderID,
-	).Scan(&o.ID, &o.UserID, &o.Status, &o.TotalMinor, &o.CreatedAt, &o.Currency, &o.FxRateUsed)
+		orderID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Order{}, domain.ErrNotFound
@@ -306,9 +411,8 @@ func (s *Store) UpdateOrderStatus(ctx context.Context, orderID int64, to string)
 func scanOrders(rows pgx.Rows) ([]domain.Order, error) {
 	orders := make([]domain.Order, 0)
 	for rows.Next() {
-		var o domain.Order
-		if err := rows.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalMinor, &o.CreatedAt,
-			&o.Currency, &o.FxRateUsed); err != nil {
+		o, err := scanOrder(rows)
+		if err != nil {
 			return nil, fmt.Errorf("scanning order row: %w", err)
 		}
 		orders = append(orders, o)
@@ -317,6 +421,28 @@ func scanOrders(rows pgx.Rows) ([]domain.Order, error) {
 		return nil, fmt.Errorf("iterating order rows: %w", err)
 	}
 	return orders, nil
+}
+
+// GetOrder loads one order with its items — the confirmation page's read.
+// It does NOT filter by user: ownership is the API layer's question (the
+// admin may see any order), and answering it here would force two methods
+// for one query.
+func (s *Store) GetOrder(ctx context.Context, orderID int64) (domain.Order, error) {
+	o, err := scanOrder(s.pool.QueryRow(ctx, `
+		SELECT `+orderColumns+`
+		FROM orders WHERE id = $1`, orderID))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Order{}, domain.ErrNotFound
+		}
+		return domain.Order{}, fmt.Errorf("querying order %d: %w", orderID, err)
+	}
+
+	orders := []domain.Order{o}
+	if err := s.attachOrderItems(ctx, orders); err != nil {
+		return domain.Order{}, err
+	}
+	return orders[0], nil
 }
 
 // attachOrderItems batch-loads items for all orders in one query (same

@@ -90,11 +90,23 @@ type CartStore interface {
 type OrderStore interface {
 	// The currency is what the customer is CHARGED in, so it is decided at
 	// the edge (withCurrency) and stamped on the order — not read back off
-	// the cart, which has no single currency of its own.
-	CreateOrder(ctx context.Context, userID int64, currency domain.Currency) (domain.Order, error)
+	// the cart, which has no single currency of its own. The CheckoutInput
+	// carries the customer's CHOICES and no money; see domain.CheckoutInput.
+	CreateOrder(ctx context.Context, userID int64, currency domain.Currency, in domain.CheckoutInput) (domain.Order, error)
+	// GetOrder is unscoped; the handler decides who may see it (owner or
+	// admin) — the store answers "what is order 12", not "may you look".
+	GetOrder(ctx context.Context, orderID int64) (domain.Order, error)
 	ListOrdersByUser(ctx context.Context, userID int64) ([]domain.Order, error)
 	ListAllOrders(ctx context.Context) ([]domain.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID int64, to string) (domain.Order, error)
+}
+
+// CheckoutStore is E6's slice: the pieces a checkout screen needs before an
+// order exists — a shipping quote for the summary card and the saved
+// address for pre-filling the form.
+type CheckoutStore interface {
+	ShippingRates(ctx context.Context) (map[domain.Currency]domain.ShippingRate, error)
+	DefaultAddress(ctx context.Context, userID int64) (domain.Address, error)
 }
 
 // Store embeds the per-entity interfaces into the one the Server depends on.
@@ -106,6 +118,7 @@ type Store interface {
 	SessionStore
 	CartStore
 	OrderStore
+	CheckoutStore
 }
 
 // Server holds the dependencies of the HTTP layer. Handlers are methods on it,
@@ -184,6 +197,11 @@ func (s *Server) Routes() chi.Router {
 			r.Delete("/cart/items/{variantID}", s.handleDeleteCartItem)
 			r.Post("/orders", s.handleCreateOrder)
 			r.Get("/orders", s.handleListMyOrders)
+			r.Get("/orders/{id}", s.handleGetOrder)
+			// The saved address, for pre-filling the checkout form. Under
+			// /account rather than /addresses because E8's account page is
+			// its natural home and the URL should not have to move.
+			r.Get("/account/address", s.handleGetDefaultAddress)
 			// Writing a review needs a session; the store additionally
 			// requires a DELIVERED order containing the product.
 			r.Post("/products/{slug}/reviews", s.handleCreateReview)

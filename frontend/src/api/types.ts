@@ -223,13 +223,51 @@ export interface CartItem {
 export interface Cart {
   items: CartItem[]
   currency: Currency
-  total_minor: number
   /**
-   * The basket summed independently in each market — never converted from
-   * one to another, because rounding a sum is not the sum of roundings.
+   * E6: total_minor now MEANS subtotal + shipping — what "Total" says on the
+   * design's summary card. subtotal_minor is the old sum-of-lines.
+   */
+  subtotal_minor: number
+  shipping_minor: number
+  total_minor: number
+  /** True when any line is chilled — the "Chilled shipping" label's flag. */
+  has_cold_chain: boolean
+  /**
+   * The same figures in every market, summed independently — never converted
+   * from one to another, because rounding a sum is not the sum of roundings.
    * A market any line cannot be priced in is absent rather than understated.
    */
+  subtotals: Money
+  shipping: Money
   totals: Money
+}
+
+// --- Checkout (E6) ------------------------------------------------------
+
+export interface Address {
+  first_name: string
+  last_name: string
+  phone: string
+  street: string
+  city: string
+  postal_code: string
+  country: string
+}
+
+export type PaymentMethod = 'card' | 'bank_transfer' | 'cash_on_delivery'
+export type PaymentStatus = 'unpaid' | 'paid' | 'refunded'
+
+/**
+ * Everything the client CONTRIBUTES to an order — note there is no money in
+ * it. Items come from the cart, prices from the server's own tables, the
+ * currency from the request; a body that smuggles a total is refused with a
+ * 400 before any handler code runs.
+ */
+export interface CheckoutInput {
+  address: Address
+  payment_method: PaymentMethod
+  delivery_note: string
+  leave_with_neighbour: boolean
 }
 
 export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
@@ -244,10 +282,25 @@ export interface OrderItem {
 export interface Order {
   id: number
   status: OrderStatus
-  total_minor: number
   created_at: string
   user_email?: string // present in admin responses only
   items: OrderItem[]
+
+  /** The five-figure breakdown (E6). tax_minor is CONTAINED in the subtotal
+   *  ("Prices include VAT") — display it, never add it. */
+  subtotal_minor: number
+  shipping_minor: number
+  discount_minor: number
+  tax_minor: number
+  total_minor: number
+
+  payment_method: PaymentMethod
+  payment_status: PaymentStatus
+
+  /** The frozen snapshot; absent on orders that predate checkout-with-address. */
+  ship_to?: Address
+  delivery_note?: string
+  leave_with_neighbour: boolean
   /**
    * What the customer was actually charged in. An order carries ONE currency
    * and no second price — unlike a cart, which is a live thing that can be
