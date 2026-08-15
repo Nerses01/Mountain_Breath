@@ -198,12 +198,12 @@ answered earlier than it needs to be.
       `product_variants.price_minor` in the same step rather than keeping a
       synced copy, which cost one extra piece of work (a price box per market
       in the admin editor) and bought one source of truth per number.
-- [ ] **3. Content storage.** "Our hive"/"Benefits"/"Journal" as markdown in
-      the repo (versioned with the code, zero backend) or DB-backed so the
-      family edits without a deploy? E9 recommends markdown for v1. Now a
-      three-language question too: markdown means one file per locale
-      (`our-hive.en.md` / `.hy.md` / `.ru.md`) per page; DB-backed means a
-      `page_translations` table mirroring decision #6.
+- [x] **3. Content storage — markdown in the repo**, as E9 recommended: one
+      file per page per locale in `frontend/src/content/`, bundled at build
+      time, versioned with the code. Zero backend, zero runtime cost;
+      editing a page is a commit. The cost accepted: the family needs a
+      commit (or a git lesson) to change a paragraph — revisit toward
+      DB-backed pages only if that actually hurts. *(Decided 2026-08-15.)*
 - [ ] **4. Product editorial fields** (E3): explicit columns and child
       tables, or one JSONB `content` column? Columns give constraints and
       clean admin forms; JSONB avoids a migration per field but loses FK
@@ -1573,25 +1573,91 @@ book). `go test ./...` green, `golangci-lint` 0 issues, `tsc -b`, `oxlint`,
 is the legal default, build-time content indexing.
 
 **Backend:**
-- [ ] Migration: `newsletter_subscribers` (email, token_sha256, confirmed_at,
-      unsubscribed_at) with **double opt-in** — reusing the token pattern from
-      E8 a third time.
-- [ ] `POST /newsletter/subscribe`, `GET /newsletter/confirm?token=`,
-      unsubscribe link.
-- [ ] Only if decision #3 chose DB-backed content: `pages` and `posts` tables
-      plus admin CRUD. Otherwise no backend work.
+- [x] Migration `000020`: `newsletter_subscribers` (email, token_sha256,
+      confirmed_at, unsubscribed_at) with **double opt-in** — the token
+      pattern's fourth use, with a twist the reset habit must NOT carry
+      over: this token is **not single-use and never expires** (decision
+      #78). It is the subscriber's permanent capability — the confirm link
+      today, the unsubscribe link at the foot of every future issue, and
+      rotating it would break the one link that must never break. The
+      lifecycle is three timestamps, not a status enum; a live recipient is
+      `confirmed_at IS NOT NULL AND unsubscribed_at IS NULL`. One upsert
+      covers every history an address can have, including the two easy to
+      get wrong: a live subscriber re-submitting gets NO mail (the shop
+      spamming its own readers), and a returning unsubscriber is a NEW
+      consent that must be proven again.
+- [x] `POST /newsletter/subscribe` (204 whatever the history — no
+      membership oracle; rate limited — unthrottled it is a spam cannon),
+      ~~`GET /newsletter/confirm?token=`~~ → **`POST /newsletter/confirm`
+      and `POST /newsletter/unsubscribe`, a deliberate departure** (decision
+      #79): corporate mail scanners prefetch every GET link in incoming
+      mail, so a mutating GET gets "clicked" by a robot before the human
+      opens the message — auto-completing the very consent double opt-in
+      exists to prove. The emailed link lands on a frontend PAGE whose
+      button does the POST; scanners follow GETs, they do not press
+      buttons. Confirmation mail in all three locales; both actions
+      idempotent (people re-click links from inboxes).
+- [x] Decision #3 chose markdown, so no pages/posts tables — the only
+      backend this phase is the newsletter above.
 
 **Frontend:**
-- [ ] Content pages: Our hive, Benefits, Harvest log, Shipping, Contact, Terms,
-      Privacy. Recommended: markdown in `src/content/` compiled at build time —
-      versioned with the code, no runtime cost, no CMS to operate. One file
-      per locale (`our-hive.en.md`, `.hy.md`, `.ru.md`) if decision #3 keeps
-      markdown, per the note added to that decision.
-- [ ] Journal: post list + detail, shared card component with the product grid.
-- [ ] Footer newsletter form wired with inline confirmation.
+- [x] Content pages: Our hive, Benefits, Shipping, Contact, Terms, Privacy —
+      **six, not the plan's seven: "Harvest log" is the design's own name
+      for what the nav calls the Journal**, so both labels point at
+      `/journal` rather than a second page satisfying a synonym. Markdown
+      in `src/content/pages/`, one file per locale (18 files), bundled via
+      Vite's eager glob import — no CMS, no runtime fetch, and a missing
+      translation falls back per FILE to English, mirroring the API's
+      per-field fallback. Rendered by `marked` (the second deliberate
+      dependency after i18next: markdown is a real parser, and hand-rolling
+      one badly is the trap) into hand-rolled `.prose` styles on the design
+      tokens — `@tailwindcss/typography` would ship a whole opinionated
+      design to fight token by token for nine rules. Unsanitized
+      `dangerouslySetInnerHTML` is a recorded decision with a tripwire: the
+      content is repo-authored, and the moment any of it comes from a
+      database or form, DOMPurify walks in.
+- [x] Journal: post list + detail, three posts ×3 locales with a
+      ten-line hand-rolled frontmatter parser (three known string fields
+      between two fences is not a YAML document). Slugs come from the
+      English files — English is the reference locale for content exactly
+      as for UI strings. Dates render per-locale via `Intl`.
+- [x] Footer newsletter form wired with inline confirmation — the success
+      copy is the honest half-promise ("check your inbox, one click
+      confirms it"), because the 204 tells the page nothing more and
+      claiming more would re-open the oracle. Plus the two emailed-link
+      landing pages, whose **button press is the consent**: nothing fires
+      on page load, pinned by a test, because some scanners execute
+      JavaScript and an auto-POST-on-load page would be a mutating GET with
+      extra steps. Header nav's three waiting destinations went live;
+      footer company + legal links resolve.
 
 **Done when:** all five header links and every footer link resolve, and a
 subscription requires confirming the email.
+✅ **Complete 2026-08-15.** The link half is a Playwright journey that
+clicks every header, footer and journal link in a real browser (plus the
+Armenian page body, not just Armenian chrome). The confirmation half was
+proven live through Mailpit: subscribe 204 → row `confirmed = f` → Armenian
+mail → confirm 204 → `t` → unsubscribe 204 on the same permanent token.
+`go test ./...` green, `golangci-lint` 0 issues, `tsc -b`, `oxlint`,
+`npm test` (151), all three e2e journeys. Postman 86 → 90 requests.
+
+**Findings while building:**
+
+- **The mock's vocabulary needed reconciling with itself**: the header says
+  Journal, the footer says Harvest log, the home page says "Read the
+  harvest log" — one page, three labels. Modelling them as one route with
+  the design's own words kept both the canvas and the information
+  architecture honest.
+- **"Compiled at build time" turned out to mean the bundler's glob import**,
+  not a build step: `import.meta.glob(…, { eager: true, query: '?raw' })`
+  inlines every file keyed by path, which makes a missing translation a
+  missing KEY — the same failure shape as the message catalogues, handled
+  by the same fallback philosophy.
+- **Consent flows are designed around robots now**: the GET-link
+  auto-confirm problem (scanners), the JS-on-load auto-confirm problem
+  (scanners that render), and the button that only a human presses. The
+  backend's double opt-in is only as strong as the dumbest machine between
+  the mail and the click.
 
 ---
 

@@ -11,17 +11,15 @@ import { SearchOverlay } from './SearchOverlay'
 /**
  * The design's header: brand block, five nav links, icon row, cart pill.
  *
- * Three of the five nav destinations (Our hive, Benefits, Journal) are not
- * built until E9. They render as plain text rather than links, so the header
- * keeps the shape the design gives it without shipping links that navigate
- * to a blank page. E9 turns them into <Link>s by giving them a `to`.
+ * All five nav destinations are live since E9 gave the last three their
+ * pages — the `to: undefined` plain-text state they waited in is gone.
  */
 const NAV = [
   { key: 'home', to: '/' },
   { key: 'shop', to: '/shop' },
-  { key: 'ourHive', to: undefined },
-  { key: 'benefits', to: undefined },
-  { key: 'journal', to: undefined },
+  { key: 'ourHive', to: '/our-hive' },
+  { key: 'benefits', to: '/benefits' },
+  { key: 'journal', to: '/journal' },
 ] as const
 
 export function SiteHeader() {

@@ -17,6 +17,67 @@ Template for an entry:
 
 ---
 
+## 2026-08-15 — Phase E9: content without a CMS, consent despite the robots
+
+**Worked on:** migration 000020 (`newsletter_subscribers`, double opt-in);
+subscribe/confirm/unsubscribe endpoints with the trilingual confirmation
+mail; the markdown pipeline (glob import, `marked`, hand-rolled frontmatter
+and `.prose` styles); 27 content files — six pages and three journal posts
+in three languages; the journal list and post pages; the emailed-link
+landing pages; the footer form gone live; every waiting nav and footer link
+wired; the link-resolution e2e journey.
+
+**Learned:**
+
+- **A bundler can be a content pipeline.** `import.meta.glob` with `eager`
+  and `?raw` turns a directory of markdown into an object in the bundle —
+  "compiled at build time" without any build step to maintain. A missing
+  translation becomes a missing KEY, the same failure shape as the message
+  catalogues, so the same per-file English fallback covers it. The whole
+  CMS is forty lines and a naming convention.
+- **Know when a format needs a parser and when it does not.** Markdown got
+  a dependency (`marked`) because its grammar is genuinely recursive and a
+  homemade parser fails on real documents. Frontmatter did NOT: three
+  `key: value` lines between fences is a ten-line loop, and importing a
+  YAML engine for it would be the same trap pointed the other way. The
+  skill is telling the two cases apart, not a blanket rule.
+- **Consent flows are adversarial against robots, not people.** Mail
+  scanners prefetch GET links — so the confirm link cannot be a mutating
+  GET (the plan's original shape, deliberately abandoned). Some scanners
+  execute JavaScript — so the landing page cannot auto-POST on load either.
+  The only click a robot never makes is a form submission, which is why the
+  button IS the consent, and why a test asserts zero requests fire on load.
+- **Not every token is a secret with a fuse.** After three uses of
+  raw-token/SHA-256-with-expiry-and-single-use, the newsletter token broke
+  the habit on purpose: it is a permanent capability, because the
+  unsubscribe link in a year-old email must still work. Recognizing which
+  properties of a pattern are essential (hashing at rest) and which were
+  contextual (expiry, single use) is what stops a pattern from becoming a
+  cargo cult.
+- **Lifecycle as timestamps beats lifecycle as enum.** `confirmed_at` +
+  `unsubscribed_at` made every rule a one-line SQL predicate — including
+  the two subtle ones: a live re-subscriber must get no mail (and keep
+  their token), and a returning unsubscriber is a new consent on a fresh
+  token. An enum would have stored the conclusion and lost the evidence.
+- **Unsanitized HTML can be a correct decision if you write down its
+  boundary.** Repo-authored markdown needs no DOMPurify — its authors can
+  already commit code. The comment in `Markdown.tsx` states the tripwire
+  (any database- or form-sourced content) so the decision cannot silently
+  outlive its premise.
+
+**Questions / to revisit:**
+
+- Actually SENDING a newsletter (composing an issue to all live
+  subscribers) is deliberately unbuilt — the list is collected with
+  consent, the sender is a Phase 11 conversation.
+- Native review of ~4,500 words of new Armenian/Russian content copy — the
+  legal pages especially.
+- If the family ever needs to edit pages without a commit, decision #3's
+  markdown migrates to DB-backed pages without URL changes; the journal
+  would go first.
+
+---
+
 ## 2026-08-15 — Phase E8: accounts, tokens, and the flows that leave the app
 
 **Worked on:** migration 000019 (`wishlist_items`, `password_reset_tokens`,

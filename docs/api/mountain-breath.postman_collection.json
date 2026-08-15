@@ -4290,6 +4290,202 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Newsletter (E9)",
+      "description": "Double opt-in: typing an address proves nothing (anyone can type anyone's), so the row is created unconfirmed and only the emailed link's click makes it live. The token is the sessions pattern's fourth use with one twist: it is NOT single-use and does NOT expire — it is the subscriber's permanent capability (confirm today, the unsubscribe link at the foot of every future issue).\n\nConfirm and unsubscribe are POSTs from the emailed link's PAGE, a deliberate departure from the plan's GET: corporate mail scanners prefetch every GET link in incoming mail, and a mutating GET gets 'clicked' by a robot before the human opens the message — auto-confirming the very consent double opt-in exists to prove. Scanners follow GETs; they do not submit forms.",
+      "item": [
+        {
+          "name": "Subscribe — always 204",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/newsletter/subscribe?lang=hy",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "newsletter",
+                "subscribe"
+              ],
+              "query": [
+                {
+                  "key": "lang",
+                  "value": "hy"
+                }
+              ]
+            },
+            "description": "The footer form. 204 whatever the address's history (never seen, pending, already live) — no membership oracle. An already-confirmed subscriber gets NO mail, or every form submit would re-spam the shop's most loyal readers. Rate limited per (IP, email) like login: this endpoint mails arbitrary addresses on request, which unthrottled is a spam cannon. The lang matters — the confirm link lands the reader back in their language.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"postman-reader@example.test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204, whatever the history\", () => {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Subscribe — not an address (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/newsletter/subscribe",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "newsletter",
+                "subscribe"
+              ]
+            },
+            "description": "The one validation: net/mail's RFC grammar (shared with registration via domain.ValidEmail), refused as a field error before any row exists.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"not-an-address\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"field error on email\", () => {",
+                  "    pm.expect(pm.response.json().error.fields.email).to.eql(\"email_format\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm — invented token (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/newsletter/confirm",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "newsletter",
+                "confirm"
+              ]
+            },
+            "description": "The real token arrives only by mail (raw in the message, SHA-256 in the table). Confirming is IDEMPOTENT — people re-click links from their inbox, and 'already confirmed' rendered as an error would read as failure to someone who did everything right. Only an invented token fails.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"token\": \"0000000000000000000000000000000000000000000000000000000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code is invalid_token\", () => {",
+                  "    pm.expect(pm.response.json().error.code).to.eql(\"invalid_token\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unsubscribe — invented token (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/newsletter/unsubscribe",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "newsletter",
+                "unsubscribe"
+              ]
+            },
+            "description": "The same permanent capability pointed the other way, equally idempotent. A real unsubscribe link must keep working forever — it is the one link in any newsletter that must never break.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"token\": \"0000000000000000000000000000000000000000000000000000000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

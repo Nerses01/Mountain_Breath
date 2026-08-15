@@ -483,6 +483,27 @@ export const en = {
       requestNew: 'Request a new one.',
     },
   },
+  // ---- Journal & content pages (E9) --------------------------------------
+  journal: {
+    eyebrow: 'Harvest notes',
+    title: 'The journal',
+    blurb: 'What is flowering, what we are jarring, and who lifted a frame — the meadow, written down.',
+    readMore: 'Read on →',
+    notFound: 'This entry does not exist (anymore?).',
+    backToList: '← All entries',
+    newsletter: {
+      confirmTitle: 'One click, as promised',
+      confirmBlurb: 'Press the button and the harvest notes are yours — once a month, unsubscribe any time.',
+      confirmAction: 'Confirm my subscription',
+      confirmDone: 'Done — you are on the list. The next letter comes with the next harvest.',
+      unsubscribeTitle: 'Leaving the list',
+      unsubscribeBlurb: 'Press the button and no more letters come. The meadow holds no grudges.',
+      unsubscribeAction: 'Unsubscribe me',
+      unsubscribeDone: 'Done — no more letters. The door stays open.',
+      invalid: 'This link no longer works. If you meant to subscribe, the footer form starts a fresh one.',
+      backHome: '← Back to the shop',
+    },
+  },
   footer: {
     blurb:
       'A family apiary on the high meadows. Honey, beeswax, propolis, royal jelly, pollen and venom, harvested by hand.',
@@ -501,6 +522,9 @@ export const en = {
       blurb: 'What is flowering, what we are jarring. Once a month.',
       placeholder: 'you@email.com',
       submit: 'Join',
+      // The honest half-promise: typing an address subscribes nobody — the
+      // emailed click does (double opt-in), and this copy says exactly that.
+      sent: 'Almost there — check your inbox, one click confirms it.',
     },
     legal: {
       terms: 'Terms',

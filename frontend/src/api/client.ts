@@ -263,6 +263,21 @@ export const api = {
       body: { variant_id: variantId },
     }),
 
+  // E9: the newsletter. Subscribe answers 204 whatever the address's
+  // history (no membership oracle); the lang matters because the confirm
+  // link lands the reader back in their language. Confirm/unsubscribe are
+  // POSTs from the emailed link's PAGE — mail scanners prefetch GET links,
+  // and a mutating GET would let a robot complete the double opt-in.
+  subscribeNewsletter: (email: string) =>
+    request<void>(withView('/api/v1/newsletter/subscribe'), {
+      method: 'POST',
+      body: { email },
+    }),
+  confirmNewsletter: (token: string) =>
+    request<void>('/api/v1/newsletter/confirm', { method: 'POST', body: { token } }),
+  unsubscribeNewsletter: (token: string) =>
+    request<void>('/api/v1/newsletter/unsubscribe', { method: 'POST', body: { token } }),
+
   // E8: the address book behind the checkout's prefill.
   listAddresses: () => request<AddressEntry[]>('/api/v1/account/addresses'),
   createAddress: (input: AddressInput) =>

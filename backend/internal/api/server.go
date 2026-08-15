@@ -156,6 +156,16 @@ type AccountStore interface {
 	FindOrCreateOAuthUser(ctx context.Context, provider, subject, email string) (domain.User, error)
 }
 
+// NewsletterStore is E9's slice: double opt-in, and the token as the
+// subscriber's permanent capability (confirm now, unsubscribe forever).
+type NewsletterStore interface {
+	// needsConfirmation is false for an already-live subscriber — the
+	// handler then sends nothing, but still answers 204.
+	SubscribeNewsletter(ctx context.Context, email, token string) (needsConfirmation bool, err error)
+	ConfirmNewsletter(ctx context.Context, token string) error
+	UnsubscribeNewsletter(ctx context.Context, token string) error
+}
+
 // Store embeds the per-entity interfaces into the one the Server depends on.
 type Store interface {
 	CategoryStore
@@ -168,6 +178,7 @@ type Store interface {
 	CheckoutStore
 	PromoStore
 	AccountStore
+	NewsletterStore
 }
 
 // Options are the E8 dependencies main wires in: how to send mail, the
@@ -275,6 +286,13 @@ func (s *Server) Routes() chi.Router {
 		r.Post("/auth/reset-password", s.handleResetPassword)
 		r.Get("/auth/oauth/google", s.handleGoogleStart)
 		r.Get("/auth/oauth/google/callback", s.handleGoogleCallback)
+		// E9: the newsletter — all anonymous by nature (the footer form and
+		// two emailed-link pages). Confirm/unsubscribe are POSTs on purpose:
+		// mail scanners prefetch GET links, and a mutating GET would let a
+		// robot complete the double opt-in (see newsletter.go).
+		r.Post("/newsletter/subscribe", s.handleNewsletterSubscribe)
+		r.Post("/newsletter/confirm", s.handleNewsletterConfirm)
+		r.Post("/newsletter/unsubscribe", s.handleNewsletterUnsubscribe)
 
 		r.Get("/categories", s.handleListCategories)
 		r.Get("/catalog/facets", s.handleCatalogFacets)

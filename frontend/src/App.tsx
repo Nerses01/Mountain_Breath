@@ -7,6 +7,9 @@ import { AdminProductsPage } from './pages/AdminProductsPage'
 import { AdminReviewsPage } from './pages/AdminReviewsPage'
 import { AccountPage } from './pages/AccountPage'
 import { CartPage } from './pages/CartPage'
+import { ContentPage } from './pages/ContentPage'
+import { JournalPage, JournalPostPage } from './pages/JournalPage'
+import { NewsletterConfirmPage, NewsletterUnsubscribePage } from './pages/NewsletterPages'
 import { CheckoutPage } from './pages/CheckoutPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { OrderDetailPage } from './pages/OrderDetailPage'
@@ -43,6 +46,18 @@ function storefrontRoutes() {
     <Route key="wishlist" path="wishlist" element={<WishlistPage />} />,
     <Route key="forgot" path="forgot-password" element={<ForgotPasswordPage />} />,
     <Route key="reset" path="reset-password/:token" element={<ResetPasswordPage />} />,
+    // E9: the content pages (markdown in the repo, decision #3), the
+    // journal, and the newsletter's emailed-link landing pages.
+    <Route key="our-hive" path="our-hive" element={<ContentPage slug="our-hive" />} />,
+    <Route key="benefits" path="benefits" element={<ContentPage slug="benefits" />} />,
+    <Route key="shipping" path="shipping" element={<ContentPage slug="shipping" />} />,
+    <Route key="contact" path="contact" element={<ContentPage slug="contact" />} />,
+    <Route key="terms" path="terms" element={<ContentPage slug="terms" />} />,
+    <Route key="privacy" path="privacy" element={<ContentPage slug="privacy" />} />,
+    <Route key="journal" path="journal" element={<JournalPage />} />,
+    <Route key="journal-post" path="journal/:slug" element={<JournalPostPage />} />,
+    <Route key="nl-confirm" path="newsletter/confirm/:token" element={<NewsletterConfirmPage />} />,
+    <Route key="nl-unsub" path="newsletter/unsubscribe/:token" element={<NewsletterUnsubscribePage />} />,
   ]
 }
 

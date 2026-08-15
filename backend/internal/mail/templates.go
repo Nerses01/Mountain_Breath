@@ -85,6 +85,44 @@ var orderCopies = map[domain.Locale]orderCopy{
 	},
 }
 
+type newsletterCopy struct {
+	subject string
+	body    string // %s = the confirm link
+	ignore  string
+}
+
+var newsletterCopies = map[domain.Locale]newsletterCopy{
+	domain.LocaleEN: {
+		subject: "Confirm your harvest notes",
+		body:    "One click and you're in: what is flowering, what we are jarring, once a month.\n\nConfirm here:\n%s",
+		ignore:  "If you didn't ask for this, ignore it — nothing will be sent.",
+	},
+	domain.LocaleHY: {
+		subject: "Հաստատեք բերքի նամակների բաժանորդագրությունը",
+		body:    "Մեկ սեղմում, և պատրաստ է. ինչ է ծաղկում, ինչ ենք լցնում բանկաների մեջ՝ ամիսը մեկ։\n\nՀաստատեք այստեղ․\n%s",
+		ignore:  "Եթե դուք չեք խնդրել սա, անտեսեք նամակը — ոչինչ չի ուղարկվի։",
+	},
+	domain.LocaleRU: {
+		subject: "Подтвердите подписку на письма с пасеки",
+		body:    "Один клик — и готово: что цветёт, что разливаем по банкам, раз в месяц.\n\nПодтвердите здесь:\n%s",
+		ignore:  "Если вы этого не просили, просто игнорируйте письмо — ничего не придёт.",
+	},
+}
+
+// NewsletterConfirmMessage is the double-opt-in mail: the click, not the
+// form submit, is what consent means.
+func NewsletterConfirmMessage(locale domain.Locale, to, link string) Message {
+	c, ok := newsletterCopies[locale]
+	if !ok {
+		c = newsletterCopies[domain.LocaleEN]
+	}
+	return Message{
+		To:      to,
+		Subject: c.subject,
+		Text:    fmt.Sprintf(c.body, link) + "\n\n" + c.ignore + "\n",
+	}
+}
+
 // OrderConfirmation builds the receipt mail from an order's SNAPSHOTS — the
 // same rule as the order page: names and prices as charged, one currency,
 // no re-resolution against today's catalog.

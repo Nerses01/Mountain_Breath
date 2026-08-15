@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
-import { useCatalogFacets } from '../../api/hooks'
+import { useCatalogFacets, useSubscribeNewsletter } from '../../api/hooks'
+import { useFieldErrors } from '../../i18n/useFieldErrors'
 import { useLocale } from '../../i18n/useLocale'
 import { Button } from '../ui/Button'
 import { CurrencySwitcher } from '../ui/CurrencySwitcher'
@@ -44,9 +45,16 @@ export function SiteFooter() {
   const facets = useCatalogFacets({})
   const shopLinks = (facets.data?.categories ?? []).slice(0, 4)
 
-  // Company links stay plain text until E9 builds those pages — but their
-  // LABELS are translatable either way.
-  const companyLinks = ['ourHive', 'harvestLog', 'shipping', 'contact'] as const
+  // E9: the company column goes live. "Harvest log" is the design's own
+  // name for what the nav calls the Journal — one page, the mock's two
+  // labels, so both point at /journal rather than inventing a second page
+  // to satisfy a synonym.
+  const companyLinks = [
+    { key: 'ourHive', to: '/our-hive' },
+    { key: 'harvestLog', to: '/journal' },
+    { key: 'shipping', to: '/shipping' },
+    { key: 'contact', to: '/contact' },
+  ] as const
 
   return (
     <footer className="mt-16 bg-bark">
@@ -75,53 +83,101 @@ export function SiteFooter() {
           </FooterColumn>
 
           <FooterColumn title={t('footer:company')}>
-            {companyLinks.map((key) => (
-              <li key={key} className="text-sm text-ink-on-dark-soft">
-                {t(`footer:companyLinks.${key}`)}
+            {companyLinks.map(({ key, to }) => (
+              <li key={key}>
+                <Link
+                  to={localePath(to)}
+                  className="text-sm text-ink-on-dark-soft transition hover:text-ink-on-dark"
+                >
+                  {t(`footer:companyLinks.${key}`)}
+                </Link>
               </li>
             ))}
           </FooterColumn>
 
-          <div className="flex flex-col gap-3">
-            <h2 className="font-display text-sm font-bold uppercase tracking-label text-honey">
-              {t('footer:newsletter.title')}
-            </h2>
-            <p className="text-sm leading-relaxed text-ink-on-dark-soft">
-              {t('footer:newsletter.blurb')}
-            </p>
-            {/* Inert until E9 wires double opt-in; kept as a real <form> so
-                the markup does not have to be rebuilt then. */}
-            <form
-              className="mt-1 flex gap-2"
-              onSubmit={(e) => e.preventDefault()}
-            >
-              <label htmlFor="newsletter-email" className="sr-only">
-                {t('footer:newsletter.title')}
-              </label>
-              <input
-                id="newsletter-email"
-                type="email"
-                placeholder={t('footer:newsletter.placeholder')}
-                className="min-w-0 flex-1 rounded-full bg-bark-soft px-4 py-3 text-sm text-ink-on-dark placeholder:text-ink-on-dark-soft"
-              />
-              <Button type="submit" variant="honey">
-                {t('footer:newsletter.submit')}
-              </Button>
-            </form>
-          </div>
+          <NewsletterSignup />
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-bark-soft pt-5 text-xs text-ink-on-dark-soft">
           <p>{t('footer:legal.rights', { year })}</p>
           <div className="flex flex-wrap items-center gap-6">
-            <span>{t('footer:legal.terms')}</span>
-            <span>{t('footer:legal.privacy')}</span>
+            <Link to={localePath('/terms')} className="transition hover:text-ink-on-dark">
+              {t('footer:legal.terms')}
+            </Link>
+            <Link to={localePath('/privacy')} className="transition hover:text-ink-on-dark">
+              {t('footer:legal.privacy')}
+            </Link>
             <CurrencySwitcher />
             <LanguageSwitcher />
           </div>
         </div>
       </div>
     </footer>
+  )
+}
+
+/**
+ * E9: the footer form goes live with double opt-in. The success copy is the
+ * honest half-promise — "one click left" — because typing an address here
+ * subscribes nobody; the emailed link does. The 204 arrives whatever the
+ * address's history, so this component CANNOT know more than that, and its
+ * copy does not pretend to.
+ */
+function NewsletterSignup() {
+  const { t } = useTranslation()
+  const [email, setEmail] = useState('')
+  const subscribe = useSubscribeNewsletter()
+  const errors = useFieldErrors(subscribe.error)
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email.trim()) return
+    subscribe.mutate(email)
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <h2 className="font-display text-sm font-bold uppercase tracking-label text-honey">
+        {t('footer:newsletter.title')}
+      </h2>
+      <p className="text-sm leading-relaxed text-ink-on-dark-soft">
+        {t('footer:newsletter.blurb')}
+      </p>
+
+      {subscribe.isSuccess ? (
+        <p role="status" className="mt-1 rounded-2xl bg-honey/15 p-4 text-sm text-honey">
+          {t('footer:newsletter.sent')}
+        </p>
+      ) : (
+        <form className="mt-1 flex flex-col gap-2" onSubmit={onSubmit} noValidate>
+          <div className="flex gap-2">
+            <label htmlFor="newsletter-email" className="sr-only">
+              {t('footer:newsletter.title')}
+            </label>
+            <input
+              id="newsletter-email"
+              type="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                subscribe.reset()
+              }}
+              placeholder={t('footer:newsletter.placeholder')}
+              aria-invalid={Boolean(errors.fieldError('email')) || undefined}
+              className="min-w-0 flex-1 rounded-full bg-bark-soft px-4 py-3 text-sm text-ink-on-dark placeholder:text-ink-on-dark-soft"
+            />
+            <Button type="submit" variant="honey" disabled={subscribe.isPending}>
+              {t('footer:newsletter.submit')}
+            </Button>
+          </div>
+          {errors.fieldError('email') && (
+            <p role="alert" className="text-xs text-danger">
+              {errors.fieldError('email')}
+            </p>
+          )}
+        </form>
+      )}
+    </div>
   )
 }
 

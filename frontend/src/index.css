@@ -238,3 +238,89 @@
   border-color: var(--color-line-strong);
   cursor: default;
 }
+
+/* ── Prose (E9) ──────────────────────────────────────────────────────────
+   The content pages' typography, hand-rolled on the design tokens rather
+   than pulling in @tailwindcss/typography — the plugin ships a whole
+   opinionated design we would then fight token by token; the pages need
+   nine rules. Applied by the Markdown component. */
+.prose {
+  max-width: 65ch;
+  color: var(--color-ink-body);
+  font-size: 1.0625rem;
+  line-height: 1.75;
+}
+
+.prose h1,
+.prose h2,
+.prose h3 {
+  font-family: var(--font-display);
+  color: var(--color-ink);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin-top: 2em;
+  margin-bottom: 0.6em;
+}
+
+.prose h1 {
+  font-size: 2.375rem;
+  line-height: 1.15;
+  margin-top: 0;
+}
+
+.prose h2 {
+  font-size: 1.625rem;
+  line-height: 1.3;
+}
+
+.prose h3 {
+  font-size: 1.1875rem;
+}
+
+.prose p,
+.prose ul,
+.prose ol {
+  margin-bottom: 1.1em;
+}
+
+.prose ul,
+.prose ol {
+  padding-inline-start: 1.4em;
+}
+
+.prose ul {
+  list-style: disc;
+}
+
+.prose ol {
+  list-style: decimal;
+}
+
+.prose li {
+  margin-bottom: 0.35em;
+}
+
+.prose a {
+  color: var(--color-brand-ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.prose strong {
+  color: var(--color-ink);
+}
+
+.prose blockquote {
+  border-inline-start: 3px solid var(--color-honey);
+  padding-inline-start: 1.1em;
+  color: var(--color-ink-soft);
+  font-style: italic;
+  margin-bottom: 1.1em;
+}
+
+.prose hr {
+  border: none;
+  border-top: 1px solid var(--color-line);
+  margin: 2.2em 0;
+}

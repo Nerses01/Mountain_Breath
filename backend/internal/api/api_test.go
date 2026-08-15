@@ -99,6 +99,13 @@ type fakeStore struct {
 	oauthSubject    string
 	oauthEmail      string
 	userByEmail     *domain.User
+
+	// E9 newsletter.
+	newsletterEmail        string
+	newsletterToken        string
+	newsletterLive         bool
+	newsletterConfirmed    string
+	newsletterUnsubscribed string
 }
 
 func newFakeStore() *fakeStore {
@@ -506,6 +513,30 @@ func (f *fakeStore) FindOrCreateOAuthUser(_ context.Context, provider, subject, 
 		return f.oauthUser, nil
 	}
 	return domain.User{ID: 42, Email: email, Role: domain.RoleCustomer}, nil
+}
+
+// --- NewsletterStore (E9) ---
+
+func (f *fakeStore) SubscribeNewsletter(_ context.Context, email, token string) (bool, error) {
+	f.newsletterEmail, f.newsletterToken = email, token
+	// alreadyLive simulates a confirmed subscriber: no confirmation needed.
+	return !f.newsletterLive, nil
+}
+
+func (f *fakeStore) ConfirmNewsletter(_ context.Context, token string) error {
+	if f.newsletterToken != "" && token != f.newsletterToken {
+		return domain.ErrNotFound
+	}
+	f.newsletterConfirmed = token
+	return nil
+}
+
+func (f *fakeStore) UnsubscribeNewsletter(_ context.Context, token string) error {
+	if f.newsletterToken != "" && token != f.newsletterToken {
+		return domain.ErrNotFound
+	}
+	f.newsletterUnsubscribed = token
+	return nil
 }
 
 // --- test helpers ---

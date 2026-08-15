@@ -37,11 +37,20 @@ func NormalizeEmail(email string) string {
 
 func ValidateRegistration(email, password string) map[string]string {
 	fields := make(map[string]string)
-	if _, err := mail.ParseAddress(email); err != nil {
+	if !ValidEmail(email) {
 		fields["email"] = ValidationEmailFormat
 	}
 	if len(password) < PasswordMinLength {
 		fields["password"] = ValidationPasswordTooShort
 	}
 	return fields
+}
+
+// ValidEmail is the one address check, shared since E9 by registration and
+// the newsletter form. net/mail implements the RFC's grammar — a hand-rolled
+// regex would reject real addresses the RFC allows, which is the postal-code
+// lesson (ValidateAddress) applied to email.
+func ValidEmail(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
 }

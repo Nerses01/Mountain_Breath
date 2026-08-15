@@ -373,6 +373,21 @@ export function useForgotPassword() {
   return useMutation({ mutationFn: api.forgotPassword })
 }
 
+// --- Newsletter (E9) --- no query cache involved: three fire-and-forget
+// mutations whose whole state lives in the mutation object itself.
+
+export function useSubscribeNewsletter() {
+  return useMutation({ mutationFn: api.subscribeNewsletter })
+}
+
+export function useConfirmNewsletter() {
+  return useMutation({ mutationFn: api.confirmNewsletter })
+}
+
+export function useUnsubscribeNewsletter() {
+  return useMutation({ mutationFn: api.unsubscribeNewsletter })
+}
+
 export function useResetPassword() {
   return useMutation({
     mutationFn: ({ token, password }: { token: string; password: string }) =>
