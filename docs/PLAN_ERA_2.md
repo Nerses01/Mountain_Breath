@@ -1671,32 +1671,103 @@ criteria that fixed-width mocks always miss, image delivery, Core Web Vitals,
 structured data.
 
 **Frontend:**
-- [ ] Breakpoint plan: **1440** as designed → **1024** (sidebar becomes a
-      drawer, 3-col grids become 2) → **768** (nav collapses to a sheet, hero
-      and product page stack, checkout becomes one column) → **375** (single
-      column, sticky add-to-cart bar, summary as a bottom sheet).
-- [ ] Accessibility audit with axe + manual keyboard pass. Known issues already
-      visible in the mock: icon-only buttons need labels; the qty stepper's
-      −/+ are plain text; tabs need the ARIA pattern (done in E3); form inputs
-      need real `<label>` association and `aria-describedby` for errors; the
-      contrast pairs fixed in E1 must be re-verified with a tool.
-- [ ] Images: `srcset` + AVIF/WebP, explicit width/height to stop layout shift,
-      lazy-loading below the fold, and server-side thumbnails (Phase 11 item)
-      — the design has a hero, six cards and a five-image gallery per product.
-- [ ] SEO: per-product title/meta/OG, JSON-LD `Product` + `Offer` +
-      `AggregateRating` (E4 and E5 make these truthful), `sitemap.xml`,
-      canonical URLs on filtered shop pages, `hreflang` alternates across the
-      three locales from E1.5.
+- [x] Breakpoint plan, delivered as planned with one simplification: **1024**
+      — the shop sidebar becomes a real drawer (`role=dialog`, Escape, focus
+      into and back out); **768** — the nav collapses into a disclosure
+      sheet behind a hamburger (a DISCLOSURE, not a modal: it pushes content
+      down in flow, so no focus trap is owed — the drawer, which covers the
+      page, does owe one and pays it); hero and page titles step DOWN the
+      existing type scale rather than scaling linearly; **375** — the sticky
+      add-to-cart bar (same handler as the buy box: a second rendering of
+      the same action, not a second action). *The checkout summary stays
+      stacked below the form rather than becoming a bottom sheet — the
+      stacked layout already keeps the total one scroll away, and a sheet
+      would be a fourth disclosure pattern for one screen.* The narrow icon
+      row sheds wishlist/account/badge into the sheet: five 44px targets do
+      not fit in 375 minus a cart pill.
+- [x] Accessibility audit with axe — **automated and CI-blocking**, not a
+      one-time pass: seven `@axe-core/playwright` scans (home, shop, the
+      open drawer, product, login, content, an Armenian page) run with the
+      e2e suite and fail the build on any WCAG A/AA violation. The audit
+      earned its keep — E1's own prediction "re-verify with axe in E10"
+      landed six distinct finds:
+      1. **ink-muted failed on `page`** (4.17:1) — E1 measured against
+         `panel` only; the token is darkened again (#93603c → #855636) and
+         the token-block comment now measures against the WORST surface.
+      2. **brand-ink failed as body-size link text** (3.84:1 on page) —
+         E1 rated it "AA for ≥18.66px bold" and eight phases of orange
+         links then leaned on it. Darkened (#b8541a → #9d4714); the primary
+         button GAINED contrast (5.95:1).
+      3. **`Price`'s large-text exemption was misread** — 17px regular is
+         not "large" (that starts at 18.66px BOLD); the secondary line is
+         ink-muted at every size now.
+      4. **`Stat` rendered `<dd>` before `<dt>`** — DOM order fixed,
+         `flex-col-reverse` keeps the design's visual.
+      5. **The Apple stub's `opacity-50` halved its text below AA** —
+         inertness now reads from a dashed border and legal ink.
+      6. **E7's checkout nested the PromoBox's form inside the checkout
+         form** (invalid HTML, found via a React warning in the e2e logs)
+         — the sidebar moved out and the submit button reconnects via the
+         `form` attribute.
+      The **keyboard pass is a Playwright journey that never calls
+      `click()`** — registration through payment on Tab/Enter/Space alone —
+      so "completable by keyboard" is a build gate, not a memory. Plus two
+      E9/E8 wiring misses the sweep caught: the hero's "Meet the
+      beekeepers" CTA still disabled after /our-hive existed, and a dead
+      disabled heart in the product buy box.
+- [x] Images: explicit dimensions and lazy-loading where real images render;
+      ~~srcset + AVIF/WebP + thumbnails~~ **deferred with cause** — the
+      shop has NO photography yet (every slot is a designed placeholder),
+      and an image pipeline built against no images would be tuned blind.
+      It moves to Phase 11 beside the server-side thumbnails it depends on,
+      to be built when the family's photos exist.
+- [x] SEO: `usePageMeta` (hand-rolled — the helmet libraries buy SSR
+      coordination this SPA does not do) sets title/description/OG,
+      canonical (filtered shop URLs canonicalize to clean `/shop`) and
+      hreflang alternates + x-default on every key page; JSON-LD
+      `Product` + `AggregateOffer` + `AggregateRating` on the product page
+      — truthful because E4 built real ratings and E5 real per-market
+      prices; `sitemap.xml` generated by the BACKEND (only it knows the
+      product slugs) and routed through the public origin by nginx and the
+      Vite proxy; `robots.txt` disallowing the private/session routes. The
+      honesty note lives on the hook: JS-managed meta reaches crawlers that
+      render; prerendering is Phase 11 work behind hosting.
 
 **Backend / CI:**
-- [ ] Lighthouse CI with budgets as a job; fail on regressions.
-- [ ] Re-baseline the k6 script against the new queries — the facet counts of
-      E2 are the likely first bottleneck, which finally answers Phase 11's
-      "find the breaking point" item with a query worth optimising.
-- [ ] Cache headers for images and the catalog; revisit only if k6 says so.
+- [x] Lighthouse CI with budgets (`frontend/lighthouserc.json`: perf ≥.85,
+      a11y ≥.95, best-practices ≥.9, SEO ≥.9, plus resource-size budgets)
+      as a CI job against the PRODUCTION build (vite preview + real API —
+      auditing the dev server would measure Vite, not the site). Verified
+      locally: home 1.0/1.0/0.96/1.0, shop and product all within budget.
+- [x] Re-baseline k6 — the script still shopped Era I's dead catalog. The
+      new mix mirrors a real shop-page view (grid + facets per view,
+      filtered pairs, the typo'd search, detail + related, locale/currency
+      spread) and the buyer flow speaks E6/E7's real checkout (preview +
+      address body). **The plan's prediction was wrong and the measurement
+      was the point**: facets came in at 113ms p50 — the bottleneck was
+      `variant_effective_prices`, and not the query (1ms) but **Postgres
+      JIT compiling 49 LLVM functions per price read** (~250ms each, never
+      cached), triggered by the view's NUMERIC/power() cost estimate.
+      `jit = off` on the app's pool (one runtime param; analytics sessions
+      can still opt in) took the catalog from **p95 = 3,090ms to 11.6ms**
+      — the SLO passed with 17× headroom, 0 errors across 8,675 requests.
+- [x] Cache headers: uploads get `public, max-age=604800, immutable` at the
+      SOURCE (filenames are unique by construction; the dev stack has no
+      nginx, so the header belongs where the file is served); the sitemap
+      caches an hour. Catalog caching stays unimplemented — k6 says 6ms
+      average, and a cache without a measured need is an invalidation bug
+      on layaway.
 
 **Done when:** the purchase journey works from 375 px to 1440 px, is completable
 with a keyboard only, and CI blocks a Lighthouse or axe regression.
+✅ **Complete 2026-08-15 — and with it, Era II.** All three clauses are
+executable: the 375px journey buys through the mobile chrome (hamburger,
+drawer, sticky bar), the keyboard journey buys without a single click, and
+both the axe scans and the Lighthouse budgets are CI jobs that fail the
+build. Full verification: `go test ./...` green, `golangci-lint` 0 issues,
+`tsc -b`, `oxlint`, `npm test` (151), **12 e2e tests across 6 journeys**,
+Lighthouse within budget on all three audited pages, k6 SLO passed.
+Postman 90 → 91 requests.
 
 ---
 

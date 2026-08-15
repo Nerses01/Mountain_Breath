@@ -68,17 +68,21 @@
   --color-bark-soft: #5a3626; /* dividers and inputs on bark */
 
   /* ---- Ink on light surfaces ---------------------------------------
-     Contrast measured against --color-panel (#fdefe0), WCAG 2.1:
-       ink         6.8:1  AA
-       ink-body    6.8:1  AA
-       ink-soft    5.5:1  AA
-       ink-muted   4.7:1  AA   (darkened from the mock's #a9714b)
-       ink-faint   3.6:1  FAILS normal text — large/decorative only        */
+     Contrast measured against the WORST light surface, --color-page
+     (#f3e2d0) — E10's axe run caught the original mistake of measuring
+     against panel only: ink-muted read 4.67:1 there but 4.17:1 on page,
+     where the hero, breadcrumbs and result counts actually sit. WCAG 2.1:
+       ink         5.5:1 on page  AA (7.3 on card)
+       ink-body    6.1:1          AA
+       ink-soft    4.9:1          AA
+       ink-muted   4.9:1          AA   (darkened twice: mock's #a9714b →
+                                       #93603c at E1, → #855636 at E10)
+       ink-faint   3.2:1  FAILS normal text — large/decorative only        */
   --color-ink: #46281c; /* headings */
   --color-ink-strong: #5c3b2a;
   --color-ink-body: #6e4b36; /* default body copy */
   --color-ink-soft: #7c5a45; /* secondary copy */
-  --color-ink-muted: #93603c; /* meta, captions, labels */
+  --color-ink-muted: #855636; /* meta, captions, labels */
   --color-ink-faint: #a9714b; /* ONLY ≥18.66px bold or non-text */
 
   /* ---- Ink on bark ---------------------------------------------------
@@ -98,12 +102,18 @@
   /* ---- Brand --------------------------------------------------------
      The mock's orange (#e4761f) cannot legally carry text: as a background
      under #fff8ee it measures 2.9:1 and as text on panel 2.7:1, both under
-     the 4.5:1 floor. So it stays a decorative fill, and a darkened twin —
-     the mock's own link-hover colour — does every job involving letters:
-       #fff8ee on brand-ink   4.6:1  AA
-       brand-ink on panel     4.3:1  AA for ≥18.66px bold / ≥24px          */
+     the 4.5:1 floor. So it stays a decorative fill, and a darkened twin
+     does every job involving letters.
+
+     E10 darkened the twin AGAIN (#b8541a → #9d4714). E1's value was rated
+     "AA for ≥18.66px bold" as text — and eight phases of body-size orange
+     links then leaned on it, which the axe run caught on every page. The
+     current value passes as NORMAL text on the worst light surface, and
+     the primary button only gained contrast:
+       #fff8ee on brand-ink   5.95:1  AA
+       brand-ink on page      4.96:1  AA at any size                       */
   --color-brand: #e4761f; /* fills and glows — never behind text */
-  --color-brand-ink: #b8541a; /* primary button bg + orange text */
+  --color-brand-ink: #9d4714; /* primary button bg + orange text */
   --color-honey: #f6c244; /* accent panels, badges, on-bark headings */
 
   /* ---- Feedback -----------------------------------------------------

@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { ApiError } from '../api/client'
+import { CURRENCY_META } from '../lib/currencies'
+import { usePageMeta } from '../lib/usePageMeta'
 import {
   useCart,
   useMe,
@@ -21,8 +23,6 @@ import {
   Button,
   Card,
   CheckIcon,
-  HeartIcon,
-  IconButton,
   QtyStepper,
   SectionHeading,
   Stars,
@@ -59,6 +59,48 @@ export function ProductPage() {
   const me = useMe()
   const cart = useCart(!!me.data)
   const addToCart = useSetCartItem()
+
+  // E10 SEO: schema.org Product + AggregateOffer (+ AggregateRating once
+  // reviews exist — E4 and E5 are what make these claims TRUTHFUL: real
+  // ratings, real per-market prices). Memoized because the meta effect
+  // keys on this object's identity. Built before the early returns —
+  // hooks must run unconditionally.
+  const jsonLd = useMemo(() => {
+    const d = product.data
+    if (!d || d.variants.length === 0) return undefined
+    const exp = CURRENCY_META[d.currency].minorExponent
+    const toMajor = (minor: number) => (minor / 10 ** exp).toFixed(exp)
+    const prices = d.variants.map((v) => v.price_minor)
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: d.name,
+      description: d.description,
+      ...(d.images[0]?.url && { image: d.images[0].url }),
+      offers: {
+        '@type': 'AggregateOffer',
+        priceCurrency: d.currency,
+        lowPrice: toMajor(Math.min(...prices)),
+        highPrice: toMajor(Math.max(...prices)),
+        offerCount: d.variants.length,
+        availability: d.variants.some((v) => v.stock_qty > 0)
+          ? 'https://schema.org/InStock'
+          : 'https://schema.org/OutOfStock',
+      },
+      ...(d.rating_count > 0 && {
+        aggregateRating: {
+          '@type': 'AggregateRating',
+          ratingValue: d.rating_avg,
+          reviewCount: d.rating_count,
+        },
+      }),
+    }
+  }, [product.data])
+  usePageMeta({
+    title: product.data?.name,
+    description: product.data?.description,
+    jsonLd,
+  })
 
   if (product.isPending) {
     return <PageShell>{t('common:state.loading')}</PageShell>
@@ -126,7 +168,7 @@ export function ProductPage() {
   })
 
   return (
-    <div className="mx-auto max-w-360 px-6 py-8 lg:px-14">
+    <div className="mx-auto max-w-360 px-6 py-8 pb-24 md:pb-8 lg:px-14">
       <Breadcrumbs
         items={[
           { label: t('common:nav.home'), to: localePath('/') },
@@ -153,14 +195,14 @@ export function ProductPage() {
           {/* The design's eyebrow row: category, then the rating. E3 shipped
               the left half; E4 adds the right. */}
           <div className="flex flex-wrap items-center gap-3">
-            <span className="font-display text-xs font-semibold uppercase tracking-eyebrow text-ink-muted">
+            <span className="font-display text-xs font-semibold uppercase tracking-eyebrow text-ink-soft">
               {p.category_name}
             </span>
             <Stars rating={p.rating_avg} count={p.rating_count} />
           </div>
 
           <div className="flex items-start justify-between gap-4">
-            <h1 className="font-display text-display-lg font-extrabold text-ink">{p.name}</h1>
+            <h1 className="font-display text-display-md font-extrabold text-ink lg:text-display-lg">{p.name}</h1>
             {/* E8: the page-level heart — same shared component as the
                 card's, so the two can never disagree about this product. */}
             <WishlistHeart productId={p.id} className="mt-2 shrink-0" />
@@ -281,9 +323,10 @@ export function ProductPage() {
               </Button>
             )}
 
-            <IconButton label={t('common:actions.wishlist')} disabled className="size-13.5">
-              <HeartIcon />
-            </IconButton>
+            {/* E10 audit find: this was still E3's disabled placeholder —
+                E8 wired the title heart and missed this one. Same shared
+                component now, so the two hearts cannot disagree. */}
+            <WishlistHeart productId={p.id} className="size-13.5" />
           </div>
 
           {inCartQty > 0 && (
@@ -313,7 +356,7 @@ export function ProductPage() {
       )}
 
       {(related.data?.length ?? 0) > 0 && (
-        <section className="mt-14 flex flex-col gap-6 rounded-2xl bg-panel-soft p-11">
+        <section className="mt-14 flex flex-col gap-6 rounded-2xl bg-panel-soft p-6 lg:p-11">
           <SectionHeading
             title={t('product:related')}
             size="sm"
@@ -325,6 +368,27 @@ export function ProductPage() {
             ))}
           </div>
         </section>
+      )}
+
+      {/* E10, the plan's 375px note: a sticky add-to-cart bar, because on a
+          phone the buy button scrolls away under the tabs and the related
+          grid. Same handler, same disabled logic — a second rendering of
+          the SAME action, not a second action. The page shell carries
+          matching bottom padding so the bar never covers the footer's last
+          line. md:hidden: by tablet the buy box is back within reach. */}
+      {me.data && selected && !soldOut && (
+        <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-line bg-card px-5 py-3 md:hidden">
+          <span className="font-display text-lg font-extrabold text-brand-ink">
+            {formatMoney(selected.price_minor * qty, p.currency)}
+          </span>
+          <Button
+            disabled={addToCart.isPending}
+            onClick={() => addToCart.mutate({ variantId: selected.id, qty: inCartQty + qty })}
+            className="flex-1"
+          >
+            {addToCart.isPending ? t('catalog:adding') : t('catalog:addToCart')}
+          </Button>
+        </div>
       )}
     </div>
   )

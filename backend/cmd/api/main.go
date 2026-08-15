@@ -66,7 +66,26 @@ func run(logger *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	// E10's load-test finding, and the single biggest latency fix in the
+	// project: Postgres JIT-compiles queries whose ESTIMATED cost crosses
+	// jit_above_cost, and variant_effective_prices' NUMERIC/power() math
+	// inflates the estimate enough to trigger it — 49 LLVM functions
+	// compiled per query, ~250ms of compiler time for a 1ms, 4-row answer,
+	// paid on EVERY price read because JIT output is never cached across
+	// queries. Under 25 virtual users that compounded to p95 = 3s.
+	//
+	// JIT exists for analytics — minutes-long scans where compilation
+	// amortizes. Every query this shop runs is sub-millisecond OLTP, so it
+	// is disabled for the app's connections (not server-wide: someone's
+	// future reporting session may well want it). Measured: the catalog
+	// p95 fell from 3,090ms to under the 200ms SLO with this one line.
+	poolCfg.ConnConfig.RuntimeParams["jit"] = "off"
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return err
 	}

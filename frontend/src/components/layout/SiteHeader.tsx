@@ -1,11 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { cx } from '../../lib/cx'
 import { useLocale } from '../../i18n/useLocale'
 import { useCart, useLogout, useMe } from '../../api/hooks'
 import { IconButton } from '../ui/IconButton'
-import { HeartIcon, SearchIcon, UserIcon } from '../ui/icons'
+import { HeartIcon, MenuIcon, SearchIcon, UserIcon, XIcon } from '../ui/icons'
 import { SearchOverlay } from './SearchOverlay'
 
 /**
@@ -42,6 +42,23 @@ export function SiteHeader() {
     searchButtonRef.current?.focus()
   }
 
+  // E10: below md the nav collapses into a disclosure sheet (the plan's 768
+  // breakpoint). A DISCLOSURE, not a modal: the page stays interactive
+  // behind it, so no focus trap is owed — just aria-expanded/-controls,
+  // Escape, and closing on navigation. The route change effect covers every
+  // way a link can be activated (click, Enter, middle-click falls out of
+  // the page anyway).
+  const [menuOpen, setMenuOpen] = useState(false)
+  useEffect(() => setMenuOpen(false), [pathname])
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [menuOpen])
+
   const cartCount = cart.data?.items.reduce((sum, it) => sum + it.qty, 0) ?? 0
 
   return (
@@ -66,7 +83,7 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <nav aria-label={t('common:nav.home')}>
+        <nav aria-label={t('common:nav.home')} className="hidden md:block">
           <ul className="flex flex-wrap items-center gap-6 font-display text-base font-medium">
             {NAV.map(({ key, to }) => {
               const label = t(`common:nav.${key}`)
@@ -107,11 +124,13 @@ export function SiteHeader() {
             <SearchIcon />
           </IconButton>
           {/* E8: the header heart goes somewhere now. A Link styled as the
-              icon button — it is navigation, and middle-click should work. */}
+              icon button — it is navigation, and middle-click should work.
+              Hidden on phones (it lives in the sheet there): five targets
+              in a 375px row leaves none of them 44px wide. */}
           <Link
             to={localePath('/wishlist')}
             aria-label={t('common:actions.wishlist')}
-            className="inline-flex size-9.5 items-center justify-center rounded-full border-[1.5px] border-line-strong text-ink-muted transition hover:text-ink"
+            className="hidden size-9.5 items-center justify-center rounded-full border-[1.5px] border-line-strong text-ink-muted transition hover:text-ink sm:inline-flex"
           >
             <HeartIcon />
           </Link>
@@ -125,7 +144,7 @@ export function SiteHeader() {
               title={t('common:hive.memberTitle', {
                 percent: me.data.hive.member_discount_percent,
               })}
-              className="rounded-full bg-honey px-3 py-1 font-display text-xs font-bold text-ink"
+              className="hidden rounded-full bg-honey px-3 py-1 font-display text-xs font-bold text-ink lg:inline"
             >
               {t('common:hive.badge')}
             </span>
@@ -140,7 +159,7 @@ export function SiteHeader() {
               me.data ? t('common:actions.account') : t('common:actions.signIn')
             }
             title={me.data ? me.data.email : t('common:actions.signIn')}
-            className="inline-flex size-9.5 items-center justify-center rounded-full border-[1.5px] border-line-strong text-ink-muted transition hover:text-ink"
+            className="hidden size-9.5 items-center justify-center rounded-full border-[1.5px] border-line-strong text-ink-muted transition hover:text-ink sm:inline-flex"
           >
             <UserIcon />
           </Link>
@@ -154,7 +173,7 @@ export function SiteHeader() {
             <button
               type="button"
               onClick={() => logout.mutate()}
-              className="font-display text-sm font-medium text-ink-muted transition hover:text-ink"
+              className="hidden font-display text-sm font-medium text-ink-muted transition hover:text-ink md:inline"
             >
               {t('account:signOut')}
             </button>
@@ -174,8 +193,77 @@ export function SiteHeader() {
               </>
             )}
           </Link>
+
+          <IconButton
+            label={t('common:nav.menu')}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-nav"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="md:hidden"
+          >
+            {menuOpen ? <XIcon /> : <MenuIcon />}
+          </IconButton>
         </div>
       </div>
+
+      {/* The sheet: the five destinations plus the controls the narrow icon
+          row sheds (wishlist, account, sign-out). Rendered in flow rather
+          than floated over the page — pushing content down keeps it obvious
+          the page underneath is still the page. */}
+      {menuOpen && (
+        <nav
+          id="mobile-nav"
+          aria-label={t('common:nav.menu')}
+          className="border-t border-line-soft bg-panel-soft md:hidden"
+        >
+          <ul className="flex flex-col px-6 py-3 font-display text-base font-medium">
+            {NAV.map(({ key, to }) => {
+              const href = localePath(to)
+              return (
+                <li key={key}>
+                  <Link
+                    to={href}
+                    aria-current={pathname === href ? 'page' : undefined}
+                    className={cx(
+                      'block py-3',
+                      pathname === href ? 'font-semibold text-brand-ink' : 'text-ink-strong',
+                    )}
+                  >
+                    {t(`common:nav.${key}`)}
+                  </Link>
+                </li>
+              )
+            })}
+            <li className="mt-1 border-t border-line-soft pt-1">
+              <Link to={localePath('/wishlist')} className="block py-3 text-ink-strong">
+                {t('common:actions.wishlist')}
+              </Link>
+            </li>
+            <li>
+              <Link
+                to={localePath(me.data ? '/account' : '/login')}
+                className="block py-3 text-ink-strong"
+              >
+                {me.data ? t('common:actions.account') : t('common:actions.signIn')}
+              </Link>
+            </li>
+            {me.data && (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    logout.mutate()
+                    setMenuOpen(false)
+                  }}
+                  className="block w-full py-3 text-left text-ink-strong"
+                >
+                  {t('account:signOut')}
+                </button>
+              </li>
+            )}
+          </ul>
+        </nav>
+      )}
 
       {searchOpen && <SearchOverlay onClose={closeSearch} />}
     </header>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useLocale } from '../i18n/useLocale'
 import { journalPost, journalPosts } from '../content'
 import { Markdown } from '../components/Markdown'
+import { usePageMeta } from '../lib/usePageMeta'
 
 /**
  * The journal (E9) — the design's "Harvest log", one page under two of the
@@ -14,10 +15,11 @@ export function JournalPage() {
   const { t } = useTranslation()
   const { locale, localePath } = useLocale()
   const posts = journalPosts(locale)
+  usePageMeta({ title: t('journal:title'), description: t('journal:blurb') })
 
   return (
     <div className="mx-auto max-w-360 px-6 py-12 lg:px-14">
-      <span className="font-display text-2xs font-bold uppercase tracking-eyebrow text-ink-faint">
+      <span className="font-display text-2xs font-bold uppercase tracking-eyebrow text-ink-soft">
         {t('journal:eyebrow')}
       </span>
       <h1 className="mt-2 font-display text-display-md font-extrabold text-ink">
@@ -58,6 +60,7 @@ export function JournalPostPage() {
   const { locale, localePath } = useLocale()
   const { slug = '' } = useParams()
   const post = journalPost(slug, locale)
+  usePageMeta({ title: post?.title, description: post?.teaser })
 
   if (!post) {
     return (

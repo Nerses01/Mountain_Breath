@@ -79,6 +79,25 @@ export function UserIcon(props: IconProps) {
   )
 }
 
+// E10: the mobile nav's disclosure pair. The mock is desktop-only, so a
+// collapsed header is a state it never draws — the plainest possible
+// hamburger and cross keep it unambiguous.
+export function MenuIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </IconBase>
+  )
+}
+
+export function XIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </IconBase>
+  )
+}
+
 export function ArrowRightIcon(props: IconProps) {
   return (
     <IconBase {...props}>

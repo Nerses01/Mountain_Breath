@@ -18,6 +18,7 @@ export const en = {
       ourHive: 'Our hive',
       benefits: 'Benefits',
       journal: 'Journal',
+      menu: 'Menu',
     },
     actions: {
       search: 'Search',
@@ -129,6 +130,7 @@ export const en = {
       benefit: 'Good for',
       price: 'Price',
     },
+    filters: 'Filters',
     clearFilters: 'Clear filters',
     noResults: 'Nothing on the shelf matches that.',
     noResultsHint: 'Try fewer filters, or a wider price range.',

@@ -43,7 +43,7 @@ const secondarySize = {
   sm: 'text-2xs',
   md: 'text-xs',
   lg: 'text-xs',
-  xl: 'text-[1.0625rem]', // 17px, the only place it clears the ink-faint bar
+  xl: 'text-[1.0625rem]', // 17px
 } as const
 
 /**
@@ -55,11 +55,12 @@ const secondarySize = {
  * shelf price per market beats one price and a rate.
  *
  * DEPARTURE FROM THE CANVAS (accessibility, standing exception 1). The mock
- * paints the secondary line #a9714b — --color-ink-faint — at 12–14px, which
- * measures 4.3:1 on the card background and fails AA for text that size. It
- * is used here only at the buy box's 17px, and drops to --color-ink-muted
- * everywhere smaller. The design's own colour, one step darker, rather than
- * a different hue: the price tag still reads as a muted pair.
+ * paints the secondary line #a9714b — --color-ink-faint — which fails AA as
+ * text on every light surface. E5 kept it for the buy box's 17px believing
+ * the large-text exemption applied; E10's axe run corrected the reading —
+ * the 3:1 exemption starts at 18.66px BOLD or 24px regular, and this line
+ * is 17px regular. Every size now uses --color-ink-muted: the design's own
+ * colour two steps darker, still reading as a muted pair.
  *
  * It renders NOTHING when there is no price, rather than "$0.00": a variant
  * the shop cannot price in any market is not free, it is unbuyable, and the
@@ -103,11 +104,7 @@ export function Price({
         <span
           className={cx(
             secondarySize[size],
-            tone === 'on-dark'
-              ? 'text-ink-on-dark-soft'
-              : size === 'xl'
-                ? 'text-ink-faint'
-                : 'text-ink-muted',
+            tone === 'on-dark' ? 'text-ink-on-dark-soft' : 'text-ink-muted',
           )}
         >
           {formatMoney(secondaryMinor, secondary)}

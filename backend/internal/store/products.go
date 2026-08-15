@@ -275,6 +275,31 @@ func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]dom
 	return products, total, nil
 }
 
+// ListProductSlugs feeds the sitemap: every ACTIVE product's slug, which is
+// locale-invariant by design (E1.5) — one list serves all three languages'
+// URLs.
+func (s *Store) ListProductSlugs(ctx context.Context) ([]string, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT slug FROM products WHERE is_active ORDER BY slug`)
+	if err != nil {
+		return nil, fmt.Errorf("querying product slugs: %w", err)
+	}
+	defer rows.Close()
+
+	slugs := make([]string, 0)
+	for rows.Next() {
+		var slug string
+		if err := rows.Scan(&slug); err != nil {
+			return nil, fmt.Errorf("scanning slug: %w", err)
+		}
+		slugs = append(slugs, slug)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating slugs: %w", err)
+	}
+	return slugs, nil
+}
+
 func (s *Store) GetProductBySlug(ctx context.Context, slug string, view domain.View) (domain.Product, error) {
 	locale := view.EffectiveLocale()
 	// The slug is deliberately NOT translated: it is the product's stable

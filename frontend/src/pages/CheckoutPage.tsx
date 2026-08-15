@@ -165,12 +165,19 @@ export function CheckoutPage() {
 
   return (
     <CheckoutShell step={1}>
-      <form
-        onSubmit={onSubmit}
-        noValidate
-        className="grid gap-9 lg:grid-cols-[1fr_400px]"
-      >
-        <div className="flex flex-col gap-6">
+      <div className="grid gap-9 lg:grid-cols-[1fr_400px]">
+        {/* E10 audit find: E7 put the PromoBox (its own <form>) inside this
+            form — nested forms are invalid HTML, and browsers resolve the
+            nesting unpredictably. The FIELDS stay in the form; the sidebar
+            lives outside it, and the submit button reconnects through the
+            `form` attribute, which is exactly the case that attribute
+            exists for. */}
+        <form
+          id="checkout-form"
+          onSubmit={onSubmit}
+          noValidate
+          className="flex flex-col gap-6"
+        >
           <h1 className="font-display text-display-md font-extrabold text-ink">
             {t('checkout:title')}
           </h1>
@@ -325,15 +332,16 @@ export function CheckoutPage() {
               <p className="text-xs text-ink-muted">{t('checkout:payment.cardStubNote')}</p>
             )}
           </CheckoutSection>
-        </div>
+        </form>
 
-        {/* ── Summary sidebar ───────────────────────────────────────── */}
+        {/* ── Summary sidebar — OUTSIDE the form (see the note above);
+            the submit button names its form explicitly. ─────────────── */}
         <div className="flex flex-col gap-4 self-start">
           <OrderSummary
             cart={cart.data}
             preview={preview.data}
             action={
-              <Button type="submit" size="lg" disabled={checkout.isPending}>
+              <Button type="submit" form="checkout-form" size="lg" disabled={checkout.isPending}>
                 {checkout.isPending ? t('checkout:placing') : t('checkout:placeOrder')}
               </Button>
             }
@@ -356,7 +364,7 @@ export function CheckoutPage() {
             ))}
           </div>
         </div>
-      </form>
+      </div>
     </CheckoutShell>
   )
 }

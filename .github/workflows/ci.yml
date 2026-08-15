@@ -134,6 +134,85 @@ jobs:
           path: frontend/test-results/
           retention-days: 7
 
+  # E10: Lighthouse with budgets (frontend/lighthouserc.json) against the
+  # PRODUCTION build served by vite preview, with the real API behind it —
+  # auditing the dev server would measure Vite's bookkeeping, not the site.
+  # Runs where e2e runs; a failed budget fails the build, which is the
+  # "CI blocks a Lighthouse regression" half of the phase's definition of
+  # done (the axe half rides inside the e2e job's a11y spec).
+  lighthouse:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: mb
+          POSTGRES_PASSWORD: ci-password
+          POSTGRES_DB: mountain_breath
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mb -d mountain_breath"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      MB_DATABASE_URL: postgres://mb:ci-password@localhost:5432/mountain_breath?sslmode=disable
+      MB_ENV: dev
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Apply migrations
+        run: >
+          go run -tags postgres
+          github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
+          -path backend/migrations -database "$MB_DATABASE_URL" up
+
+      - name: Seed catalog
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          psql "$MB_DATABASE_URL" -f backend/seed/seed.sql
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Start api and preview server
+        run: |
+          (cd backend && go run ./cmd/api) &
+          (cd frontend && npm run preview) &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8080/health && break || sleep 1
+          done
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:4173/ > /dev/null && break || sleep 1
+          done
+
+      - name: Lighthouse with budgets
+        working-directory: frontend
+        run: >
+          npx --yes @lhci/cli@0.15.x autorun
+          --collect.url=http://localhost:4173/
+          --collect.url=http://localhost:4173/shop
+          --collect.url=http://localhost:4173/products/mountain-wildflower-honey
+
   # Publish images to GitHub Container Registry — only for green builds of
   # master, never for PRs. Phase 9's deploy will pull exactly these.
   images:

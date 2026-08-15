@@ -17,6 +17,64 @@ Template for an entry:
 
 ---
 
+## 2026-08-15 — Phase E10: the audit phase, and the end of Era II
+
+**Worked on:** the mobile chrome (nav sheet, filter drawer, sticky
+add-to-cart, responsive type); seven CI-blocking axe scans and the fixes
+they forced; the 375px and keyboard-only purchase journeys; `usePageMeta`,
+JSON-LD, the backend sitemap, robots.txt; Lighthouse CI with budgets; the
+k6 re-baseline and the JIT finding; cache headers. Era II's last phase.
+
+**Learned:**
+
+- **An audit you run once decays; a gate compounds.** The phase's whole
+  design was turning "audited" into executable statements: axe scans that
+  fail the build, a purchase journey that never calls `click()`, Lighthouse
+  budgets in CI. The gates paid for themselves immediately — six real
+  violations on day one, several of them MINE from earlier phases.
+- **Measure contrast against the worst surface a token can sit on.** E1
+  measured against `panel`; the hero sits on `page`, which is darker, and
+  two tokens quietly failed there for eight phases. Same class of lesson as
+  the WCAG large-text exemption: it starts at 18.66px BOLD, not "17px looks
+  big enough" — read the spec's numbers, not its vibe.
+- **The bottleneck was a compiler, not a query.** The plan predicted the
+  facet counts; k6 measured them at 113ms p50 and pointed instead at every
+  price read: Postgres was JIT-compiling 49 LLVM functions per query
+  (~250ms, never cached) because the effective-prices view's NUMERIC math
+  inflated the cost estimate. `jit = off` for the app's pool — one runtime
+  parameter — took p95 from 3,090ms to 11.6ms. Predictions are for
+  deciding WHERE to measure; only the measurement decides what is true.
+- **Deciding what NOT to build is E10 work too.** No image pipeline (there
+  are no images yet — tuning srcset against designed placeholders is
+  optimizing blind), no catalog cache (k6 says 6ms average; a cache without
+  a measured need is an invalidation bug on layaway), no bottom-sheet
+  summary (the stacked layout already serves; a fourth disclosure pattern
+  for one screen is complexity, not fidelity).
+- **Overlay semantics follow coverage, not style**: in-flow disclosure
+  (nav sheet — page stays interactive, no focus trap owed) versus dialog
+  (filter drawer — covers the page, so Escape/focus-return are owed).
+  Naming the rule once beats re-deriving it per overlay.
+- **Frameworks hide invalid HTML until something else surfaces it.** The
+  nested checkout forms (E7's PromoBox inside E6's form) rendered fine and
+  passed every test — a React console warning in the e2e logs was the only
+  witness. The `form` attribute exists precisely for "the submit button
+  lives outside its form".
+
+**Questions / to revisit (the Phase 11 handoff):**
+
+- Prerendering/SSR for meta that reaches non-rendering crawlers — behind
+  hosting, with the image pipeline behind photography.
+- The `agentic-browsing` Lighthouse category (new, unasserted) — watch it.
+- The k6 SLO could tighten (p95 11.6ms vs the 200ms threshold) once the
+  stack runs on the real host rather than a dev machine.
+
+**Era II is complete.** Ten phases (E1–E10 plus E1.5): the design became a
+trilingual, dual-currency shop with a real checkout, promotions, accounts,
+content, and now the hardening to stand behind it. What remains before
+customers is Phase 9's blocked hosting — and photographs.
+
+---
+
 ## 2026-08-15 — Phase E9: content without a CMS, consent despite the robots
 
 **Worked on:** migration 000020 (`newsletter_subscribers`, double opt-in);

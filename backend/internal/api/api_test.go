@@ -142,6 +142,14 @@ func (f *fakeStore) ListProducts(_ context.Context, filter domain.ProductFilter)
 	return f.products, len(f.products), nil
 }
 
+func (f *fakeStore) ListProductSlugs(_ context.Context) ([]string, error) {
+	slugs := make([]string, 0, len(f.products))
+	for _, p := range f.products {
+		slugs = append(slugs, p.Slug)
+	}
+	return slugs, nil
+}
+
 func (f *fakeStore) CatalogFacets(_ context.Context, filter domain.ProductFilter) (domain.CatalogFacets, error) {
 	f.lastLocale = filter.EffectiveLocale()
 	f.lastFilter = filter

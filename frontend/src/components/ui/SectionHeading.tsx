@@ -32,7 +32,7 @@ export function SectionHeading({
     <div className={cx('flex flex-wrap items-end justify-between gap-4', className)}>
       <div className="flex flex-col gap-2">
         {eyebrow && (
-          <span className="font-display text-xs font-bold uppercase tracking-eyebrow text-ink-muted">
+          <span className="font-display text-xs font-bold uppercase tracking-eyebrow text-ink-soft">
             {eyebrow}
           </span>
         )}

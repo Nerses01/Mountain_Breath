@@ -19,6 +19,7 @@ export const ru = {
       ourHive: 'Наша пасека',
       benefits: 'Польза',
       journal: 'Журнал',
+      menu: 'Меню',
     },
     actions: {
       search: 'Поиск',
@@ -91,6 +92,7 @@ export const ru = {
       benefit: 'Полезно для',
       price: 'Цена',
     },
+    filters: 'Фильтры',
     clearFilters: 'Сбросить фильтры',
     noResults: 'На полке нет ничего подходящего.',
     noResultsHint: 'Попробуйте убрать фильтры или расширить диапазон цен.',

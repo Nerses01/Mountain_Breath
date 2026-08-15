@@ -3,7 +3,6 @@ import { useProducts } from '../api/hooks'
 import { ProductCard } from '../components/ProductCard'
 import {
   ArrowRightIcon,
-  Button,
   ButtonLink,
   Card,
   CheckIcon,
@@ -11,6 +10,7 @@ import {
   Stat,
 } from '../components/ui'
 import { useLocale } from '../i18n/useLocale'
+import { usePageMeta } from '../lib/usePageMeta'
 
 /**
  * The design's Home screen: hero with a stat strip, the "How we harvest" /
@@ -30,12 +30,16 @@ export function HomePage() {
   // so the two pages agree about what "the shelf" looks like.
   const products = useProducts({ perPage: 6, sort: 'popular' })
 
+  // The home page IS the brand — bare title, the hero's blurb as the
+  // description a search result shows.
+  usePageMeta({ description: t('home:hero.blurb') })
+
   return (
     <div className="mx-auto max-w-360 px-6 lg:px-14">
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <section className="grid items-center gap-10 py-12 lg:grid-cols-2 lg:py-14">
         <div className="flex flex-col gap-5.5">
-          <p className="font-display text-sm font-bold uppercase tracking-eyebrow text-ink-muted">
+          <p className="font-display text-sm font-bold uppercase tracking-eyebrow text-ink-soft">
             {t('home:hero.eyebrow')}
           </p>
 
@@ -48,7 +52,11 @@ export function HomePage() {
               "Everythingthe hive gives" as one word. The space is invisible
               on screen (a trailing space before a line break collapses) and
               audible where it matters. */}
-          <h1 className="font-display text-display-xl font-extrabold text-ink">
+          {/* E10: the 68px hero size is a 1440px number — at 375px it fits
+              four characters a line. Step down through the scale instead of
+              scaling linearly, so each breakpoint uses a size the type
+              system already tuned. */}
+          <h1 className="font-display text-display-lg font-extrabold text-ink md:text-display-xl">
             <span className="text-brand-ink">{t('home:hero.titleAccent')}</span>{' '}
             <br />
             {t('home:hero.title')}
@@ -63,11 +71,12 @@ export function HomePage() {
               {t('home:hero.primaryCta')}
               <ArrowRightIcon className="ml-2.5 inline size-4" />
             </ButtonLink>
-            {/* E9 builds "Our hive"; until then the secondary CTA is inert
-                rather than a link to a page that does not exist. */}
-            <Button variant="ghost" size="lg" disabled>
+            {/* E10 audit find: E9 built /our-hive and this stayed disabled —
+                the cost of "inert until the page exists" comments is that
+                someone must remember them. Live now. */}
+            <ButtonLink to={localePath('/our-hive')} variant="ghost" size="lg">
               {t('home:hero.secondaryCta')}
-            </Button>
+            </ButtonLink>
           </div>
 
           <div className="mt-2.5 flex flex-wrap gap-9 border-t border-line pt-4.5">
@@ -199,7 +208,7 @@ export function HomePage() {
       </section>
 
       {/* ── Story band ───────────────────────────────────────────────── */}
-      <section className="mb-14 grid items-center gap-10 rounded-2xl bg-honey p-11 lg:grid-cols-[1fr_380px]">
+      <section className="mb-14 grid items-center gap-10 rounded-2xl bg-honey p-6 md:p-11 lg:grid-cols-[1fr_380px]">
         <div className="flex flex-col gap-3.5">
           <p className="font-display text-xs font-bold uppercase tracking-eyebrow text-ink-strong">
             {t('home:story.eyebrow')}

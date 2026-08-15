@@ -20,8 +20,23 @@ export function Stat({
   tone?: 'light' | 'dark'
   className?: string
 }) {
+  // E10 axe finds, both in this one component:
+  //  - a <dl>'s TERM must precede its definition in the DOM (the axe
+  //    definition-list rule); the design draws the value on top, so the DOM
+  //    order is dt→dd and flex-col-reverse restores the visual.
+  //  - the label was ink-muted, which E1 verified against PANEL (4.67:1) —
+  //    but the hero sits on PAGE, where the same token measures 4.17:1 and
+  //    fails AA. ink-soft clears 4.5:1 on every light surface.
   return (
-    <dl className={cx('flex flex-col gap-0.5', className)}>
+    <dl className={cx('flex flex-col-reverse gap-0.5', className)}>
+      <dt
+        className={cx(
+          'text-xs',
+          tone === 'dark' ? 'text-ink-on-dark-soft' : 'text-ink-soft',
+        )}
+      >
+        {label}
+      </dt>
       <dd
         className={cx(
           'font-display text-display-xs font-extrabold',
@@ -30,14 +45,6 @@ export function Stat({
       >
         {value}
       </dd>
-      <dt
-        className={cx(
-          'text-xs',
-          tone === 'dark' ? 'text-ink-on-dark-soft' : 'text-ink-muted',
-        )}
-      >
-        {label}
-      </dt>
     </dl>
   )
 }

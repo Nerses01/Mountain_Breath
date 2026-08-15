@@ -19,10 +19,12 @@ export {
   CheckIcon,
   ChevronDownIcon,
   HeartIcon,
+  MenuIcon,
   MinusIcon,
   PlusIcon,
   SearchIcon,
   StarIcon,
+  XIcon,
 } from './icons'
 export { Input } from './Input'
 export { QtyStepper } from './QtyStepper'

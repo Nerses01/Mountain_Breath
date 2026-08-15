@@ -60,7 +60,7 @@ export function LoginPage() {
         {/* ── The form panel ─────────────────────────────────────────── */}
         <div className="flex flex-col gap-8 bg-card p-8 lg:p-12">
           <div className="flex flex-col gap-2.5">
-            <span className="font-display text-2xs font-bold uppercase tracking-eyebrow text-ink-faint">
+            <span className="font-display text-2xs font-bold uppercase tracking-eyebrow text-ink-soft">
               {t('account:club.eyebrow')}
             </span>
             <h1 className="font-display text-display-md font-extrabold tracking-tight text-ink">
@@ -140,7 +140,7 @@ export function LoginPage() {
 
             <div
               aria-hidden="true"
-              className="flex items-center gap-3.5 text-xs text-ink-faint"
+              className="flex items-center gap-3.5 text-xs text-ink-muted"
             >
               <span className="h-px flex-1 bg-line" />
               {t('account:login.or')}
@@ -159,9 +159,13 @@ export function LoginPage() {
               >
                 {t('account:login.google')}
               </a>
+              {/* E10 axe fix: the stub was opacity-50, which halves the
+                  TEXT's contrast below AA. Inertness now reads from the
+                  dashed border and muted-but-legal ink instead — looking
+                  disabled is a style; being unreadable is a violation. */}
               <div
                 aria-hidden="true"
-                className="flex-1 rounded-full border-[1.5px] border-line bg-card px-4 py-3.5 text-center font-display text-sm font-semibold text-ink opacity-50"
+                className="flex-1 rounded-full border-[1.5px] border-dashed border-line bg-card px-4 py-3.5 text-center font-display text-sm font-semibold text-ink-muted"
               >
                 {t('account:login.apple')}
               </div>

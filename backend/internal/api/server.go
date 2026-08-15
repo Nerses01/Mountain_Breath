@@ -33,6 +33,8 @@ type ProductStore interface {
 	// domain.View — one value rather than two loose strings that could be
 	// passed in the wrong order.
 	ListProducts(ctx context.Context, f domain.ProductFilter) ([]domain.Product, int, error)
+	// Every active slug, for the sitemap (E10).
+	ListProductSlugs(ctx context.Context) ([]string, error)
 	// CatalogFacets takes the same filter as the listing — the sidebar
 	// counts describe the same query the grid runs, minus paging.
 	CatalogFacets(ctx context.Context, f domain.ProductFilter) (domain.CatalogFacets, error)
@@ -262,8 +264,18 @@ func (s *Server) Routes() chi.Router {
 
 	// Uploaded product images. http.FileServer refuses path traversal (..)
 	// on its own; filenames are server-generated anyway.
-	r.Handle("/uploads/*", http.StripPrefix("/uploads/",
-		http.FileServer(http.Dir(s.uploadsDir))))
+	//
+	// E10: Cache-Control at the SOURCE, not only at nginx — the dev stack
+	// has no nginx, and a header set where the file is served is true on
+	// every path to it. immutable is honest here because upload filenames
+	// are server-generated and unique: a changed image is a new URL.
+	r.Handle("/uploads/*", cacheControl("public, max-age=604800, immutable",
+		http.StripPrefix("/uploads/", http.FileServer(http.Dir(s.uploadsDir)))))
+
+	// E10 SEO: the sitemap lives on the BACKEND because only the backend
+	// knows the product slugs. nginx and the Vite proxy route it through
+	// the public origin.
+	r.Get("/sitemap.xml", s.handleSitemap)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		// Resolve the session cookie (if any) for every API request.

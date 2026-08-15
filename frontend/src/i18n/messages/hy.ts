@@ -20,6 +20,7 @@ export const hy = {
       ourHive: 'Մեր փեթակը',
       benefits: 'Օգուտները',
       journal: 'Օրագիր',
+      menu: 'Ցանկ',
     },
     actions: {
       search: 'Որոնել',
@@ -89,6 +90,7 @@ export const hy = {
       benefit: 'Օգտակար է',
       price: 'Գին',
     },
+    filters: 'Զտիչներ',
     clearFilters: 'Մաքրել զտիչները',
     noResults: 'Դարակին համապատասխան բան չկա։',
     noResultsHint: 'Փորձեք ավելի քիչ զտիչ կամ ավելի լայն գնային միջակայք։',
