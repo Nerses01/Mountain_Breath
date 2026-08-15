@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -12,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
+	"github.com/Nerses01/Mountain_Breath/backend/internal/mail"
 )
 
 // The store interfaces are everything the API layer needs from the database.
@@ -127,6 +129,33 @@ type PromoStore interface {
 	UpsellForGap(ctx context.Context, view domain.View, gapMinor int64) (*domain.Upsell, error)
 }
 
+// AccountStore is E8's slice: the hearts, the reset tokens, the address
+// book and the OAuth identities — everything the account grows this phase.
+type AccountStore interface {
+	// The wishlist answers with full product CARDS; the heart's on/off
+	// state everywhere derives from this one list client-side.
+	ListWishlist(ctx context.Context, userID int64, view domain.View) ([]domain.Product, error)
+	AddWishlistItem(ctx context.Context, userID, productID int64) error
+	RemoveWishlistItem(ctx context.Context, userID, productID int64) error
+	// One transaction: the cart line and the wishlist row must never both
+	// exist, nor neither.
+	SaveForLater(ctx context.Context, userID, variantID int64) error
+
+	// The sessions pattern re-armed: raw token to the inbox, SHA-256 to the
+	// table, single use enforced under a row lock.
+	CreatePasswordReset(ctx context.Context, userID int64, token string, expiresAt time.Time) error
+	ConsumePasswordReset(ctx context.Context, token, newPasswordHash string) error
+
+	ListAddresses(ctx context.Context, userID int64) ([]domain.AddressEntry, error)
+	CreateAddress(ctx context.Context, userID int64, e domain.AddressEntry) (domain.AddressEntry, error)
+	UpdateAddress(ctx context.Context, userID int64, e domain.AddressEntry) error
+	DeleteAddress(ctx context.Context, userID, addressID int64) error
+
+	// Provider identity → shop account: known subject wins, verified email
+	// links, otherwise a fresh passwordless customer.
+	FindOrCreateOAuthUser(ctx context.Context, provider, subject, email string) (domain.User, error)
+}
+
 // Store embeds the per-entity interfaces into the one the Server depends on.
 type Store interface {
 	CategoryStore
@@ -138,6 +167,25 @@ type Store interface {
 	OrderStore
 	CheckoutStore
 	PromoStore
+	AccountStore
+}
+
+// Options are the E8 dependencies main wires in: how to send mail, the
+// origin the BROWSER uses (for emailed links and OAuth redirects — the
+// API's own address would be wrong in both), and the Google client. A
+// struct rather than more positional parameters, because a zero Options is
+// a meaningful configuration (log-sink mail, OAuth disabled) that every
+// existing test gets for free.
+type Options struct {
+	Mailer             mail.Mailer
+	PublicURL          string
+	GoogleClientID     string
+	GoogleClientSecret string
+	// Endpoint overrides so handler tests can stand up a FAKE Google with
+	// httptest and drive the whole callback path. Empty = the real service.
+	GoogleAuthURL     string
+	GoogleTokenURL    string
+	GoogleUserinfoURL string
 }
 
 // Server holds the dependencies of the HTTP layer. Handlers are methods on it,
@@ -148,17 +196,41 @@ type Server struct {
 	devMode    bool
 	uploadsDir string
 	metrics    *metrics
+	mailer     mail.Mailer
+	publicURL  string
+	google     googleOAuth
+	limiter    *rateLimiter
 }
 
 // extraCollectors lets main contribute collectors that need dependencies the
 // api layer doesn't own (e.g. the pgx pool stats collector).
-func NewServer(log *slog.Logger, store Store, devMode bool, uploadsDir string, extraCollectors ...prometheus.Collector) *Server {
+func NewServer(log *slog.Logger, store Store, devMode bool, uploadsDir string,
+	opts Options, extraCollectors ...prometheus.Collector) *Server {
+	mailer := opts.Mailer
+	if mailer == nil {
+		mailer = &mail.LogSink{Log: log}
+	}
+	publicURL := strings.TrimRight(opts.PublicURL, "/")
+	if publicURL == "" {
+		publicURL = "http://localhost:5173"
+	}
 	return &Server{
 		log:        log,
 		store:      store,
 		devMode:    devMode,
 		uploadsDir: uploadsDir,
 		metrics:    newMetrics(extraCollectors...),
+		mailer:     mailer,
+		publicURL:  publicURL,
+		google: googleOAuth{
+			clientID:     opts.GoogleClientID,
+			clientSecret: opts.GoogleClientSecret,
+			publicURL:    publicURL,
+			authURL:      opts.GoogleAuthURL,
+			tokenURL:     opts.GoogleTokenURL,
+			userinfoURL:  opts.GoogleUserinfoURL,
+		},
+		limiter: newRateLimiter(),
 	}
 }
 
@@ -197,6 +269,12 @@ func (s *Server) Routes() chi.Router {
 		r.Post("/auth/login", s.handleLogin)
 		r.Post("/auth/logout", s.handleLogout)
 		r.Get("/auth/me", s.handleMe)
+		// E8: the reset flow (both anonymous by nature — the whole point is
+		// the caller cannot sign in) and the Google flow.
+		r.Post("/auth/forgot-password", s.handleForgotPassword)
+		r.Post("/auth/reset-password", s.handleResetPassword)
+		r.Get("/auth/oauth/google", s.handleGoogleStart)
+		r.Get("/auth/oauth/google/callback", s.handleGoogleCallback)
 
 		r.Get("/categories", s.handleListCategories)
 		r.Get("/catalog/facets", s.handleCatalogFacets)
@@ -227,6 +305,16 @@ func (s *Server) Routes() chi.Router {
 			// /account rather than /addresses because E8's account page is
 			// its natural home and the URL should not have to move.
 			r.Get("/account/address", s.handleGetDefaultAddress)
+			// E8: the wishlist (set-semantics like the cart) and the
+			// account page's address book.
+			r.Get("/wishlist", s.handleListWishlist)
+			r.Put("/wishlist/{productID}", s.handleAddWishlistItem)
+			r.Delete("/wishlist/{productID}", s.handleRemoveWishlistItem)
+			r.Post("/wishlist/save-for-later", s.handleSaveForLater)
+			r.Get("/account/addresses", s.handleListAddresses)
+			r.Post("/account/addresses", s.handleCreateAddress)
+			r.Put("/account/addresses/{id}", s.handleUpdateAddress)
+			r.Delete("/account/addresses/{id}", s.handleDeleteAddress)
 			// Writing a review needs a session; the store additionally
 			// requires a DELIVERED order containing the product.
 			r.Post("/products/{slug}/reviews", s.handleCreateReview)

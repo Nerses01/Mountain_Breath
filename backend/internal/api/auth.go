@@ -15,12 +15,27 @@ import (
 
 const (
 	sessionCookieName = "mb_session"
-	sessionTTL        = 7 * 24 * time.Hour
+	// The two session lifetimes "Keep me signed in" chooses between (E8).
+	// Short is the shared-computer default; long is an explicit opt-in the
+	// customer makes per sign-in. Either way the token itself is rotated at
+	// every login — startSession always mints a fresh one.
+	sessionTTL         = 7 * 24 * time.Hour
+	rememberSessionTTL = 30 * 24 * time.Hour
 )
 
 type credentialsRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+// loginRequest is credentials plus the checkbox. A separate struct rather
+// than a field on credentialsRequest because register also decodes that
+// one under DisallowUnknownFields — and "remember" on a REGISTER body
+// should be the 400 it currently is.
+type loginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Remember bool   `json:"remember"`
 }
 
 type userResponse struct {
@@ -78,20 +93,23 @@ func (s *Server) decodeCredentials(w http.ResponseWriter, r *http.Request) (cred
 	return req, true
 }
 
-// startSession creates a DB session for the user and sets the cookie.
-func (s *Server) startSession(w http.ResponseWriter, r *http.Request, userID int64) error {
+// startSession creates a DB session for the user and sets the cookie. The
+// TTL is a parameter since E8: the "keep me signed in" checkbox picks
+// between the week and the month, and the DB row and the cookie must agree
+// on whichever it is.
+func (s *Server) startSession(w http.ResponseWriter, r *http.Request, userID int64, ttl time.Duration) error {
 	token, err := newSessionToken()
 	if err != nil {
 		return err
 	}
-	if err := s.store.CreateSession(r.Context(), token, userID, time.Now().Add(sessionTTL)); err != nil {
+	if err := s.store.CreateSession(r.Context(), token, userID, time.Now().Add(ttl)); err != nil {
 		return err
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    token,
 		Path:     "/",
-		MaxAge:   int(sessionTTL.Seconds()),
+		MaxAge:   int(ttl.Seconds()),
 		HttpOnly: true,               // JavaScript cannot read it → XSS can't steal it
 		Secure:   !s.devMode,         // HTTPS-only in prod; localhost has no TLS
 		SameSite: http.SameSiteLaxMode, // not sent on cross-site POSTs → CSRF baseline
@@ -128,7 +146,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.startSession(w, r, user.ID); err != nil {
+	if err := s.startSession(w, r, user.ID, sessionTTL); err != nil {
 		s.log.Error("starting session", "error", err)
 		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 		return
@@ -139,8 +157,24 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
-	req, ok := s.decodeCredentials(w, r)
-	if !ok {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	var req loginRequest
+	if err := dec.Decode(&req); err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_json", "request body is not valid JSON: "+err.Error())
+		return
+	}
+	req.Email = domain.NormalizeEmail(req.Email)
+
+	// The limiter runs BEFORE the lookup and the bcrypt compare: it exists
+	// to bound guessing, and a guess that still costs the shop a query and
+	// a hash is a guess half-allowed. E8 pulls this forward from Phase 11 —
+	// this is the phase with auth open on the table.
+	if !s.limiter.allow(limitKey(r, req.Email)) {
+		s.respondError(w, http.StatusTooManyRequests, "too_many_attempts",
+			"too many attempts — try again later")
 		return
 	}
 
@@ -157,12 +191,19 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// An OAuth-born account has password_hash '' and bcrypt refuses to
+	// match anything against it — password login fails closed with the
+	// same answer as a wrong password, no special case needed.
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		s.respondError(w, http.StatusUnauthorized, "invalid_credentials", domain.ErrInvalidCredentials.Error())
 		return
 	}
 
-	if err := s.startSession(w, r, user.ID); err != nil {
+	ttl := sessionTTL
+	if req.Remember {
+		ttl = rememberSessionTTL
+	}
+	if err := s.startSession(w, r, user.ID, ttl); err != nil {
 		s.log.Error("starting session", "error", err)
 		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 		return

@@ -47,6 +47,16 @@ services:
       MB_ENV: ${MB_ENV:-dev}
       MB_DATABASE_URL: postgres://${POSTGRES_USER:-mb}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-mountain_breath}?sslmode=disable
       MB_UPLOADS_DIR: /uploads
+      # E8: mail and browser-facing links. All optional — unset SMTP means
+      # messages land in the api log, and unset Google keys disable that
+      # sign-in path cleanly.
+      MB_PUBLIC_URL: ${MB_PUBLIC_URL:-http://localhost}
+      MB_SMTP_ADDR: ${MB_SMTP_ADDR:-}
+      MB_SMTP_USERNAME: ${MB_SMTP_USERNAME:-}
+      MB_SMTP_PASSWORD: ${MB_SMTP_PASSWORD:-}
+      MB_MAIL_FROM: ${MB_MAIL_FROM:-}
+      MB_GOOGLE_CLIENT_ID: ${MB_GOOGLE_CLIENT_ID:-}
+      MB_GOOGLE_CLIENT_SECRET: ${MB_GOOGLE_CLIENT_SECRET:-}
     volumes:
       # images survive container rebuilds, like the database does
       - uploads_data:/uploads

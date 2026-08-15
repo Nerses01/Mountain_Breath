@@ -1,6 +1,8 @@
 import type { Currency } from '../lib/currencies'
 import type {
   Address,
+  AddressEntry,
+  AddressInput,
   AdminProduct,
   CheckoutInput,
   AdminReview,
@@ -12,6 +14,7 @@ import type {
   CatalogFacets,
   Category,
   Credentials,
+  LoginInput,
   EditorialInput,
   ImageInput,
   NewCategory,
@@ -230,9 +233,44 @@ export const api = {
   me: () => request<User>('/api/v1/auth/me'),
   register: (creds: Credentials) =>
     request<User>('/api/v1/auth/register', { method: 'POST', body: creds }),
-  login: (creds: Credentials) =>
-    request<User>('/api/v1/auth/login', { method: 'POST', body: creds }),
+  login: (input: LoginInput) =>
+    request<User>('/api/v1/auth/login', { method: 'POST', body: input }),
   logout: () => request<void>('/api/v1/auth/logout', { method: 'POST' }),
+  // E8: the reset flow. forgot answers 204 whether or not the email exists
+  // (no enumeration oracle), so the UI says "if that address is ours, a
+  // link is on its way" either way. The lang matters: the emailed link
+  // lands the reader back in their language.
+  forgotPassword: (email: string) =>
+    request<void>(withView('/api/v1/auth/forgot-password'), {
+      method: 'POST',
+      body: { email },
+    }),
+  resetPassword: (token: string, password: string) =>
+    request<void>('/api/v1/auth/reset-password', {
+      method: 'POST',
+      body: { token, password },
+    }),
+
+  // E8: the wishlist — set-semantics like the cart, product cards back.
+  getWishlist: () => request<Product[]>(withView('/api/v1/wishlist')),
+  addWishlistItem: (productId: number) =>
+    request<void>(`/api/v1/wishlist/${productId}`, { method: 'PUT' }),
+  removeWishlistItem: (productId: number) =>
+    request<void>(`/api/v1/wishlist/${productId}`, { method: 'DELETE' }),
+  saveForLater: (variantId: number) =>
+    request<void>('/api/v1/wishlist/save-for-later', {
+      method: 'POST',
+      body: { variant_id: variantId },
+    }),
+
+  // E8: the address book behind the checkout's prefill.
+  listAddresses: () => request<AddressEntry[]>('/api/v1/account/addresses'),
+  createAddress: (input: AddressInput) =>
+    request<AddressEntry>('/api/v1/account/addresses', { method: 'POST', body: input }),
+  updateAddress: (id: number, input: AddressInput) =>
+    request<AddressEntry>(`/api/v1/account/addresses/${id}`, { method: 'PUT', body: input }),
+  deleteAddress: (id: number) =>
+    request<void>(`/api/v1/account/addresses/${id}`, { method: 'DELETE' }),
 
   // cart & orders (require login). The cart carries product NAMES, so it is
   // a localized read like the catalog; order items are frozen snapshots of

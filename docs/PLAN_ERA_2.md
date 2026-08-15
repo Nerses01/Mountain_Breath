@@ -208,9 +208,14 @@ answered earlier than it needs to be.
       tables, or one JSONB `content` column? Columns give constraints and
       clean admin forms; JSONB avoids a migration per field but loses FK
       safety.
-- [ ] **5. Social sign-in.** Google/Apple are two buttons in the mock and the
-      most third-party-dependent item in the plan. Confirm they are in scope,
-      or drop the buttons from the design.
+- [x] **5. Social sign-in — Google real, Apple a stub.** The
+      authorization-code flow is built and tested against a fake Google;
+      going live needs only a free OAuth client pasted into `backend/.env`
+      (instructions in `.env.example`). Apple's button renders
+      decorative-disabled with the truth stated underneath — their sign-in
+      requires the paid ($99/yr) developer program, which the family has
+      not bought; the E6 card-stub pattern covers the mock's shape.
+      *(Decided 2026-08-15.)*
 - [x] **6. Translatable content strategy — translation tables.**
       `product_translations` / `category_translations` in E1.5, and
       `benefit_translations` later in E2 alongside the `benefits` table it
@@ -1435,37 +1440,128 @@ apply → 280¢ off in both markets' totals, unknown → `promo_unknown`, floor 
 transactional email, session lifetime policy, OAuth's authorization-code flow.
 
 **Backend:**
-- [ ] Migration: `wishlist_items` (user_id, product_id, added_at, PK on both).
-      Login required — consistent with decision #9 on carts; anonymous
-      wishlists stay in the backlog.
-- [ ] "Save for later" = move a line from `cart_items` to `wishlist_items` in
-      one transaction.
-- [ ] Migration: `password_reset_tokens` (user_id, token_sha256, expires_at,
-      used_at) — the same leak-resistant design as sessions (decision #8),
-      single use, short TTL, and the request endpoint must answer identically
-      whether or not the email exists (no user enumeration, as login already
-      does).
-- [ ] Transactional email (pulled forward from Phase 11): provider or SMTP,
-      templates for reset and order confirmation, and a dev sink so tests never
-      send mail.
-- [ ] "Keep me signed in": short session vs. 30-day persistent cookie, chosen
-      at login; rotate the token on login either way.
-- [ ] Login rate limiting (also from Phase 11) — this is the phase where auth
-      is already open.
-- [ ] OAuth (decision #5, optional): `oauth_identities` (provider, subject,
-      user_id, UNIQUE(provider, subject)); account linking by verified email.
-- [ ] Tests: a reset token works once and not after expiry; rate limiting
-      trips and recovers; save-for-later moves exactly one row each way.
+- [x] Migration `000019_accounts`: `wishlist_items` (user_id, product_id,
+      added_at, PK on both — hearting twice is one fact, so writes are
+      idempotent upserts). Login required — consistent with decision #9 on
+      carts; anonymous wishlists stay in the backlog. The list read answers
+      with full product CARDS via a `productCards` helper generalized out of
+      E3's related-products query (the orderColumns lesson, applied
+      preemptively); inactive products drop out of the LIST but keep their
+      rows — a retired jar's heart is not the customer's to lose.
+- [x] "Save for later" = move a line from `cart_items` to `wishlist_items` in
+      one transaction — `DELETE … RETURNING` is the read and the write in
+      one statement, and the GRAIN changes in transit: a cart line is a
+      variant with a quantity, a wishlist entry is just the product.
+- [x] Migration: `password_reset_tokens` (user_id, token_sha256, expires_at,
+      used_at) — the sessions pattern (decision #8) re-armed, with two
+      columns sessions don't need: a 1-hour fuse (an inbox gets compromised
+      LATER) and single use recorded rather than deleted. Consuming a token
+      is one transaction under `FOR UPDATE` (two racing submits cannot both
+      spend it), sets the new hash, and **revokes every session** — a reset
+      means "someone may have my credentials", and a reset that leaves a
+      stolen session alive changed the lock with the window open. A new
+      request retires the previous unused links. The request endpoint
+      answers 204 whether or not the email exists (decision #71).
+- [x] Transactional email: an `internal/mail` package with a one-method
+      `Mailer` interface (the store-interface pattern applied to a side
+      effect), a plain-SMTP implementation, and a log sink when nothing is
+      configured. **Mailpit joined the dev compose stack** — the API speaks
+      real SMTP to :1025 and the mailbox is a web UI at :8025, so the dev
+      sink IS the production path, not a mock. Templates (reset + order
+      confirmation) live on the BACKEND in all three languages — an email
+      renders server-side, no browser catalogue between the text and the
+      reader — which also pulled `MinorExponent`/`FormatMinor` into Go
+      under the tested-duplication rule (#53's tripwire now checks the
+      exponent column too). The confirmation sends after commit and is
+      non-fatal: the order EXISTS, and a mail hiccup must not 500 it.
+- [x] "Keep me signed in": `remember` on the login body picks 7 vs 30 days,
+      cookie MaxAge and DB row agreeing; the token is rotated at every
+      login either way. A separate `loginRequest` struct, so a `remember`
+      key on REGISTER stays the 400 it should be.
+- [x] Login rate limiting (pulled from Phase 11): a fixed-window counter,
+      10 attempts / 10 minutes per (IP, email) — both halves of the key
+      matter: hammering one account doesn't lock its owner out from their
+      own address, and a botnet spreading one guess still burns its per-IP
+      budget. Runs BEFORE the lookup and the bcrypt compare, so guessing
+      cannot even spend the shop's hashing time. In-memory per-process,
+      with the scaling caveat written at the type: replicas multiply the
+      limit, and THAT is when it moves to storage. Also guards
+      forgot-password, which is otherwise a spam cannon.
+- [x] OAuth — **decision #5 resolved: Google real, Apple a stub on the
+      design** (the user's call, 2026-08-15; Apple's paid developer program
+      is not bought). `oauth_identities` (provider, subject, UNIQUE on the
+      pair); the authorization-code flow hand-rolled — state cookie (CSRF),
+      server-side code→token exchange, userinfo over the shop's own TLS
+      connection (which is why no JWKS/JWT verification is needed).
+      Account resolution order: known subject → link by provider-VERIFIED
+      email → mint a passwordless customer (`password_hash = ''`, which
+      bcrypt refuses to match anything against — password login fails
+      closed with no special case, and forgot-password is how such an
+      account later GAINS a password). Endpoints injectable, so handler
+      tests drive the whole callback against a fake Google stood up with
+      httptest.
+- [x] Tests: a reset token works once and not after expiry (and the
+      superseded-link case, and session revocation); rate limiting trips
+      and recovers (recovery white-box with an injected clock — it is ten
+      minutes long on a real one); save-for-later moves exactly one row
+      each way and honestly 404s the second time; address defaults juggle
+      under the partial unique index; OAuth links and never follows a
+      changed provider email.
 
 **Frontend:**
-- [ ] `LoginPage` rebuilt as the two-panel design with the Hive club panel,
-      show/hide password, keep-me-signed-in, forgot-password link.
-- [ ] `/forgot-password` and `/reset-password/:token` pages.
-- [ ] `WishlistPage`; heart toggles wired on card, product and cart.
-- [ ] Account area: profile, address book, order history.
+- [x] `LoginPage` rebuilt as the two-panel design: Hive club panel with the
+      mock's copy and the three perk tiles, show/hide password (a real
+      `aria-pressed` toggle), keep-me-signed-in, forgot-password link, the
+      Google button as an `<a>` (OAuth is a NAVIGATION, not a fetch) and
+      the Apple stub decorative-disabled with the truth underneath — the
+      E6 card-fields pattern, per decision #5. Register shares the panel:
+      the design's own "New here? Create an account" line is the mode
+      switch. A failed Google round-trip lands back with `?oauth_error=1`
+      and explains itself.
+- [x] `/forgot-password` and `/reset-password/:token` pages. The sent-copy
+      is deliberately conditional ("if that address is ours…") — the 204
+      tells the page nothing more, and claiming more would re-open the
+      enumeration oracle the backend closed. A dead link renders one calm
+      message with the way out.
+- [x] `WishlistPage` (the shop's own `ProductCard` grid — un-hearting IS
+      removal); heart toggles wired on card, product page and header via
+      ONE shared `WishlistHeart` whose state derives from the wishlist
+      QUERY, so two hearts for one product cannot disagree; "Save for
+      later" on every cart line.
+- [x] Account area at `/account`: profile (email, hive standing, sign out),
+      the address book CRUD (one form for add and edit, the checkout's
+      exact field keys), and doors to orders and the wishlist. Order
+      history deliberately STAYS at `/orders` — the account page is its
+      front door, not its new home. The header's account icon now points
+      here. *Checkout's `address_id` selection stayed out (as E6's note
+      anticipated it might): the inline form prefilled from the default
+      already covers the flow, and picking among several addresses at
+      checkout is backlog, not this phase's Done-when.*
 
 **Done when:** a forgotten password is recoverable end to end and hearts
 survive a logout on another device.
+✅ **Complete 2026-08-15.** The reset was proven live through the whole
+loop: forgot → Mailpit's mailbox (Armenian subject intact — RFC 2047 at
+work) → the `/hy/` link → 204 → old password 401, new password 200, reused
+link 400. Hearts live in Postgres keyed by user, so the second half of the
+Done-when is storage, pinned by the wishlist store tests and the Playwright
+account journey (register → heart → wishlist → save-for-later → address
+book). `go test ./...` green, `golangci-lint` 0 issues, `tsc -b`, `oxlint`,
+`npm test` (146), both e2e journeys. Postman 75 → 86 requests.
+
+**Findings while building:**
+
+- **The e2e suite deliberately skips the reset flow**: its middle step is
+  an email, and CI has no mailbox (Mailpit runs in dev only). The store
+  tests own the token's lifecycle, the handler tests own the link's
+  construction, and the live Mailpit walk above proved the one hop between
+  them — a browser test would re-prove what three layers already pin.
+- **Old e2e selectors break on redesigns**: the purchase journey's
+  "Create account" button died with the login rebuild — the cost of
+  testing through real screens, paid, noted, fixed.
+- **The SMTP subject line is a trap**: mail predates UTF-8, and an
+  unencoded Armenian subject arrives as mojibake. `mime.QEncoding` is one
+  line; knowing it is needed is the lesson.
 
 ---
 

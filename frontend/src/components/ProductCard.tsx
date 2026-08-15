@@ -4,7 +4,8 @@ import type { Product } from '../api/types'
 import { useLocale } from '../i18n/useLocale'
 import { Price } from './ui/Price'
 import { cx } from '../lib/cx'
-import { Badge, HeartIcon, IconButton, Stars } from './ui'
+import { Badge, Stars } from './ui'
+import { WishlistHeart } from './WishlistHeart'
 
 /**
  * The design's product card: image slot with a badge and a wishlist heart,
@@ -94,17 +95,9 @@ export function ProductCard({
           </Badge>
         )}
 
-        {/* Inert until E8 builds the wishlist. Disabled rather than absent:
-            leaving it out now and adding it later would move every card's
-            layout, and a disabled control announces itself honestly. */}
-        <IconButton
-          label={t('common:actions.wishlist')}
-          tone="bare"
-          disabled
-          className="absolute right-3 top-3 z-10 size-8 bg-panel-soft text-ink-faint"
-        >
-          <HeartIcon />
-        </IconButton>
+        {/* E8: the heart is live — one shared component owns the state, so
+            this card and the product page can never disagree about it. */}
+        <WishlistHeart productId={product.id} className="absolute right-3 top-3 z-10" />
 
         {!inStock && (
           <span className="absolute inset-x-3 bottom-3 rounded-full bg-bark/90 px-3 py-1.5 text-center text-2xs font-semibold uppercase tracking-label text-ink-on-dark">

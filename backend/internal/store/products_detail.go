@@ -196,6 +196,16 @@ func (s *Store) ListCuratedRelated(ctx context.Context, slug string, view domain
 // compile-time constant supplied by the caller — the same
 // constants-not-user-input rule the catalog queries follow.
 func (s *Store) relatedProducts(ctx context.Context, slug string, view domain.View, tail string) ([]domain.Product, error) {
+	return s.productCards(ctx, view, tail, relatedLimit, slug)
+}
+
+// productCards is the one query shape behind every "grid of cards keyed by
+// something else" read — related products (keyed by a slug) and E8's
+// wishlist (keyed by a user id). The tail supplies the JOIN/WHERE/ORDER and
+// refers to the caller's key as $1; $2 is always the locale. Generalized
+// out of relatedProducts when the wishlist would otherwise have copied the
+// whole SELECT list — the orderColumns lesson, applied preemptively.
+func (s *Store) productCards(ctx context.Context, view domain.View, tail string, limit int, arg any) ([]domain.Product, error) {
 	locale := view.EffectiveLocale()
 	q := `
 		SELECT p.id, p.category_id, p.slug,
@@ -212,15 +222,15 @@ func (s *Store) relatedProducts(ctx context.Context, slug string, view domain.Vi
 		LEFT JOIN category_translations ct  ON ct.category_id  = c.id AND ct.locale  = $2
 		LEFT JOIN category_translations cen ON cen.category_id = c.id AND cen.locale = 'en'
 		` + tail + `
-		LIMIT ` + fmt.Sprint(relatedLimit)
+		LIMIT ` + fmt.Sprint(limit)
 
-	rows, err := s.pool.Query(ctx, q, slug, locale)
+	rows, err := s.pool.Query(ctx, q, arg, locale)
 	if err != nil {
-		return nil, fmt.Errorf("querying related products: %w", err)
+		return nil, fmt.Errorf("querying product cards: %w", err)
 	}
 	defer rows.Close()
 
-	products := make([]domain.Product, 0, relatedLimit)
+	products := make([]domain.Product, 0, limit)
 	for rows.Next() {
 		var p domain.Product
 		if err := rows.Scan(&p.ID, &p.CategoryID, &p.Slug, &p.Name, &p.Description,
@@ -228,12 +238,12 @@ func (s *Store) relatedProducts(ctx context.Context, slug string, view domain.Vi
 			&p.Badge, &p.BadgeTone, &p.SalesCount,
 			&p.CategorySlug, &p.CategoryName,
 			&p.Rating.Average, &p.Rating.Count); err != nil {
-			return nil, fmt.Errorf("scanning related product: %w", err)
+			return nil, fmt.Errorf("scanning product card: %w", err)
 		}
 		products = append(products, p)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating related products: %w", err)
+		return nil, fmt.Errorf("iterating product cards: %w", err)
 	}
 
 	// The card needs a price and a benefit line, exactly like the shop grid.

@@ -1,6 +1,13 @@
 import { Link } from 'react-router'
 import { Trans, useTranslation } from 'react-i18next'
-import { useCart, useMe, usePreview, useRemoveCartItem, useSetCartItem } from '../api/hooks'
+import {
+  useCart,
+  useMe,
+  usePreview,
+  useRemoveCartItem,
+  useSaveForLater,
+  useSetCartItem,
+} from '../api/hooks'
 import type { CartItem } from '../api/types'
 import type { Currency } from '../lib/currencies'
 import { useLocale } from '../i18n/useLocale'
@@ -30,6 +37,7 @@ export function CartPage() {
   const preview = usePreview(!!me.data)
   const setItem = useSetCartItem()
   const removeItem = useRemoveCartItem()
+  const saveForLater = useSaveForLater()
 
   if (me.isPending || cart.isPending || (me.data && preview.isPending)) {
     return <Shell>{t('common:state.loading')}</Shell>
@@ -96,6 +104,8 @@ export function CartPage() {
                       : setItem.mutate({ variantId: it.variant_id, qty })
                   }
                   onRemove={() => removeItem.mutate(it.variant_id)}
+                  onSaveForLater={() => saveForLater.mutate(it.variant_id)}
+                  savingForLater={saveForLater.isPending}
                 />
               ))}
               <li className="flex items-center justify-between py-5">
@@ -145,11 +155,15 @@ function CartLine({
   currency,
   onQty,
   onRemove,
+  onSaveForLater,
+  savingForLater,
 }: {
   item: CartItem
   currency: Currency
   onQty: (qty: number) => void
   onRemove: () => void
+  onSaveForLater: () => void
+  savingForLater: boolean
 }) {
   const { t } = useTranslation()
   const { localePath } = useLocale()
@@ -175,16 +189,28 @@ function CartLine({
         </span>
       </div>
 
-      <QtyStepper
-        value={item.qty}
-        onChange={onQty}
-        min={0}
-        max={item.stock_qty}
-        label={t('common:actions.cart')}
-        decreaseLabel={t('cart:decrease')}
-        increaseLabel={t('cart:increase')}
-        className="px-4 py-2"
-      />
+      <div className="flex flex-col items-center gap-1.5">
+        <QtyStepper
+          value={item.qty}
+          onChange={onQty}
+          min={0}
+          max={item.stock_qty}
+          label={t('common:actions.cart')}
+          decreaseLabel={t('cart:decrease')}
+          increaseLabel={t('cart:increase')}
+          className="px-4 py-2"
+        />
+        {/* E8: the design's "Save for later" — a MOVE to the wishlist, so
+            the line leaves the cart and a heart appears in its place. */}
+        <button
+          type="button"
+          onClick={onSaveForLater}
+          disabled={savingForLater}
+          className="text-xs font-semibold text-ink-muted transition hover:text-brand-ink disabled:opacity-50"
+        >
+          {t('cart:saveForLater')}
+        </button>
+      </div>
 
       <Price prices={item.line_totals} primaryMinor={item.line_total_minor} className="w-24 items-end" />
 

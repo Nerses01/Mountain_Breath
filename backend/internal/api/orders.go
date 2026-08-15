@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
+	"github.com/Nerses01/Mountain_Breath/backend/internal/mail"
 )
 
 type orderItemResponse struct {
@@ -193,6 +195,19 @@ func (s *Server) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.metrics.ordersCreated.Inc()
+
+	// E8: the confirmation mail, from the order's SNAPSHOTS (names and
+	// prices as charged), in the language the checkout happened in.
+	// Non-fatal by design: the order EXISTS — a mail hiccup after commit is
+	// a logged nuisance, never a 500 telling the customer their real order
+	// failed.
+	locale := localeFromContext(r.Context())
+	orderURL := fmt.Sprintf("%s%s/orders/%d", s.publicURL, localePathPrefix(locale), order.ID)
+	if err := s.mailer.Send(r.Context(),
+		mail.OrderConfirmation(locale, user.Email, order, orderURL)); err != nil {
+		s.log.Error("sending order confirmation", "order", order.ID, "error", err)
+	}
+
 	s.respondJSON(w, http.StatusCreated, toOrderResponse(order))
 }
 

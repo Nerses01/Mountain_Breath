@@ -7,6 +7,7 @@ import {
 import { api, ApiError, type CatalogFilterParams, type ProductListParams } from './client'
 import type {
   Address,
+  AddressInput,
   EditorialInput,
   Money,
   ImageInput,
@@ -328,6 +329,92 @@ export function useOrder(id: number) {
     queryFn: () => api.getOrder(id),
     enabled: Number.isFinite(id) && id > 0,
   })
+}
+
+// --- Account (E8) ---
+
+// The wishlist doubles as the heart-state oracle: every heart on every card
+// derives its on/off from this one query's product ids — six products make
+// membership a Set lookup, not a per-product endpoint.
+export function useWishlist(loggedIn: boolean) {
+  const view = useView()
+  return useQuery({
+    queryKey: ['wishlist', ...view],
+    queryFn: api.getWishlist,
+    enabled: loggedIn,
+  })
+}
+
+export function useToggleWishlist() {
+  const qc = useQueryClient()
+  return useMutation({
+    // One mutation for both directions — the caller states the DESIRED
+    // state, mirroring the API's set-semantics.
+    mutationFn: ({ productId, hearted }: { productId: number; hearted: boolean }) =>
+      hearted ? api.addWishlistItem(productId) : api.removeWishlistItem(productId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['wishlist'] }),
+  })
+}
+
+export function useSaveForLater() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.saveForLater,
+    onSuccess: () => {
+      // A line left the cart and a heart appeared — three caches moved.
+      qc.invalidateQueries({ queryKey: ['cart'] })
+      qc.invalidateQueries({ queryKey: ['preview'] })
+      qc.invalidateQueries({ queryKey: ['wishlist'] })
+    },
+  })
+}
+
+export function useForgotPassword() {
+  return useMutation({ mutationFn: api.forgotPassword })
+}
+
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: ({ token, password }: { token: string; password: string }) =>
+      api.resetPassword(token, password),
+  })
+}
+
+export function useAddresses(enabled: boolean) {
+  return useQuery({
+    queryKey: ['addresses'],
+    queryFn: api.listAddresses,
+    enabled,
+  })
+}
+
+// All three writes invalidate the book AND the checkout's prefill — the
+// default address is the same fact read through two endpoints.
+function useInvalidateAddresses() {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: ['addresses'] })
+    qc.invalidateQueries({ queryKey: ['default-address'] })
+  }
+}
+
+export function useCreateAddress() {
+  const invalidate = useInvalidateAddresses()
+  return useMutation({ mutationFn: api.createAddress, onSuccess: invalidate })
+}
+
+export function useUpdateAddress() {
+  const invalidate = useInvalidateAddresses()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: AddressInput }) =>
+      api.updateAddress(id, input),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteAddress() {
+  const invalidate = useInvalidateAddresses()
+  return useMutation({ mutationFn: api.deleteAddress, onSuccess: invalidate })
 }
 
 // The saved address for pre-filling the checkout form. 404 (first-time

@@ -260,7 +260,7 @@
                 "login"
               ]
             },
-            "description": "Wrong password and unknown email return the SAME error — the API must not reveal which accounts exist (user enumeration)."
+            "description": "Wrong password and unknown email return the SAME error — the API must not reveal which accounts exist (user enumeration).\n\nE8: the login body also accepts \"remember\": true — the session and its cookie then live 30 days instead of 7. The token is rotated at every login either way. Login is rate limited per (IP, email): 10 attempts per 10 minutes, counted BEFORE the password check so guessing cannot even spend the shop's bcrypt time. The 11th answers 429 too_many_attempts."
           },
           "event": [
             {
@@ -3855,6 +3855,434 @@
                   "    pm.expect(hive.member).to.eql(hive.prior_orders >= 1);",
                   "    pm.expect(hive.first_delivery_free).to.eql(hive.prior_orders === 0);",
                   "    pm.expect(hive.member_discount_percent).to.eql(hive.member ? 8 : 0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Accounts (E8)",
+      "description": "Wishlist, password reset, the address book and Google sign-in.\n\nThe reset flow reuses the sessions pattern a third time: the email carries a raw 256-bit token, the table stores its SHA-256, single use is enforced under a row lock, and consuming a token revokes every session. The wishlist is set-semantics like the cart. The address book is the account page's CRUD behind the checkout's prefill.\n\nRun the wishlist/address requests signed in (Register/Login first).",
+      "item": [
+        {
+          "name": "Forgot password — always 204",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/auth/forgot-password",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "Requests a reset link. The answer is 204 WHETHER OR NOT the email exists — login already answers identically for unknown email and wrong password, and a reset endpoint that said 'sent!' for members and 'no such account' for strangers would be a free membership oracle. Rate limited per (IP, email) like login. The mailed link lands in the requester's language (?lang= / cookie / Accept-Language, as everywhere).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"definitely-not-registered@example.test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204 — for members and strangers alike\", () => {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset password — invented token (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/auth/reset-password",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "Spends an emailed token. Unknown, already-spent and expired tokens all answer the same 400 invalid_token — one answer for every kind of no, so a token-guesser has nothing to calibrate against. A valid token sets the new bcrypt hash and DELETES every session the user has: a reset means 'someone may have my credentials', and a reset that leaves a stolen session alive changed the lock while leaving a window open.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"token\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n    \"password\": \"a-brand-new-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test(\"one answer for every kind of no\", () => {",
+                  "    pm.expect(pm.response.json().error.code).to.eql(\"invalid_token\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pick a product for the wishlist",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/products?per_page=1",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "per_page",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Stores the first listed product's id as {{wishlistProductId}} for the requests below — product ids are not stable across seeds, so the collection asks rather than assumes."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const items = pm.response.json().items;",
+                  "if (items.length > 0) {",
+                  "    pm.collectionVariables.set(\"wishlistProductId\", items[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Heart a product (idempotent)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/wishlist/{{wishlistProductId}}",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "wishlist",
+                "{{wishlistProductId}}"
+              ]
+            },
+            "description": "PUT with set-semantics, like the cart: the URL names the desired STATE ('this product is hearted'), so repeating the request changes nothing and the heart button needs no read-before-write. Requires login."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The wishlist lists full cards",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/wishlist",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "wishlist"
+              ]
+            },
+            "description": "Product CARDS, not a leaner wishlist DTO — a wishlist is a shelf of saved cards, and the heart's on/off state everywhere in the UI derives from this one list client-side."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test(\"carries the hearted product as a full card\", () => {",
+                  "    const ids = pm.response.json().map(p => p.id);",
+                  "    pm.expect(ids).to.include(Number(pm.collectionVariables.get(\"wishlistProductId\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Un-heart it",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/wishlist/{{wishlistProductId}}",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "wishlist",
+                "{{wishlistProductId}}"
+              ]
+            },
+            "description": "Removing an absent heart also succeeds — the state the customer asked for is the state they get."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Save for later — no such cart line (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/wishlist/save-for-later",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "wishlist",
+                "save-for-later"
+              ]
+            },
+            "description": "Moves a CART LINE to the wishlist in one transaction (the line and the wishlist row must never both exist, nor neither). POST, not PUT: it is a transfer, and the second identical request finds no line to move — which is what this request, run against an empty cart, demonstrates.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"variant_id\": 999999\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404 with an empty cart (204 after Set cart item)\", () => {",
+                  "    pm.expect([204, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add an address to the book",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/account/addresses",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "account",
+                "addresses"
+              ]
+            },
+            "description": "The account page's book behind the checkout prefill. The FIRST entry becomes the default whatever the flag says (a book with entries but no default would leave the prefill nothing to stand on); a later entry claiming the default demotes the old one inside one transaction, because the one-default-per-user partial unique index rejects the intermediate state. Validation uses the checkout's exact field keys (address.street …).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"label\": \"Postman test\", \"is_default\": false,\n    \"first_name\": \"Anahit\", \"last_name\": \"Sargsyan\",\n    \"phone\": \"+374 91 000000\", \"street\": \"14 Abovyan St\",\n    \"city\": \"Yerevan\", \"postal_code\": \"0009\", \"country\": \"AM\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "",
+                  "const entry = pm.response.json();",
+                  "pm.collectionVariables.set(\"addressId\", entry.id);",
+                  "pm.test(\"the entry has book-keeping\", () => {",
+                  "    pm.expect(entry.is_default).to.be.a(\"boolean\");",
+                  "    pm.expect(entry.label).to.eql(\"Postman test\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List the book",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/account/addresses",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "account",
+                "addresses"
+              ]
+            },
+            "description": "Defaults first. Every row is scoped to the session's user in the WHERE clause — someone else's address id behaves exactly like no address (the 404-not-403 rule, applied to a book)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"an array of entries\", () => {",
+                  "    pm.expect(pm.response.json()).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete the test entry",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/account/addresses/{{addressId}}",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "account",
+                "addresses",
+                "{{addressId}}"
+              ]
+            },
+            "description": "Cleanup for re-runs. Deleting the default is allowed and leaves the book without one — a true statement about the customer's choices; the next checkout simply has nothing to prefill."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Google sign-in entry point",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/auth/oauth/google",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "auth",
+                "oauth",
+                "google"
+              ]
+            },
+            "description": "Leg 1 of the authorization-code flow: a 302 to Google carrying a random state (CSRF proof, mirrored in a short-lived cookie). 404 when MB_GOOGLE_CLIENT_ID/SECRET are unset — unconfigured means the feature does not exist, and the login page's button explains itself. The callback is browser-driven and cannot be usefully exercised from Postman; its tests live in backend/internal/api/account_test.go against a fake Google."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"302 when configured, 404 when not\", () => {",
+                  "    pm.expect([302, 404]).to.include(pm.response.code);",
                   "});"
                 ]
               }

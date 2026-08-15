@@ -8,7 +8,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"testing"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/Nerses01/Mountain_Breath/backend/internal/api"
 	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
@@ -77,10 +80,32 @@ type fakeStore struct {
 	priorOrders int
 	upsell      *domain.Upsell
 	orderErr    error
+
+	// E8 accounts. Mostly recording fields, same philosophy as the E3
+	// editorial fakes: handler tests prove requests become the right calls;
+	// the store's own behaviour has the Docker-backed suite.
+	wishlist        map[int64]bool // product id → hearted
+	wishlistItems   []domain.Product
+	savedForLater   int64
+	resetUserID     int64
+	resetToken      string
+	consumedToken   string
+	newPasswordHash string
+	consumeErr      error
+	addresses       []domain.AddressEntry
+	deletedAddress  int64
+	oauthUser       domain.User
+	oauthProvider   string
+	oauthSubject    string
+	oauthEmail      string
+	userByEmail     *domain.User
 }
 
 func newFakeStore() *fakeStore {
-	return &fakeStore{sessions: make(map[string]domain.User)}
+	return &fakeStore{
+		sessions: make(map[string]domain.User),
+		wishlist: make(map[int64]bool),
+	}
 }
 
 // --- CategoryStore ---
@@ -277,7 +302,12 @@ func (f *fakeStore) CreateUser(_ context.Context, u *domain.User) error {
 	return nil
 }
 
-func (f *fakeStore) GetUserByEmail(_ context.Context, _ string) (domain.User, error) {
+func (f *fakeStore) GetUserByEmail(_ context.Context, email string) (domain.User, error) {
+	// E8: settable, because the reset and remember-me tests need a user the
+	// handler can FIND — the zero fake keeps its "nobody exists" behaviour.
+	if f.userByEmail != nil && f.userByEmail.Email == email {
+		return *f.userByEmail, nil
+	}
 	return domain.User{}, domain.ErrNotFound
 }
 
@@ -395,12 +425,112 @@ func (f *fakeStore) UpdateOrderStatus(_ context.Context, _ int64, _ string) (dom
 	return domain.Order{}, domain.ErrNotFound
 }
 
+// --- AccountStore (E8) ---
+
+func (f *fakeStore) ListWishlist(_ context.Context, _ int64, view domain.View) ([]domain.Product, error) {
+	f.lastCurrency = view.EffectiveCurrency()
+	return f.wishlistItems, nil
+}
+
+func (f *fakeStore) AddWishlistItem(_ context.Context, _ int64, productID int64) error {
+	if !f.hasProduct(productID) {
+		return domain.ErrNotFound
+	}
+	f.wishlist[productID] = true
+	return nil
+}
+
+func (f *fakeStore) RemoveWishlistItem(_ context.Context, _ int64, productID int64) error {
+	delete(f.wishlist, productID)
+	return nil
+}
+
+func (f *fakeStore) SaveForLater(_ context.Context, _ int64, variantID int64) error {
+	for _, it := range f.cart {
+		if it.VariantID == variantID {
+			f.savedForLater = variantID
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
+func (f *fakeStore) CreatePasswordReset(_ context.Context, userID int64, token string, _ time.Time) error {
+	f.resetUserID, f.resetToken = userID, token
+	return nil
+}
+
+func (f *fakeStore) ConsumePasswordReset(_ context.Context, token, newHash string) error {
+	if f.consumeErr != nil {
+		return f.consumeErr
+	}
+	f.consumedToken, f.newPasswordHash = token, newHash
+	return nil
+}
+
+func (f *fakeStore) ListAddresses(_ context.Context, _ int64) ([]domain.AddressEntry, error) {
+	return f.addresses, nil
+}
+
+func (f *fakeStore) CreateAddress(_ context.Context, _ int64, e domain.AddressEntry) (domain.AddressEntry, error) {
+	e.ID = int64(len(f.addresses) + 1)
+	e.IsDefault = e.IsDefault || len(f.addresses) == 0
+	f.addresses = append(f.addresses, e)
+	return e, nil
+}
+
+func (f *fakeStore) UpdateAddress(_ context.Context, _ int64, e domain.AddressEntry) error {
+	for i := range f.addresses {
+		if f.addresses[i].ID == e.ID {
+			f.addresses[i] = e
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
+func (f *fakeStore) DeleteAddress(_ context.Context, _ int64, addressID int64) error {
+	for i := range f.addresses {
+		if f.addresses[i].ID == addressID {
+			f.addresses = append(f.addresses[:i], f.addresses[i+1:]...)
+			f.deletedAddress = addressID
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
+func (f *fakeStore) FindOrCreateOAuthUser(_ context.Context, provider, subject, email string) (domain.User, error) {
+	f.oauthProvider, f.oauthSubject, f.oauthEmail = provider, subject, email
+	if f.oauthUser.ID != 0 {
+		return f.oauthUser, nil
+	}
+	return domain.User{ID: 42, Email: email, Role: domain.RoleCustomer}, nil
+}
+
 // --- test helpers ---
 
 // newTestServer wires a real router (all real middleware!) around the fake.
 func newTestServer(fake *fakeStore) http.Handler {
+	return newTestServerOpts(fake, api.Options{})
+}
+
+// newTestServerOpts is newTestServer with E8's knobs — the mailer fake and
+// the endpoints of a pretend Google.
+func newTestServerOpts(fake *fakeStore, opts api.Options) http.Handler {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil)) // silent in tests
-	return api.NewServer(logger, fake, false, os.TempDir()).Routes()
+	return api.NewServer(logger, fake, false, os.TempDir(), opts).Routes()
+}
+
+// testPasswordHash bcrypts at MinCost — these tests measure handlers, not
+// key-stretching.
+func testPasswordHash(t *testing.T, password string) string {
+	t.Helper()
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(hash)
 }
 
 // loginAs plants a session directly in the fake and returns its cookie.

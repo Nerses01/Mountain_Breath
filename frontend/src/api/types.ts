@@ -201,6 +201,28 @@ export interface Credentials {
   password: string
 }
 
+/** Login is credentials plus the "keep me signed in" checkbox (E8): a week
+ *  of session by default, thirty days when remembered. */
+export interface LoginInput extends Credentials {
+  remember: boolean
+}
+
+// --- Account (E8) -------------------------------------------------------
+
+/** One row of the account page's address book: an Address with a name tag
+ *  and the default flag the checkout prefills from. */
+export interface AddressEntry extends Address {
+  id: number
+  label: string
+  is_default: boolean
+}
+
+/** What the book's forms send — the id lives in the URL on updates. */
+export interface AddressInput extends Address {
+  label: string
+  is_default: boolean
+}
+
 // Per-locale text. `name`/`description` on the parent objects are the ENGLISH
 // copy and stay required — every other language falls back to them — so this
 // map carries only hy and ru. An "en" key is rejected by the API.

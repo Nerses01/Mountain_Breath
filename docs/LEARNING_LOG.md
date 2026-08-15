@@ -17,6 +17,71 @@ Template for an entry:
 
 ---
 
+## 2026-08-15 — Phase E8: accounts, tokens, and the flows that leave the app
+
+**Worked on:** migration 000019 (`wishlist_items`, `password_reset_tokens`,
+`oauth_identities`, address labels); the `mail` package with Mailpit in the
+dev stack; the full password-reset loop; keep-me-signed-in TTLs; login rate
+limiting; the wishlist with save-for-later; the account page's address book;
+Google OAuth against a fake and the Apple stub; the two-panel sign-in,
+forgot/reset pages, hearts everywhere; the account e2e journey.
+
+**Learned:**
+
+- **One pattern, three tables.** Sessions, reset tokens and (in E9's plan)
+  newsletter confirmations are the same design: the client holds a raw
+  random value, the database holds its SHA-256. What varies is the policy
+  bolted on — sessions expire late, reset tokens expire in an hour and die
+  on first use, and consuming one revokes the sessions too. Recognizing a
+  pattern means the third use costs a comment, not a design session.
+- **Absence of information is information.** Three separate rules exist to
+  say nothing: forgot-password answers 204 for strangers and members alike,
+  a dead reset token never says WHICH kind of dead it is, and E7's
+  "promo_unknown" covers disabled codes. All are the same idea — an error
+  channel is an oracle unless you flatten it — and all trace back to
+  login's identical-errors rule from Phase 4.
+- **OAuth is three redirects and one back-channel call.** Naming the legs
+  demystified it: state cookie out (CSRF proof), one-time code back, the
+  SERVER swaps code for token (the browser never sees the secret), userinfo
+  over our own TLS connection — which is exactly why no JWT signature
+  verification is needed: the JWKS dance exists for tokens you did not
+  fetch yourself. The subject is the identity; the email is a one-time,
+  verified-only linking hint, because providers let people change email.
+- **An empty bcrypt hash is a lock with no key.** OAuth-born accounts store
+  `password_hash = ''` and bcrypt refuses to match anything against it —
+  password login fails closed with zero special-case code, and
+  forgot-password doubles as "add a password to my Google account". The
+  cheapest possible design fell out of understanding the library instead of
+  adding a nullable column.
+- **The dev sink should be the production path.** Mailpit speaks real SMTP,
+  and building against it (not a mock) is what surfaced RFC 2047: an
+  unencoded Armenian subject line arrives as mojibake. A `t.Log`-style
+  fake mailer would have shipped that bug to the first real relay.
+- **Rate limiting is a keying problem more than an algorithm problem.**
+  Fixed-window vs token bucket mattered far less than (IP, email) as the
+  key — either half alone is a lockout attack or a botnet pass — and than
+  running the check BEFORE bcrypt, so guessing cannot spend the shop's own
+  hashing time.
+- **A grain change can be a feature.** The cart line (variant × qty) becomes
+  a wishlist row (product) in one `DELETE … RETURNING` transaction — the
+  transfer drops precision on purpose, because later-you wants to remember
+  the jar, not the Tuesday's quantity.
+
+**Questions / to revisit:**
+
+- Going live with Google needs the OAuth client created in the console and
+  its redirect URI updated when Phase 9 lands a real domain.
+- The limiter is per-process; if the compose stack ever runs two API
+  replicas, it moves to storage (the caveat is written at the type).
+- The account page could later let the checkout PICK among saved addresses
+  (`address_id`); today it prefills the default only — backlog, noted in
+  the plan.
+- Native review of the new Armenian/Russian copy (auth screens + the two
+  email templates) — the reset email especially, since it lands in
+  strangers' inboxes.
+
+---
+
 ## 2026-08-15 — Phase E7: one calculator, and locks that make promises
 
 **Worked on:** migration 000018 (`promo_codes`, per-market

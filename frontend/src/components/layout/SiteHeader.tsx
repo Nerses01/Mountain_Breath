@@ -108,9 +108,15 @@ export function SiteHeader() {
           >
             <SearchIcon />
           </IconButton>
-          <IconButton label={t('common:actions.wishlist')}>
+          {/* E8: the header heart goes somewhere now. A Link styled as the
+              icon button — it is navigation, and middle-click should work. */}
+          <Link
+            to={localePath('/wishlist')}
+            aria-label={t('common:actions.wishlist')}
+            className="inline-flex size-9.5 items-center justify-center rounded-full border-[1.5px] border-line-strong text-ink-muted transition hover:text-ink"
+          >
             <HeartIcon />
-          </IconButton>
+          </Link>
 
           {/* E7: the member badge — the design's header never draws a
               signed-in state (§6 exception 2 again), but the hive club is a
@@ -131,7 +137,7 @@ export function SiteHeader() {
               shows a signed-in state. The app has auth, so one is added
               here (docs/PLAN_ERA_2.md §6, exception 2). */}
           <Link
-            to={localePath(me.data ? '/orders' : '/login')}
+            to={localePath(me.data ? '/account' : '/login')}
             aria-label={
               me.data ? t('common:actions.account') : t('common:actions.signIn')
             }

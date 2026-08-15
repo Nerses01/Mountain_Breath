@@ -15,6 +15,7 @@ import (
 
 	"github.com/Nerses01/Mountain_Breath/backend/internal/api"
 	"github.com/Nerses01/Mountain_Breath/backend/internal/config"
+	"github.com/Nerses01/Mountain_Breath/backend/internal/mail"
 	"github.com/Nerses01/Mountain_Breath/backend/internal/store"
 )
 
@@ -84,10 +85,27 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("creating uploads dir: %w", err)
 	}
 
+	// E8: outgoing mail. Configured SMTP (Mailpit in dev, a real relay in
+	// prod) or the log sink, so an unconfigured machine still runs and
+	// still SHOWS what it would have sent.
+	var mailer mail.Mailer = &mail.LogSink{Log: logger}
+	if cfg.SMTPAddr != "" {
+		mailer = &mail.SMTP{
+			Addr: cfg.SMTPAddr, From: cfg.MailFrom,
+			Username: cfg.SMTPUsername, Password: cfg.SMTPPassword,
+		}
+		logger.Info("mail via SMTP", "addr", cfg.SMTPAddr)
+	}
+
 	srv := &http.Server{
 		Addr: cfg.Addr,
 		Handler: api.NewServer(logger, store.New(pool), cfg.Env == "dev",
-			cfg.UploadsDir, store.NewPoolCollector(pool)).Routes(),
+			cfg.UploadsDir, api.Options{
+				Mailer:             mailer,
+				PublicURL:          cfg.PublicURL,
+				GoogleClientID:     cfg.GoogleClientID,
+				GoogleClientSecret: cfg.GoogleClientSecret,
+			}, store.NewPoolCollector(pool)).Routes(),
 		// Never run an HTTP server without timeouts: a client that sends
 		// its request one byte per minute would otherwise hold a goroutine
 		// and a connection open forever (slowloris attack).

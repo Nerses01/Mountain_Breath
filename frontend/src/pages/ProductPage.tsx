@@ -11,6 +11,7 @@ import {
 } from '../api/hooks'
 import type { ProductDetail, ProductVariant } from '../api/types'
 import { ProductCard } from '../components/ProductCard'
+import { WishlistHeart } from '../components/WishlistHeart'
 import { Gallery } from '../components/product/Gallery'
 import { Reviews } from '../components/product/Reviews'
 import { Tabs, type Tab } from '../components/product/Tabs'
@@ -158,7 +159,12 @@ export function ProductPage() {
             <Stars rating={p.rating_avg} count={p.rating_count} />
           </div>
 
-          <h1 className="font-display text-display-lg font-extrabold text-ink">{p.name}</h1>
+          <div className="flex items-start justify-between gap-4">
+            <h1 className="font-display text-display-lg font-extrabold text-ink">{p.name}</h1>
+            {/* E8: the page-level heart — same shared component as the
+                card's, so the two can never disagree about this product. */}
+            <WishlistHeart productId={p.id} className="mt-2 shrink-0" />
+          </div>
 
           <p className="text-lg leading-relaxed text-ink-body">{p.description}</p>
 

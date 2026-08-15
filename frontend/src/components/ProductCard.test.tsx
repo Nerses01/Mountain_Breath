@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ProductCard } from './ProductCard'
 import type { Product } from '../api/types'
 
@@ -44,11 +45,15 @@ const product: Product = {
 }
 
 // Components using <Link> need a router context — MemoryRouter is the
-// test-friendly one (no real browser URL involved).
+// test-friendly one (no real browser URL involved). E8's live heart added
+// the query provider: the card now asks who is signed in.
 function renderCard(p: Product, onAdd?: (p: Product) => void) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <MemoryRouter>
-      <ProductCard product={p} onAdd={onAdd} />
+      <QueryClientProvider client={qc}>
+        <ProductCard product={p} onAdd={onAdd} />
+      </QueryClientProvider>
     </MemoryRouter>,
   )
 }

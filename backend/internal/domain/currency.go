@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Currency is one of the markets the shop prices in. Deliberately the same
 // shape as Locale: a string type whose only legal values come from a
@@ -80,6 +83,39 @@ func CurrencyForLocale(l Locale) Currency {
 }
 
 func (c Currency) String() string { return string(c) }
+
+// MinorExponent is how many decimal places the minor unit sits below the
+// major one — 2 for USD (1400 = $14.00), 0 for AMD (6700 = 6,700 ֏, the
+// dram having no subdivision in circulation).
+//
+// E8 pulls this into Go because EMAILS are rendered here: an order
+// confirmation needs a human total, and the browser's formatMoney cannot
+// help a message composed on the server. It extends the same tested
+// duplication as the currency set itself — TestCurrenciesMatchTheDatabase
+// asserts these values against the currencies table, so Go and SQL cannot
+// quietly disagree about what 1400 means.
+func (c Currency) MinorExponent() int {
+	if c == CurrencyAMD {
+		return 0
+	}
+	return 2
+}
+
+// FormatMinor renders an amount for plain-text contexts (emails, logs):
+// "24.00 USD", "6700 AMD". No grouping, no symbols — symbols and their
+// placement are display-locale concerns the frontend owns; a text email
+// wants unambiguous over pretty.
+func FormatMinor(minor int64, c Currency) string {
+	exp := c.MinorExponent()
+	if exp == 0 {
+		return fmt.Sprintf("%d %s", minor, c)
+	}
+	div := int64(1)
+	for range exp {
+		div *= 10
+	}
+	return fmt.Sprintf("%d.%0*d %s", minor/div, exp, minor%div, c)
+}
 
 // Money is an amount expressed in every market at once: currency → integer
 // minor units. The map, rather than a single number plus a rate, is the

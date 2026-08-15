@@ -5,14 +5,18 @@ import { AdminOrdersPage } from './pages/AdminOrdersPage'
 import { AdminPage } from './pages/AdminPage'
 import { AdminProductsPage } from './pages/AdminProductsPage'
 import { AdminReviewsPage } from './pages/AdminReviewsPage'
+import { AccountPage } from './pages/AccountPage'
 import { CartPage } from './pages/CartPage'
 import { CheckoutPage } from './pages/CheckoutPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { OrderDetailPage } from './pages/OrderDetailPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { OrdersPage } from './pages/OrdersPage'
 import { ProductPage } from './pages/ProductPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { ShopPage } from './pages/ShopPage'
+import { WishlistPage } from './pages/WishlistPage'
 
 /**
  * The storefront pages, defined once and mounted under every locale prefix.
@@ -32,6 +36,13 @@ function storefrontRoutes() {
     <Route key="cart" path="cart" element={<CartPage />} />,
     <Route key="orders" path="orders" element={<OrdersPage />} />,
     <Route key="order" path="orders/:id" element={<OrderDetailPage />} />,
+    // E8: the account area and the reset flow. The reset route's token is a
+    // URL param because that is what the EMAILED link carries — the page
+    // just posts it back.
+    <Route key="account" path="account" element={<AccountPage />} />,
+    <Route key="wishlist" path="wishlist" element={<WishlistPage />} />,
+    <Route key="forgot" path="forgot-password" element={<ForgotPasswordPage />} />,
+    <Route key="reset" path="reset-password/:token" element={<ResetPasswordPage />} />,
   ]
 }
 

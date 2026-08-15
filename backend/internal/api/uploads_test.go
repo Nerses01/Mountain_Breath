@@ -49,7 +49,7 @@ func TestUploadProductImage(t *testing.T) {
 	cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleAdmin})
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	server := api.NewServer(logger, fake, false, uploadsDir).Routes()
+	server := api.NewServer(logger, fake, false, uploadsDir, api.Options{}).Routes()
 
 	doUpload := func(path, filename string, content []byte) *httptest.ResponseRecorder {
 		body, contentType := multipartBody(t, "image", filename, content)

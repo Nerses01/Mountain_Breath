@@ -51,6 +51,20 @@ func TestCurrenciesMatchTheDatabase(t *testing.T) {
 		}
 	}
 
+	// E8 widened the duplication: emails are rendered in Go, so the minor
+	// exponent gained a Go copy too — same tripwire, one more column.
+	for _, c := range domain.Currencies {
+		var dbExp int
+		if err := testPool.QueryRow(ctx,
+			`SELECT minor_exponent FROM currencies WHERE code = $1`, string(c)).Scan(&dbExp); err != nil {
+			t.Fatalf("querying exponent for %s: %v", c, err)
+		}
+		if dbExp != c.MinorExponent() {
+			t.Errorf("%s: database exponent %d, Go says %d — FormatMinor would "+
+				"misplace the decimal point in every email", c, dbExp, c.MinorExponent())
+		}
+	}
+
 	// The base currency is the one price the schema treats as mandatory, so
 	// disagreeing about which it is would be worse than disagreeing about
 	// the set.

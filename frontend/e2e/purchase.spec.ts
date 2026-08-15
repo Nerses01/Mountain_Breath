@@ -13,14 +13,14 @@ import { expect, test } from '@playwright/test'
 test('a new customer can buy a product end to end', async ({ page }) => {
   const email = `e2e-${Date.now()}@test.local`
 
-  // --- register ---
+  // --- register (E8's two-panel page: the create-account LINE switches
+  // mode, then the submit button carries the same words) ---
   await page.goto('/')
   await page.getByRole('link', { name: 'Sign in' }).click()
-  await page.getByRole('button', { name: 'Create account' }).click()
+  await page.getByRole('button', { name: 'Create an account' }).click()
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill('e2e-password-123')
-  // scope to the form: the mode tab above it has the same label
-  await page.locator('form').getByRole('button', { name: 'Create account' }).click()
+  await page.getByRole('button', { name: 'Create an account', exact: true }).last().click()
 
   // logged in: the header's account link is titled with our email
   await expect(page.getByTitle(email)).toBeVisible()

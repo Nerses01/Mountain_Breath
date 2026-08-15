@@ -46,6 +46,16 @@ func ValidateAddress(a Address) map[string]string {
 	return fields
 }
 
+// AddressEntry is one row of the account page's address book (E8): an
+// Address plus its book-keeping. Embedding rather than repeating the seven
+// fields — the entry IS an address, with a name tag and a default flag.
+type AddressEntry struct {
+	ID        int64
+	Label     string // "Home", "Office" — the customer's word, may be empty
+	IsDefault bool
+	Address
+}
+
 // ── Payment ───────────────────────────────────────────────────────────────
 
 // PaymentMethod is HOW the customer chose to pay. PaymentStatus (below) is

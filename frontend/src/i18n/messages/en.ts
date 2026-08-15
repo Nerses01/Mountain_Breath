@@ -378,6 +378,7 @@ export const en = {
       applied: '{{code}} applied',
       remove: 'Remove code',
     },
+    saveForLater: 'Save for later',
   },
   account: {
     orderNumber: 'Order #{{id}}',
@@ -392,12 +393,95 @@ export const en = {
     noOrders: 'No orders yet.',
     signInRequired: 'Please <1>sign in</1> to see your orders.',
     signIn: 'Sign in',
-    createAccount: 'Create account',
+    createAccount: 'Create an account',
     email: 'Email',
     password: 'Password',
     admin: 'Admin',
     signOut: 'Sign out',
     working: 'Working…',
+    // ---- E8: the account area ----------------------------------------
+    title: 'Your account',
+    profile: {
+      title: 'Profile',
+      memberLine: '{{percent}}% off every order',
+      firstOrderLine: 'Your first order ships free — a hive club welcome.',
+    },
+    addresses: {
+      title: 'Address book',
+      add: 'Add an address',
+      empty: 'No saved addresses yet — your first checkout starts the book.',
+      unlabelled: 'Address',
+      default: 'Default',
+      makeDefault: 'Make default',
+      edit: 'Edit',
+      delete: 'Delete',
+      label: 'Label',
+      labelPlaceholder: 'Home, office…',
+      save: 'Save address',
+      cancel: 'Cancel',
+    },
+    wishlist: {
+      title: 'Your wishlist',
+      empty: 'Nothing saved yet.',
+      signInRequired: 'Please <1>sign in</1> to see your wishlist.',
+      signInToSave: 'Sign in to save products',
+    },
+    // ---- E8: the two-panel sign-in (screen 06) -----------------------
+    // The club copy is the design's, verbatim.
+    club: {
+      eyebrow: 'Hive club',
+      imageSlot: 'photo — hives on the meadow at dusk',
+      headline: 'Members get the first jars of every harvest.',
+      blurb:
+        'Royal jelly and fresh comb sell out in days. Club members are told the morning we jar it, and pay 8% less on every order after the first.',
+      tiles: {
+        discount: { value: '8%', label: 'Member price' },
+        pick: { value: 'First', label: 'Pick of harvest' },
+        delivery: { value: 'Free', label: 'First delivery' },
+      },
+    },
+    login: {
+      title: 'Welcome back',
+      blurb:
+        'Sign in to reorder in one tap, follow your parcel, and see which hive your last jar came from.',
+      show: 'Show',
+      hide: 'Hide',
+      remember: 'Keep me signed in',
+      forgot: 'Forgot password?',
+      or: 'or',
+      google: 'Continue with Google',
+      apple: 'Continue with Apple',
+      // The Apple button is decorative until the developer program is paid
+      // for (decision #5) — the truth stated underneath, the E6 card-stub
+      // pattern.
+      appleNote: 'Apple sign-in is on its way; Google works today.',
+      newHere: 'New here?',
+      firstOrderFree: '— first order ships free.',
+      oauthFailed: 'Google sign-in didn’t finish — try again, or use your password.',
+    },
+    register: {
+      title: 'Join the hive club',
+      blurb:
+        'An account is the club: your first order ships free, and every order after it is 8% off.',
+      haveAccount: 'Already have an account?',
+    },
+    forgot: {
+      title: 'Forgot your password?',
+      blurb: 'Tell us your email and we will send a link to set a new one.',
+      submit: 'Send the link',
+      // Conditional on purpose: the server answers identically whether the
+      // address exists, so this page cannot honestly claim more.
+      sent: 'If that address is ours, a reset link is on its way. It works once and expires in an hour.',
+      backToSignIn: '← Back to sign in',
+    },
+    reset: {
+      title: 'Set a new password',
+      newPassword: 'New password',
+      submit: 'Save the new password',
+      done: 'Done — your password is changed and every old session is signed out.',
+      invalid: 'This reset link no longer works — it may have expired or already been used.',
+      requestNew: 'Request a new one.',
+    },
   },
   footer: {
     blurb:
