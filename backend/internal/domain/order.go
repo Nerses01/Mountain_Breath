@@ -55,6 +55,11 @@ type Order struct {
 	Totals        OrderTotals
 	PaymentMethod string
 	PaymentStatus string
+
+	// E7. The promo code this order redeemed — a snapshot of its TEXT, like
+	// product names in order_items: the receipt keeps saying "HONEY10" even
+	// if the family later renames or deletes the code. "" = no promo.
+	PromoCode string
 }
 
 type OrderItem struct {

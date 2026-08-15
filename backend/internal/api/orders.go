@@ -71,6 +71,12 @@ type orderResponse struct {
 	SubtotalMinor int64 `json:"subtotal_minor"`
 	ShippingMinor int64 `json:"shipping_minor"`
 	DiscountMinor int64 `json:"discount_minor"`
+	// E7: the composition of discount_minor (member + promo = discount),
+	// because the receipt draws them as separate lines; promo_code is the
+	// frozen text of the code that was redeemed, absent when none was.
+	MemberDiscountMinor int64  `json:"member_discount_minor"`
+	PromoDiscountMinor  int64  `json:"promo_discount_minor"`
+	PromoCode           string `json:"promo_code,omitempty"`
 	// Contained in the subtotal ("Prices include VAT"), never added on top;
 	// shown on the invoice line, absent from the arithmetic.
 	TaxMinor   int64 `json:"tax_minor"`
@@ -99,7 +105,10 @@ func toOrderResponse(o domain.Order) orderResponse {
 		Currency: o.Currency, FxRateUsed: o.FxRateUsed,
 		SubtotalMinor: o.Totals.SubtotalMinor, ShippingMinor: o.Totals.ShippingMinor,
 		DiscountMinor: o.Totals.DiscountMinor, TaxMinor: o.Totals.TaxMinor,
-		TotalMinor:    o.TotalMinor,
+		MemberDiscountMinor: o.Totals.MemberDiscountMinor,
+		PromoDiscountMinor:  o.Totals.PromoDiscountMinor,
+		PromoCode:           o.PromoCode,
+		TotalMinor:          o.TotalMinor,
 		PaymentMethod: o.PaymentMethod, PaymentStatus: o.PaymentStatus,
 		DeliveryNote: o.DeliveryNote, LeaveWithNeighbour: o.LeaveWithNeighbour,
 	}
@@ -171,6 +180,12 @@ func (s *Server) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 			// broken. The message names the product so the customer can drop
 			// it or switch currency, and so the family can fix the price.
 			s.respondError(w, http.StatusConflict, "price_unavailable", err.Error())
+		case errors.Is(err, domain.ErrPromoInvalid):
+			// The cart's code stopped being valid between apply and "Place
+			// the order". Refused, not silently repriced — the customer saw
+			// a total this order would no longer match. The client refreshes
+			// its preview, which names the reason inline.
+			s.respondError(w, http.StatusConflict, "promo_invalid", err.Error())
 		default:
 			s.log.Error("creating order", "error", err)
 			s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")

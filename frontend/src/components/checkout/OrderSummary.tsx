@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { Cart } from '../../api/types'
+import type { Cart, Preview } from '../../api/types'
 import { formatMoney } from '../../lib/format'
 import { secondaryCurrency } from '../../lib/currencies'
 import { Price } from '../ui/Price'
@@ -13,17 +13,33 @@ import { Price } from '../ui/Price'
  * so there is exactly one place a discrepancy could hide, and it is this
  * file's props.
  *
- * Every figure comes off the Cart response; nothing is computed here. Even
- * the subtotal is the server's — a component that summed line totals itself
- * would be a second implementation of arithmetic the backend already owns.
- *
- * `action` is the button slot: "Go to checkout" on the cart, "Place the
- * order" on the checkout. The discount row waits for E7 — rendering a
- * hardcoded "− $4.00" like the mock would be showing a promise the backend
- * cannot keep yet.
+ * E7 split its inputs: the LINES come off the cart (what is in the basket),
+ * every FIGURE comes off the preview (what it costs — which since E7 depends
+ * on who is asking and what code they hold, so /cart no longer carries it).
+ * Nothing is computed here; the one calculator lives in the Go domain layer
+ * and this component draws its answer.
  */
-export function OrderSummary({ cart, action }: { cart: Cart; action?: ReactNode }) {
+export function OrderSummary({
+  cart,
+  preview,
+  action,
+}: {
+  cart: Cart
+  preview: Preview
+  action?: ReactNode
+}) {
   const { t } = useTranslation()
+
+  const shippingValue = () => {
+    if (preview.shipping_minor > 0) {
+      return formatMoney(preview.shipping_minor, preview.currency)
+    }
+    // Why it is free deserves its name: the first-order perk is a promise
+    // kept, not a coincidence of thresholds.
+    return preview.first_delivery_free
+      ? t('checkout:summary.firstDeliveryFree')
+      : t('checkout:summary.freeShipping')
+  }
 
   return (
     <section
@@ -59,22 +75,35 @@ export function OrderSummary({ cart, action }: { cart: Cart; action?: ReactNode 
       <dl className="flex flex-col gap-2.5 border-t border-bark-soft pt-4">
         <SummaryRow
           label={t('checkout:summary.subtotal')}
-          value={formatMoney(cart.subtotal_minor, cart.currency)}
+          value={formatMoney(preview.subtotal_minor, preview.currency)}
         />
         <SummaryRow
           // The fee is named for what it is: a chilled parcel costs more,
           // and the label saying so is the design's own habit.
           label={
-            cart.has_cold_chain
+            preview.has_cold_chain
               ? t('checkout:summary.chilledShipping')
               : t('checkout:summary.shipping')
           }
-          value={
-            cart.shipping_minor === 0
-              ? t('checkout:summary.freeShipping')
-              : formatMoney(cart.shipping_minor, cart.currency)
-          }
+          value={shippingValue()}
         />
+        {/* The two discount lines the mock draws, each only when it earned
+            its place — a permanent "− $0.00" row would be noise. Honey
+            accent on the amounts, as the design colours them. */}
+        {preview.member_discount_minor > 0 && (
+          <SummaryRow
+            label={t('checkout:summary.memberDiscount')}
+            value={`− ${formatMoney(preview.member_discount_minor, preview.currency)}`}
+            accent
+          />
+        )}
+        {preview.promo_discount_minor > 0 && preview.promo_code && (
+          <SummaryRow
+            label={t('checkout:summary.promo', { code: preview.promo_code })}
+            value={`− ${formatMoney(preview.promo_discount_minor, preview.currency)}`}
+            accent
+          />
+        )}
       </dl>
 
       <div className="flex items-end justify-between border-t border-bark-soft pt-4">
@@ -82,8 +111,8 @@ export function OrderSummary({ cart, action }: { cart: Cart; action?: ReactNode 
           {t('checkout:summary.total')}
         </span>
         <Price
-          prices={hasBothMarkets(cart) ? cart.totals : undefined}
-          primaryMinor={cart.total_minor}
+          prices={hasBothMarkets(preview) ? preview.totals : undefined}
+          primaryMinor={preview.total_minor}
           size="lg"
           tone="on-dark"
           className="items-end"
@@ -95,18 +124,26 @@ export function OrderSummary({ cart, action }: { cart: Cart; action?: ReactNode 
   )
 }
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
+function SummaryRow({
+  label,
+  value,
+  accent,
+}: {
+  label: string
+  value: string
+  accent?: boolean
+}) {
   return (
     <div className="flex justify-between text-[0.9375rem]">
       <dt className="text-ink-on-dark-body">{label}</dt>
-      <dd className="text-ink-on-dark">{value}</dd>
+      <dd className={accent ? 'text-honey' : 'text-ink-on-dark'}>{value}</dd>
     </div>
   )
 }
 
 // The muted second total only earns its line when the other market is
-// actually priced — a basket the shop cannot quote in drams shows dollars
-// alone rather than a dash.
-function hasBothMarkets(cart: Cart): boolean {
-  return secondaryCurrency(cart.currency, cart.totals) !== undefined
+// actually priced — a basket the shop cannot quote in drams (or whose promo
+// does not exist there) shows dollars alone rather than a dash.
+function hasBothMarkets(preview: Preview): boolean {
+  return secondaryCurrency(preview.currency, preview.totals) !== undefined
 }

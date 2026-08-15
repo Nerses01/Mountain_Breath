@@ -2722,7 +2722,7 @@
                 "cart"
               ]
             },
-            "description": "The logged-in user's cart with live prices/stock and computed totals. 401 anonymous.\n\nSince E5 it also carries `currency` (what `total_minor` and every `price_minor` are denominated in) and `totals`, the basket summed INDEPENDENTLY in each market. Nothing here is converted: a market that any single line cannot be priced in is absent from `totals` rather than being understated.\n\nE6: the response now QUOTES the checkout — `subtotal_minor`, `shipping_minor` (with `has_cold_chain` naming the chilled surcharge when it applies) and `total_minor` = subtotal + shipping, plus the per-market `subtotals`/`shipping`/`totals` maps. The quote uses the same domain arithmetic CreateOrder charges with, so the number the customer reads is the number the shop honours."
+            "description": "The signed-in user's basket: the lines, each with live name/price/stock, and the sum-of-lines per market.\n\nE7 REMOVED shipping_minor, total_minor and their per-market maps from this response: what delivery costs now depends on WHO is asking (the hive club waives a first order's base) and what code the cart carries, so every summary figure comes from POST /checkout/preview instead. A cart read lists contents; the preview prices them."
           },
           "event": [
             {
@@ -2734,11 +2734,16 @@
                   "    pm.response.to.have.status(200);",
                   "});",
                   "",
-                  "pm.test(\"the quote balances\", () => {",
-                  "    const body = pm.response.json();",
+                  "const body = pm.response.json();",
+                  "pm.test(\"lists lines and their sums\", () => {",
                   "    pm.expect(body.items).to.be.an(\"array\");",
-                  "    pm.expect(body.subtotal_minor + body.shipping_minor).to.eql(body.total_minor);",
-                  "    pm.expect(body.totals).to.be.an(\"object\");",
+                  "    pm.expect(body.subtotal_minor).to.be.a(\"number\");",
+                  "    pm.expect(body.subtotals).to.be.an(\"object\");",
+                  "});",
+                  "",
+                  "pm.test(\"carries NO shipping or total — E7 moved the quote to the preview\", () => {",
+                  "    pm.expect(body.shipping_minor).to.be.undefined;",
+                  "    pm.expect(body.total_minor).to.be.undefined;",
                   "});"
                 ]
               }
@@ -2877,6 +2882,12 @@
                   "        pm.expect(order.subtotal_minor + order.shipping_minor - order.discount_minor)",
                   "            .to.eql(order.total_minor);",
                   "        pm.expect(order.tax_minor).to.be.at.most(order.subtotal_minor);",
+                  "    });",
+                  "    pm.test(\"the discount split sums (E7)\", () => {",
+                  "        // Member + promo = discount — the orders_discount_split CHECK,",
+                  "        // restated at the contract boundary.",
+                  "        pm.expect(order.member_discount_minor + order.promo_discount_minor)",
+                  "            .to.eql(order.discount_minor);",
                   "    });",
                   "    pm.test(\"address snapshot and payment recorded\", () => {",
                   "        pm.expect(order.ship_to.city).to.eql(\"Yerevan\");",
@@ -3564,6 +3575,293 @@
         }
       ],
       "description": "Screen 05: a checkout that collects an address and produces an itemised order.\n\nThe model in one paragraph: the client sends CHOICES (address, payment method, note); the server computes every figure — subtotal from locked shelf prices, shipping from per-currency rate rows (base waived over the free threshold, the cold-chain surcharge never), VAT contained in the subtotal per \"Prices include VAT\", and a CHECK constraint holding subtotal + shipping − discount = total on every row, forever. The address is snapshotted onto the order exactly as prices are: an order is a closed record, and nothing the customer later edits may reach into it."
+    },
+    {
+      "name": "Promotions & hive club (Phase E7)",
+      "description": "The promo box, the free-shipping bar and the member discount — all priced by ONE pure calculator (domain.Price) that the preview, the cart page and order creation share.\n\nThe hive club is not a stored tier: the design's sign-in screen defines it as having an account, so both perks (first delivery free, 8% off after the first order) derive from a count of the user's non-cancelled orders.\n\nRun these signed in (Register/Login first) with something in the cart (Set cart item).",
+      "item": [
+        {
+          "name": "Checkout preview",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/checkout/preview",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "checkout",
+                "preview"
+              ]
+            },
+            "description": "Every money figure the cart and checkout screens render. POST with no body: everything it prices is server-side state (the cart, the applied code, the customer's order history) plus the negotiated language/currency. The order that POST /orders later creates is priced by the same function with the same inputs read under lock — which is what makes 'cart, checkout and the order agree to the dram' a property of the design."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const p = pm.response.json();",
+                  "pm.test(\"the books balance\", () => {",
+                  "    pm.expect(p.subtotal_minor + p.shipping_minor - p.discount_minor)",
+                  "        .to.eql(p.total_minor);",
+                  "    pm.expect(p.member_discount_minor + p.promo_discount_minor)",
+                  "        .to.eql(p.discount_minor);",
+                  "    pm.expect(p.tax_minor).to.be.at.most(p.subtotal_minor);",
+                  "});",
+                  "",
+                  "pm.test(\"says WHY shipping costs what it costs\", () => {",
+                  "    pm.expect(p.first_delivery_free).to.be.a(\"boolean\");",
+                  "    pm.expect(p.base_shipping_waived).to.be.a(\"boolean\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Apply promo — messy case normalizes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/cart/promo",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "cart",
+                "promo"
+              ]
+            },
+            "description": "Attaches a code to the cart (server-side state — it survives reloads and tabs, and checkout re-validates it under lock). Deliberately typed lowercase with whitespace: normalization is part of the contract, matched by the upper(code) unique index. Answers with a fresh preview, because the caller's next question is always 'so what does it cost now'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"code\": \"  welcome10 \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const p = pm.response.json();",
+                  "pm.test(\"the preview carries the canonical code\", () => {",
+                  "    pm.expect(p.promo_code).to.eql(\"WELCOME10\");",
+                  "});",
+                  "",
+                  "if (p.subtotal_minor > 0) {",
+                  "    pm.test(\"10% came off, and the split records it as promo\", () => {",
+                  "        pm.expect(p.promo_discount_minor).to.be.above(0);",
+                  "        pm.expect(p.member_discount_minor + p.promo_discount_minor)",
+                  "            .to.eql(p.discount_minor);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Apply promo — unknown code (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/cart/promo",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "cart",
+                "promo"
+              ]
+            },
+            "description": "Every way a code can be wrong is a FIELD error on promo_code — the same envelope as any form, rendered by the client's own catalogue. 'promo_unknown' deliberately also covers disabled and not-yet-started codes, so the endpoint is not an oracle for guessing which codes exist.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"code\": \"NO-SUCH-CODE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test(\"the refusal is a code under the input, not prose\", () => {",
+                  "    const fields = pm.response.json().error.fields;",
+                  "    pm.expect(fields.promo_code).to.eql(\"promo_unknown\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Apply promo — under the code's floor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/cart/promo",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "cart",
+                "promo"
+              ]
+            },
+            "description": "COMB5 is a FIXED code ($5 / 2,400 ֏) with a per-market minimum ($30 / 14,000 ֏) — money rows in promo_code_values, per E5's rule that money is a per-market shelf price. With a small basket this answers 400 promo_min_subtotal; with a big one it applies. Both are asserted, because this collection runs against live state.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"code\": \"COMB5\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200 or 400, depending on the basket\", () => {",
+                  "    pm.expect([200, 400]).to.include(pm.response.code);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 400) {",
+                  "    pm.test(\"the floor is named\", () => {",
+                  "        pm.expect(pm.response.json().error.fields.promo_code)",
+                  "            .to.eql(\"promo_min_subtotal\");",
+                  "    });",
+                  "} else {",
+                  "    pm.test(\"the fixed amount landed\", () => {",
+                  "        pm.expect(pm.response.json().promo_code).to.eql(\"COMB5\");",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remove promo",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/cart/promo",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "cart",
+                "promo"
+              ]
+            },
+            "description": "Detaches whatever code the cart carries (idempotent — removing nothing is fine) and answers with the promo-less preview."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const p = pm.response.json();",
+                  "pm.test(\"no code, no promo discount\", () => {",
+                  "    pm.expect(p.promo_code).to.be.undefined;",
+                  "    pm.expect(p.promo_discount_minor).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Me carries the hive standing",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/auth/me",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "The header badge's data source. The SERVER derives membership from order history — the client renders booleans, it never re-implements 'after the first order'. The two perks are mutually exclusive by construction: first_delivery_free until an order exists, member (8%) from the second order on."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const hive = pm.response.json().hive;",
+                  "pm.test(\"the standing is derived server-side\", () => {",
+                  "    pm.expect(hive.prior_orders).to.be.a(\"number\");",
+                  "    pm.expect(hive.member).to.eql(hive.prior_orders >= 1);",
+                  "    pm.expect(hive.first_delivery_free).to.eql(hive.prior_orders === 0);",
+                  "    pm.expect(hive.member_discount_percent).to.eql(hive.member ? 8 : 0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

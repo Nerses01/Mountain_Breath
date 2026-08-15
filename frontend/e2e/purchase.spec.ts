@@ -55,6 +55,19 @@ test('a new customer can buy a product end to end', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Your cart' })).toBeVisible()
   await expect(page.getByText('Mountain Wildflower Honey').first()).toBeVisible()
   await expect(page.getByText('Subtotal')).toBeVisible()
+
+  // E7: this account has no orders, so the hive club's welcome perk shows —
+  // the banner names it, and the shipping row says why it is free.
+  await expect(page.getByText('Your first order ships free')).toBeVisible()
+  await expect(page.getByText('Free — first order')).toBeVisible()
+
+  // E7: apply a seeded promo code (typed messily on purpose — the server
+  // normalizes) and the discount line appears with the code's name; every
+  // figure in the card is the preview endpoint's answer.
+  await page.getByLabel('Promo code').fill('  welcome10 ')
+  await page.getByRole('button', { name: 'Apply' }).click()
+  await expect(page.getByText('Code WELCOME10')).toBeVisible()
+
   await page.getByRole('link', { name: 'Go to checkout' }).click()
 
   // --- checkout (E6): the address form under its own chrome ---
@@ -85,6 +98,8 @@ test('a new customer can buy a product end to end', async ({ page }) => {
   // The breakdown balances on screen: subtotal + shipping = total, and the
   // "Includes VAT" line is display-only, contained in the subtotal.
   await expect(page.getByText('Includes VAT')).toBeVisible()
+  // E7: the receipt keeps the redeemed code's name — the snapshot, on screen.
+  await expect(page.getByText('Code WELCOME10')).toBeVisible()
 
   // --- it appears in the order history too ---
   await page.getByRole('link', { name: '← All your orders' }).click()

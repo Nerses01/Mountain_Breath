@@ -70,37 +70,6 @@ func TestShippingFor(t *testing.T) {
 	}
 }
 
-func TestComputeTotals(t *testing.T) {
-	tests := []struct {
-		name                         string
-		subtotal, shipping, discount int64
-		wantTotal, wantTax           int64
-	}{
-		{"the design's cart", 6200, 600, 400, 6400, 1033},
-		{"free shipping, no discount", 7600, 0, 0, 7600, 1267},
-		{"empty-ish order", 120, 400, 0, 520, 20},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := domain.ComputeTotals(tc.subtotal, tc.shipping, tc.discount)
-			if got.TotalMinor != tc.wantTotal {
-				t.Errorf("total = %d, want %d", got.TotalMinor, tc.wantTotal)
-			}
-			if got.TaxMinor != tc.wantTax {
-				t.Errorf("tax = %d, want %d", got.TaxMinor, tc.wantTax)
-			}
-			// The invariant the CHECK constraint enforces at rest, restated
-			// here so a change to either is caught by the other.
-			if got.SubtotalMinor+got.ShippingMinor-got.DiscountMinor != got.TotalMinor {
-				t.Error("totals do not balance")
-			}
-			if got.TaxMinor > got.SubtotalMinor {
-				t.Error("contained tax exceeds what contains it")
-			}
-		})
-	}
-}
-
 func TestValidateAddress(t *testing.T) {
 	complete := domain.Address{
 		FirstName: "Anahit", LastName: "Sargsyan", Phone: "+374 91 000000",

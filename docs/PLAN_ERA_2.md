@@ -1300,33 +1300,130 @@ redemption limits under concurrency, why one calculator must serve every
 screen.
 
 **Backend:**
-- [ ] `domain.Price(cart, user, promo, shippingRate) → Breakdown` as a **pure
-      function** — no DB, no HTTP, fully table-testable. This is the Era I
-      layering rule paying off; it is also the single source of truth for cart,
-      checkout preview and order creation.
-- [ ] Migration: `promo_codes` (code, kind `percent|fixed|free_shipping`,
-      value, starts_at, ends_at, max_redemptions, per_user_limit,
-      min_subtotal_minor, active) and `promo_redemptions` (code_id, user_id,
-      order_id) with a unique index that makes over-redemption impossible
-      rather than unlikely.
-- [ ] Migration: membership — `users.tier` (`guest|hive_club`) or a
-      `memberships` table if it needs dates. Rules from the design: 8% off
-      every order after the first, first delivery free.
-- [ ] `POST /api/v1/checkout/preview` → the breakdown for the current cart,
-      promo and user, without creating anything. Cart, checkout and the
-      progress bar all call this.
-- [ ] Concurrency test in the spirit of the oversell test: N goroutines
-      redeeming a code with `max_redemptions = 1` → exactly one succeeds.
+- [x] `domain.Price(input) → Breakdown` as a **pure function** — no DB, no
+      HTTP, no clock it is not handed, fully table-testable (nine cases, each
+      re-asserting the balance, split and containment invariants). The single
+      source of truth for cart, checkout preview and order creation.
+      **It superseded more than planned:** `ComputeTotals` AND `QuoteCart` are
+      deleted, and the cart response **stopped quoting shipping and total**
+      (decision #68) — what delivery costs now depends on WHO is asking, so a
+      cart-contents quote was one discount away from being E6's "Total" lie
+      again. `/cart` lists lines and sums; `POST /checkout/preview` owns every
+      summary figure. `TestCartQuoteMatchesTheCharge` became
+      `TestPreviewMatchesTheCharge`, which is the stronger statement.
+- [x] Migration `000018_promotions`: `promo_codes` + `promo_redemptions`,
+      **reshaped from the bullet in two ways.** The money columns (`value`
+      for fixed codes, `min_subtotal_minor`) moved to a per-market child
+      table `promo_code_values` — a fixed discount is MONEY, and E5's rule
+      says money is a per-market shelf price, never one number converted
+      (decision #67). And `per_user_limit` became the **unique index itself**:
+      `UNIQUE (code_id, user_id)` makes once-per-customer a property of the
+      storage, which is what "impossible rather than unlikely" actually
+      requires — a configurable N would trade the proof for a count. The
+      global `max_redemptions` IS a count, so it is enforced like stock:
+      under `FOR UPDATE` of the promo row. Codes are case-insensitively
+      unique via an `upper(code)` expression index. Verified up → down → up.
+- [x] ~~Migration: membership — `users.tier` or a `memberships` table~~
+      **No membership migration, deliberately** (decision #66): the design's
+      sign-in screen defines the club as HAVING AN ACCOUNT ("Create an
+      account — first order ships free"), so both perks derive from
+      `count(non-cancelled orders)` — a fact the orders table already holds,
+      where a tier column would be a synced copy waiting to drift (the #45
+      lesson). Order one ships free (base only — the cold-chain surcharge
+      survives every kind of free shipping); orders two onward are 8% off
+      the shelf subtotal. `/auth/me` now serves the derived standing, so no
+      client re-implements "after the first order".
+- [x] `POST /api/v1/checkout/preview` → the breakdown for the current cart,
+      promo and user, without creating anything. Also `POST /cart/promo` and
+      `DELETE /cart/promo` — the applied code is **server-side cart state**
+      (`cart_promos`, one row per user), so it survives reloads and tabs and
+      the server re-judges it on every read (decision #70). Both promo
+      endpoints answer with a fresh preview. The preview also carries the
+      progress-bar numbers, the dual-market totals (a market where the promo
+      cannot apply identically is absent, not understated) and an **upsell**:
+      the cheapest in-stock product that would close the remaining gap.
+      Three consequences the plan did not spell out: VAT is now carved from
+      `subtotal − discount` (the discounted price IS the price); the two
+      discounts stack side by side on the shelf subtotal, neither compounding
+      on the other, with the promo absorbing the clamp when they exceed the
+      goods; and orders snapshot the split (`member_discount_minor` +
+      `promo_discount_minor` = `discount_minor`, CHECKed) plus the code's
+      TEXT, because the receipt draws two named lines.
+- [x] Concurrency test in the oversell test's image: ten goroutines, ten
+      users, one `max_redemptions = 1` code → exactly one order carries the
+      discount and nine are REFUSED (`ErrPromoInvalid` → 409) rather than
+      silently charged full price. **The lock ordering had to be re-proven**
+      (the E2 lesson recurring): checkout now locks user row → cart variants
+      (asc) → promo row → products (asc). The user-row lock is new and
+      closes the same-customer races too — two parallel first orders both
+      shipping free, two redemptions of a per-customer code (decision #69).
+      Cancelling an order releases its redemption the way it restores stock;
+      the order keeps the code's text snapshot.
 
 **Frontend:**
-- [ ] Promo input with inline success/error from the envelope's `code`.
-- [ ] Free-shipping progress bar + the upsell CTA ("Add pollen · $16").
-- [ ] Discount and member lines in `OrderSummary`; member badge in the header.
-- [ ] Every money figure on cart and checkout comes from `/checkout/preview` —
-      no client-side arithmetic beyond formatting.
+- [x] Promo input with inline success/error — every refusal is a
+      `fields.promo_code` validation CODE (`promo_unknown`, `promo_expired`,
+      `promo_used`, `promo_exhausted`, `promo_not_in_market`,
+      `promo_min_subtotal`) rendered by the same catalogue as every form.
+      "Unknown" deliberately covers disabled and not-yet-started codes — the
+      promo box must not be an oracle for guessing which codes exist. An
+      applied code whose validity DIED since (basket shrank, code expired)
+      complains by name via the preview's `promo_issue` instead of silently
+      dropping the discount; checkout's 409 refetches the preview so the
+      reason lands next to the code it is about.
+- [x] Free-shipping progress bar + the upsell CTA ("Add pollen · $16") — the
+      honey banner, with two states the mock never draws (§6 exception 2):
+      "unlocked", and the first-order perk by name. The bar is absent (not
+      full, not zero) whenever the base is already waived or the market has
+      no threshold — nothing to count toward, nothing drawn. The CTA is a
+      real one-click add (the upsell carries its variant id), and the mock's
+      banner copy is used verbatim as the blurb.
+- [x] Discount and member lines in `OrderSummary` (each drawn only when it
+      earned its place — no permanent "− $0.00"), the free shipping row
+      labelled with its REASON, and the receipt splitting "Hive club
+      discount" from "Code HONEY10" (a lump-sum "Discount" survives only for
+      pre-E7 orders). Member badge in the header from `/auth/me`'s derived
+      standing. **The cart page itself was rebuilt to the designed screen 04**
+      (the gap table always parked "Cart: free-shipping progress, promo,
+      summary card" as E6/E7 — this is the E7 half): designed rows with the
+      E1 `QtyStepper` finally on the cart, keep-shopping / "Prices include
+      VAT" footer row, banner, promo box, dark summary card.
+- [x] Every money figure on cart and checkout comes from `/checkout/preview` —
+      the client's remaining arithmetic is formatting and the bar's width.
+      The preview is a priced+translated query (`['preview', locale,
+      currency]`), invalidated by every cart mutation; the promo mutations
+      write their response straight into its cache slot. 18 new Vitest cases
+      (137 total); the Playwright journey now applies `  welcome10 ` messily
+      (normalization is contract), sees "Code WELCOME10" on the summary AND
+      on the receipt, and meets the first-order banner.
 
 **Done when:** cart, checkout and the created order agree to the dram, and a
 one-use code cannot be used twice under parallel checkouts.
+✅ **Complete 2026-08-15.** The dram agreement is now a store test
+(`TestPreviewMatchesTheCharge`) and the one-use race is
+`TestCreateOrder_ParallelCheckoutsCannotOverRedeem` (1 winner, 9 refusals,
+1 redemption row). Verified live: `go test ./...` green, `golangci-lint` 0
+issues, `tsc -b`, `oxlint`, `npm test` (137), Playwright journey with promo,
+and the full promo flow driven by hand against the running API (messy-case
+apply → 280¢ off in both markets' totals, unknown → `promo_unknown`, floor →
+`promo_min_subtotal`, remove → total restored). Postman 69 → 75 requests.
+
+**Findings while building:**
+
+- **A perk is a pricing rule, not a banner.** "First order ships free"
+  touched the shipping arithmetic, the cart's contract (it can no longer
+  quote a total without knowing the customer), one E6 test's expectations
+  and the deadlock ordering. Nothing about it was frontend.
+- **The E6 currency-snapshot test failed the day the perk landed** — its
+  buyers were first-order buyers, so their base shipping vanished. The test
+  was updated to assert the perk instead; the per-market rate card it used
+  to pin moved to a test whose buyer pays shipping.
+- **Postgres cannot infer a type for a placeholder the SQL never uses** —
+  the shared `promoColumns` fragment forced `$1` to be the user id in every
+  query that embeds it, which is why the code lookup binds the CODE as `$2`.
+- **Git Bash mangles `/tmp` paths** (MSYS path conversion) — the documented
+  PowerShell seed commands exist for a reason; running them through bash
+  produced `C:/Users/…/Temp/seed.sql` inside the container's psql.
 
 ---
 

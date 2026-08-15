@@ -3,6 +3,7 @@ package store_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
 	"github.com/Nerses01/Mountain_Breath/backend/internal/store"
@@ -219,9 +220,14 @@ func TestListAllOrders_JoinsTheCustomerEmail(t *testing.T) {
 	}
 }
 
-// GetCart's quote and CreateOrder's charge use the same arithmetic — the
-// number the customer read IS the number they are charged.
-func TestCartQuoteMatchesTheCharge(t *testing.T) {
+// The preview's arithmetic and CreateOrder's charge are the same function
+// fed the same facts — the number the customer read IS the number they are
+// charged. This test assembles domain.Price's inputs exactly the way the
+// preview endpoint does (live reads, no locks) and demands the transaction
+// (locked reads) lands on the same figure. E6's version compared QuoteCart;
+// E7 deleted QuoteCart because the charge now depends on the CUSTOMER, and
+// this stronger statement replaced it.
+func TestPreviewMatchesTheCharge(t *testing.T) {
 	if testing.Short() {
 		t.Skip("integration test (needs Docker)")
 	}
@@ -242,15 +248,35 @@ func TestCartQuoteMatchesTheCharge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	quote := domain.QuoteCart(items, rates)
+	prior, err := s.PriorOrders(ctx, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	promo, err := s.CartPromoForUser(ctx, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview := domain.Price(domain.PriceInput{
+		Currency:      domain.CurrencyAMD,
+		SubtotalMinor: domain.CartTotals(items)[domain.CurrencyAMD],
+		Rate:          rates[domain.CurrencyAMD],
+		PriorOrders:   prior,
+		Promo:         promo,
+		Now:           time.Now(),
+	})
 
 	order, err := s.CreateOrder(ctx, userID, domain.CurrencyAMD, testCheckout())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if quote.TotalMinor[domain.CurrencyAMD] != order.TotalMinor {
-		t.Errorf("quoted %d, charged %d — the customer read a number the shop did not honour",
-			quote.TotalMinor[domain.CurrencyAMD], order.TotalMinor)
+	if preview.TotalMinor != order.TotalMinor {
+		t.Errorf("previewed %d, charged %d — the customer read a number the shop did not honour",
+			preview.TotalMinor, order.TotalMinor)
+	}
+	// A first order, so the preview promised free base delivery and the
+	// charge must have honoured it: 2 × 7,600 ֏ with no 1,900 ֏ base.
+	if order.TotalMinor != 15200 {
+		t.Errorf("total = %d, want 15200 (first delivery free)", order.TotalMinor)
 	}
 }

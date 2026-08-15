@@ -96,9 +96,12 @@ func trimScheme(dsn string) string {
 // makes generated ids predictable again.
 func resetDB(t *testing.T) {
 	t.Helper()
+	// promo_codes is listed explicitly: every other E7 table hangs off
+	// users, orders or promo_codes and is caught by CASCADE, but the codes
+	// table itself references nothing here and would leak between tests.
 	_, err := testPool.Exec(context.Background(), `
 		TRUNCATE cart_items, order_items, orders, sessions, users,
-		         product_variants, products, categories
+		         product_variants, products, categories, promo_codes
 		RESTART IDENTITY CASCADE`)
 	if err != nil {
 		t.Fatalf("resetting db: %v", err)

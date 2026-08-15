@@ -111,9 +111,25 @@ export function OrderDetailPage() {
                 ? t('checkout:summary.freeShipping')
                 : formatMoney(o.shipping_minor, o.currency)}
             />
-            {o.discount_minor > 0 && (
-              <Row label={t('order:discount')} value={'− ' + formatMoney(o.discount_minor, o.currency)} />
+            {/* E7: the split, drawn as the two lines the design names — and
+                a generic "Discount" only for pre-split orders, whose lump
+                sum cannot honestly claim either label. */}
+            {o.member_discount_minor > 0 && (
+              <Row
+                label={t('order:memberDiscount')}
+                value={'− ' + formatMoney(o.member_discount_minor, o.currency)}
+              />
             )}
+            {o.promo_discount_minor > 0 && o.promo_code && (
+              <Row
+                label={t('order:promo', { code: o.promo_code })}
+                value={'− ' + formatMoney(o.promo_discount_minor, o.currency)}
+              />
+            )}
+            {o.discount_minor > 0 &&
+              o.member_discount_minor + o.promo_discount_minor === 0 && (
+                <Row label={t('order:discount')} value={'− ' + formatMoney(o.discount_minor, o.currency)} />
+              )}
             {/* Contained, not added: the line reads "includes VAT", and the
                 figure takes no part in the sum below it. */}
             <Row label={t('order:includesVat')} value={formatMoney(o.tax_minor, o.currency)} muted />

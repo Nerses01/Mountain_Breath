@@ -252,11 +252,12 @@ func TestCheckoutChargesTheResolvedCurrency(t *testing.T) {
 	}
 }
 
-// The cart totals every market separately, and the response says which one
-// the flat total_minor belongs to. Since E6 the totals INCLUDE shipping —
-// quoted per market from shipping_rates, never converted — and the
-// subtotals keep the old sum-of-lines meaning.
-func TestCartResponseTotalsEachMarket(t *testing.T) {
+// The cart sums every market separately, and the response says which one
+// the flat subtotal_minor belongs to. E7 REMOVED shipping and totals from
+// this response: they depend on who is asking (the club's first-delivery
+// perk, the applied promo), so they live on POST /checkout/preview now.
+// This test pins both halves — the sums that remain, and the absence.
+func TestCartResponseSubtotalsEachMarket(t *testing.T) {
 	fake := newFakeStore()
 	fake.cart = []domain.CartItem{
 		{VariantID: 1, Qty: 2, PriceMinor: 6700,
@@ -274,25 +275,23 @@ func TestCartResponseTotalsEachMarket(t *testing.T) {
 	var got struct {
 		Currency      string           `json:"currency"`
 		SubtotalMinor int64            `json:"subtotal_minor"`
-		ShippingMinor int64            `json:"shipping_minor"`
-		TotalMinor    int64            `json:"total_minor"`
 		Subtotals     map[string]int64 `json:"subtotals"`
-		Totals        map[string]int64 `json:"totals"`
+		// Present only if the old quote fields leak back in.
+		TotalMinor *int64 `json:"total_minor"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
 
-	// 28,700 ֏ of lines + the 1,900 ֏ base rate (under the 33,500 free
-	// threshold, nothing cold-chain in this basket).
-	if got.Currency != "AMD" || got.SubtotalMinor != 28700 ||
-		got.ShippingMinor != 1900 || got.TotalMinor != 30600 {
-		t.Errorf("resolved quote = %d + %d = %d %s, want 28700 + 1900 = 30600 AMD",
-			got.SubtotalMinor, got.ShippingMinor, got.TotalMinor, got.Currency)
+	// 28,700 ֏ of lines; the dollar column summed with dollar prices, never
+	// the dram sum converted.
+	if got.Currency != "AMD" || got.SubtotalMinor != 28700 {
+		t.Errorf("resolved subtotal = %d %s, want 28700 AMD", got.SubtotalMinor, got.Currency)
 	}
-	// The dollar column is quoted with the DOLLAR rate ($4 base), not the
-	// dram fee converted.
-	if got.Subtotals["USD"] != 6000 || got.Totals["USD"] != 6400 {
-		t.Errorf("USD quote = %d → %d, want 6000 → 6400", got.Subtotals["USD"], got.Totals["USD"])
+	if got.Subtotals["USD"] != 6000 {
+		t.Errorf("USD subtotal = %d, want 6000", got.Subtotals["USD"])
+	}
+	if got.TotalMinor != nil {
+		t.Error("total_minor is back on the cart — it belongs to /checkout/preview")
 	}
 }

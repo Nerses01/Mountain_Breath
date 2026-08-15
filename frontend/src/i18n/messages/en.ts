@@ -32,6 +32,11 @@ export const en = {
       label: 'Language',
       change: 'Change language',
     },
+    // E7: the header badge for signed-in customers past their first order.
+    hive: {
+      badge: 'Hive club',
+      memberTitle: 'Hive club member — {{percent}}% off every order',
+    },
     currency: {
       label: 'Currency',
     },
@@ -65,6 +70,15 @@ export const en = {
     // the code carries no number.
     too_long: 'This is too long',
     invalid_status: 'Not a valid status',
+    // E7 — the promo box's vocabulary. Every reason is one the shopper can
+    // act on (except "unknown", which deliberately also covers disabled and
+    // not-yet-started codes, so the box is not an oracle for guessing).
+    promo_unknown: 'We do not recognise this code',
+    promo_expired: 'This code has expired',
+    promo_used: 'You have already used this code',
+    promo_exhausted: 'This code has been fully redeemed',
+    promo_not_in_market: 'This code does not work in this currency',
+    promo_min_subtotal: 'This code needs a larger basket',
     unknown: 'This value is not valid',
   },
   // Shared UI states. These belong in `common` rather than being repeated
@@ -290,6 +304,11 @@ export const en = {
       shipping: 'Shipping',
       chilledShipping: 'Chilled shipping',
       freeShipping: 'Free',
+      // E7: the two discount lines the design draws, and why shipping is
+      // free when it is — the perk deserves its name on the receipt.
+      memberDiscount: 'Hive club discount',
+      promo: 'Code {{code}}',
+      firstDeliveryFree: 'Free — first order',
       total: 'Pay today',
     },
     promises: {
@@ -307,6 +326,8 @@ export const en = {
     deliveryTo: 'Delivery to',
     payment: 'Payment',
     discount: 'Discount',
+    memberDiscount: 'Hive club discount',
+    promo: 'Code {{code}}',
     includesVat: 'Includes VAT',
     allOrders: '← All your orders',
     method: {
@@ -333,6 +354,30 @@ export const en = {
     checkout: 'Checkout',
     placingOrder: 'Placing order…',
     goToCheckout: 'Go to checkout',
+    // ---- The designed cart (E7) ---------------------------------------
+    keepShopping: '← Keep shopping',
+    pricesIncludeVat: 'Prices include VAT',
+    // The honey banner. `away` and the CTA carry live figures; the blurb is
+    // the design's own copy. The unlocked / first-order states are ones the
+    // mock never draws (§6 exception 2) — ours to word.
+    progress: {
+      label: 'Progress toward free shipping',
+      away: '{{amount}} away from free shipping',
+      blurb: 'Add a beeswax block or a bag of pollen and we cover the courier.',
+      add: 'Add {{name}} · {{price}}',
+      unlocked: 'Free shipping unlocked',
+      unlockedBlurb: 'The base delivery fee for this order is on us.',
+      firstOrder: 'Your first order ships free',
+      firstOrderBlurb: 'A hive club welcome — the base delivery fee is waived.',
+    },
+    promo: {
+      title: 'Promo code',
+      placeholder: 'Enter code',
+      apply: 'Apply',
+      applying: 'Applying…',
+      applied: '{{code}} applied',
+      remove: 'Remove code',
+    },
   },
   account: {
     orderNumber: 'Order #{{id}}',

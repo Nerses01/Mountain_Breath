@@ -48,6 +48,19 @@ const (
 	ValidationInvalidPaymentMethod = "invalid_payment_method"
 	ValidationCashIsAMDOnly        = "cash_is_amd_only"
 
+	// E7. Why a promo code cannot apply, in the order Promo.Issue checks
+	// them. "Unknown" deliberately covers inactive and not-yet-started codes
+	// too: confirming that a disabled or unannounced code exists is exactly
+	// what a code-guesser wants to learn (the 404-not-403 reasoning again).
+	// The rest are specific because the customer can ACT on them — wait,
+	// spend more, switch market, pick another code.
+	ValidationPromoUnknown     = "promo_unknown"
+	ValidationPromoExpired     = "promo_expired"
+	ValidationPromoUsed        = "promo_used"
+	ValidationPromoExhausted   = "promo_exhausted"
+	ValidationPromoNotInMarket = "promo_not_in_market"
+	ValidationPromoMinSubtotal = "promo_min_subtotal"
+
 	// A translations map keyed by a language the shop does not serve. Caught
 	// here rather than at the database, whose CHECK constraint would answer
 	// with a 500-shaped driver error instead of a field-level 400.

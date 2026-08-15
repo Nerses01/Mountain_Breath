@@ -235,7 +235,12 @@ export function useSetCartItem() {
     // The key must match useCart's EXACTLY, view and all: setQueryData is an
     // exact-key write, unlike invalidateQueries, which matches by prefix. A
     // stale ['cart'] here would silently stop updating the header count.
-    onSuccess: (cart) => qc.setQueryData(['cart', ...view], cart),
+    onSuccess: (cart) => {
+      qc.setQueryData(['cart', ...view], cart)
+      // Every quantity change moves the preview's money — subtotal,
+      // discounts, whether the free-shipping bar is full.
+      qc.invalidateQueries({ queryKey: ['preview'] })
+    },
   })
 }
 
@@ -243,7 +248,45 @@ export function useRemoveCartItem() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: api.removeCartItem,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cart'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cart'] })
+      qc.invalidateQueries({ queryKey: ['preview'] })
+    },
+  })
+}
+
+// --- Checkout preview & promos (E7) ---
+
+// The one calculator's client end: every money figure the cart page and the
+// checkout sidebar render comes from this query. Keyed by the view — the
+// preview is a priced, translated read like the cart itself.
+export function usePreview(loggedIn: boolean) {
+  const view = useView()
+  return useQuery({
+    queryKey: ['preview', ...view],
+    queryFn: api.checkoutPreview,
+    enabled: loggedIn,
+  })
+}
+
+// Both promo mutations answer with a fresh preview, and both write it
+// straight into the cache under the exact view key (the setCartItem
+// pattern) — no second round trip to learn what just changed.
+export function useApplyPromo() {
+  const qc = useQueryClient()
+  const view = useView()
+  return useMutation({
+    mutationFn: api.applyPromo,
+    onSuccess: (preview) => qc.setQueryData(['preview', ...view], preview),
+  })
+}
+
+export function useRemovePromo() {
+  const qc = useQueryClient()
+  const view = useView()
+  return useMutation({
+    mutationFn: api.removePromo,
+    onSuccess: (preview) => qc.setQueryData(['preview', ...view], preview),
   })
 }
 
@@ -257,10 +300,14 @@ export function useCheckout() {
       // since E6 the address book gained the form's address, which is what
       // the NEXT checkout pre-fills from.
       qc.invalidateQueries({ queryKey: ['cart'] })
+      qc.invalidateQueries({ queryKey: ['preview'] })
       qc.invalidateQueries({ queryKey: ['orders'] })
       qc.invalidateQueries({ queryKey: ['products'] })
       qc.invalidateQueries({ queryKey: ['product'] })
       qc.invalidateQueries({ queryKey: ['default-address'] })
+      // E7: the order that just landed may have been the FIRST — the hive
+      // standing on /auth/me (header badge, perk lines) just changed.
+      qc.invalidateQueries({ queryKey: ['me'] })
     },
   })
 }

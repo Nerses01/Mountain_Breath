@@ -17,6 +17,81 @@ Template for an entry:
 
 ---
 
+## 2026-08-15 — Phase E7: one calculator, and locks that make promises
+
+**Worked on:** migration 000018 (`promo_codes`, per-market
+`promo_code_values`, `promo_redemptions` with its unique index,
+`cart_promos`, the order's discount split); `domain.Price` as the one pure
+calculator (deleting `ComputeTotals` and `QuoteCart`); the hive club derived
+from order history instead of stored; `POST /checkout/preview`,
+`POST|DELETE /cart/promo`, hive standing on `/auth/me`; the redemption race
+test; the designed cart page with the honey banner, progress bar, upsell CTA
+and promo box; discount lines on summary and receipt; the member badge.
+
+**Learned:**
+
+- **A pure function is the load-bearing wall of pricing.** `domain.Price`
+  takes plain values and returns the whole breakdown — the C++ instinct is
+  `constexpr`: no I/O, no hidden clock (`now` is a parameter precisely so a
+  test can hold time still at an expiry boundary). Cart, preview and the
+  checkout transaction call the same function with differently-sourced
+  inputs, so "every screen agrees to the dram" is a property of the design,
+  and the table test gets to pin nine interacting-rule cases without a
+  database.
+- **Two kinds of impossibility, and when each applies.** Once-per-customer
+  is a UNIQUE index — a fact of the storage, like a `static_assert`, immune
+  to check-then-insert races by construction. The global cap is a COUNT, and
+  a count cannot be an index, so it is enforced the way stock is: a `FOR
+  UPDATE` lock on the promo row and a count taken under it. Knowing which
+  tool fits which invariant is the actual lesson; the race test (ten
+  checkouts, one code, one winner, nine clean refusals) is its proof.
+- **Every new lock re-opens the deadlock proof.** E2 taught it with
+  `sales_count`; E7 recites it: user row → cart variants (ascending) →
+  promo row → products (ascending), every transaction in the same order.
+  The user-row lock was not in the plan — it exists because "how many orders
+  does this customer have" became money (the first-delivery perk), and two
+  parallel checkouts by one customer could both read zero.
+- **Derive what is derivable.** The design's own copy defines the hive club
+  as having an account, so membership is `count(non-cancelled orders)` — no
+  tier column, no second copy to drift (E5's `price_minor` lesson, avoided
+  in advance this time). Corollary: the perks needed no admin UI, no
+  enrollment flow, and cancelling your first order honestly makes your next
+  one "first" again.
+- **A discount changed who may answer "what does delivery cost".** The cart
+  response lost its shipping and total: they now depend on the CUSTOMER and
+  the code, so a contents-only quote was E6's "Total" lie one phase later.
+  Removing fields from a response is also a contract change — cart tests,
+  Postman and the frontend moved in the same commit, which is what rule #15
+  is for.
+- **Validity is a moment, not a property.** An applied code is one row of
+  cart state; whether it WORKS is re-judged on every read and once more
+  under lock at charge time. The three verdicts have three audiences: apply
+  answers the form field, preview names the issue beside the code, checkout
+  refuses with 409 — because silently repricing an approved total is worse
+  than asking the customer to look again.
+- **Error text can be an oracle.** "promo_unknown" deliberately covers
+  disabled and not-yet-started codes: distinguishing them would let anyone
+  enumerate which codes exist before their campaign starts — the 404-not-403
+  reasoning, wearing a promo box.
+- **VAT follows the money that moves.** With discounts real, the contained
+  tax is carved from `subtotal − discount`: the discounted price IS the
+  price, and its receipt line must contain the tax of what was actually
+  paid.
+
+**Questions / to revisit:**
+
+- Promo codes have no admin CRUD — the family edits SQL (or the seed) until
+  a phase needs the form. Fine for three codes; revisit when it is not.
+- The upsell suggests the cheapest gap-closing product; a smarter pick
+  (benefit overlap with the basket, like E3's related fallback) is a
+  one-query change if the banner earns it.
+- Percent promos and the member 8% stack additively on the shelf subtotal.
+  If the family ever wants exclusive codes ("not combinable with member
+  pricing"), that is a `stackable` boolean on `promo_codes` and one branch
+  in `Price` — noted so the conversation starts from the right place.
+
+---
+
 ## 2026-08-14 — Phase E6: the server owns every number
 
 **Worked on:** migration 000017 (`addresses`, order snapshot columns, the

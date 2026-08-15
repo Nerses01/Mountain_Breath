@@ -107,6 +107,13 @@ type OrderTotals struct {
 	DiscountMinor int64
 	TaxMinor      int64
 	TotalMinor    int64
+
+	// E7: the composition of DiscountMinor, because the receipt draws two
+	// separate lines ("Hive club discount" and the promo by name) and one
+	// number cannot say which promise produced it. Invariant, mirrored by
+	// the orders_discount_split CHECK: Member + Promo = Discount.
+	MemberDiscountMinor int64
+	PromoDiscountMinor  int64
 }
 
 // VATPercent is Armenia's standard rate. It lives in the domain because the
@@ -160,59 +167,31 @@ func (r ShippingRate) ShippingFor(subtotalMinor int64, hasColdChain bool) int64 
 	return shipping
 }
 
-// ComputeTotals assembles the breakdown. Discount is a parameter with
-// exactly one legal value today (0 — promotions are E7), kept in the
-// signature so the CHECK constraint's shape and this function's shape agree
-// from the start rather than diverging when E7 arrives.
-func ComputeTotals(subtotalMinor, shippingMinor, discountMinor int64) OrderTotals {
-	return OrderTotals{
-		SubtotalMinor: subtotalMinor,
-		ShippingMinor: shippingMinor,
-		DiscountMinor: discountMinor,
-		TaxMinor:      ContainedVAT(subtotalMinor),
-		TotalMinor:    subtotalMinor + shippingMinor - discountMinor,
-	}
-}
+// ComputeTotals was E6's assembler, superseded in E7 by Price (price.go) —
+// the discount stopped being a pass-through parameter and became rules, and
+// rules belong in the one calculator every screen shares. Deleted rather
+// than kept as a second, discount-blind way to produce an OrderTotals.
 
 // ── Quoting a cart ────────────────────────────────────────────────────────
+//
+// E6's QuoteCart lived here — per-market subtotal + shipping for a live
+// basket. E7 deleted it: what delivery costs now depends on the CUSTOMER
+// (the club waives a first order's base) and the cart's promo, so a quote
+// computed from contents alone was one discount away from lying. Price
+// (price.go) is the one calculator; the preview endpoint runs it per market.
 
-// CartQuote is the design's summary card for a LIVE basket: per-market
-// subtotal, shipping and total, before any order exists. It is what the
-// cart page and the checkout sidebar render, and it exists so that the
-// number the customer reads before clicking "Place the order" comes from
-// the same arithmetic that will charge them — one function, two moments.
-type CartQuote struct {
-	HasColdChain  bool
-	SubtotalMinor Money
-	ShippingMinor Money
-	TotalMinor    Money
-}
-
-// QuoteCart prices a basket in every market at once. Rates come per
-// currency (shipping_rates rows); a market with no rate simply has no
-// shipping and no total — absent, not zero, the same honesty rule as
-// CartTotals. Checkout later refuses such a market; browsing it degrades.
-func QuoteCart(items []CartItem, rates map[Currency]ShippingRate) CartQuote {
-	q := CartQuote{
-		SubtotalMinor: CartTotals(items),
-		ShippingMinor: make(Money, len(rates)),
-		TotalMinor:    make(Money, len(rates)),
-	}
-	for _, it := range items {
-		if it.IsColdChain {
-			q.HasColdChain = true
-		}
-	}
-	for currency, subtotal := range q.SubtotalMinor {
-		rate, ok := rates[currency]
-		if !ok {
-			continue
-		}
-		shipping := rate.ShippingFor(subtotal, q.HasColdChain)
-		q.ShippingMinor[currency] = shipping
-		q.TotalMinor[currency] = subtotal + shipping
-	}
-	return q
+// Upsell is the free-shipping banner's suggestion: one product that would
+// close the remaining gap to the threshold — the design's "Add pollen ·
+// $16". Name is already resolved into the shopper's language; PriceMinor is
+// in the market being browsed.
+type Upsell struct {
+	// VariantID is what the banner's button actually adds — a cart line is
+	// a variant, and a suggestion the client cannot act on in one click
+	// would be a link wearing a button's clothes.
+	VariantID  int64
+	Slug       string
+	Name       string
+	PriceMinor int64
 }
 
 // ── The checkout request ──────────────────────────────────────────────────

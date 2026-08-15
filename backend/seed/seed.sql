@@ -687,3 +687,41 @@ FROM (
     GROUP BY product_id
 ) r
 WHERE p.id = r.product_id;
+
+-- ══ Promo codes (E7) ══════════════════════════════════════════════════════
+--
+-- Three codes, one per kind, so every branch of domain.Price can be tried
+-- from a browser (and the e2e journey can apply one). Convergent upserts
+-- like everything else in this file; the conflict target is the EXPRESSION
+-- index that makes codes case-insensitively unique, so it is named as an
+-- expression too.
+--
+-- The money rows follow E5's rule: a fixed discount and a minimum subtotal
+-- are per-market shelf prices, one row per currency, never converted.
+INSERT INTO promo_codes (code, kind, percent)
+VALUES ('WELCOME10', 'percent', 10)
+ON CONFLICT ((upper(code))) DO UPDATE
+    SET kind = EXCLUDED.kind, percent = EXCLUDED.percent, active = TRUE;
+
+INSERT INTO promo_codes (code, kind)
+VALUES ('COMB5', 'fixed')
+ON CONFLICT ((upper(code))) DO UPDATE
+    SET kind = EXCLUDED.kind, percent = NULL, active = TRUE;
+
+INSERT INTO promo_codes (code, kind)
+VALUES ('FREESHIP', 'free_shipping')
+ON CONFLICT ((upper(code))) DO UPDATE
+    SET kind = EXCLUDED.kind, percent = NULL, active = TRUE;
+
+-- COMB5: $5 / 2,400 ֏ off baskets over $30 / 14,000 ֏. Minor units per
+-- market: cents for USD (500 = $5.00) but WHOLE DRAMS for AMD (2400 =
+-- 2,400 ֏) — the dram's minor_exponent is 0, the E5 trap restated.
+INSERT INTO promo_code_values (code_id, currency, amount_minor, min_subtotal_minor)
+SELECT p.id, v.currency, v.amount_minor, v.min_subtotal_minor
+FROM promo_codes p,
+     (VALUES ('USD', 500::bigint, 3000::bigint),
+             ('AMD', 2400::bigint, 14000::bigint)) AS v(currency, amount_minor, min_subtotal_minor)
+WHERE upper(p.code) = 'COMB5'
+ON CONFLICT (code_id, currency) DO UPDATE
+    SET amount_minor = EXCLUDED.amount_minor,
+        min_subtotal_minor = EXCLUDED.min_subtotal_minor;

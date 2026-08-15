@@ -112,6 +112,21 @@ export function SiteHeader() {
             <HeartIcon />
           </IconButton>
 
+          {/* E7: the member badge — the design's header never draws a
+              signed-in state (§6 exception 2 again), but the hive club is a
+              standing promise and a member should see it acknowledged.
+              The SERVER derives membership; this renders a boolean. */}
+          {me.data?.hive.member && (
+            <span
+              title={t('common:hive.memberTitle', {
+                percent: me.data.hive.member_discount_percent,
+              })}
+              className="rounded-full bg-honey px-3 py-1 font-display text-xs font-bold text-ink"
+            >
+              {t('common:hive.badge')}
+            </span>
+          )}
+
           {/* The design draws no account control at all, since it never
               shows a signed-in state. The app has auth, so one is added
               here (docs/PLAN_ERA_2.md §6, exception 2). */}

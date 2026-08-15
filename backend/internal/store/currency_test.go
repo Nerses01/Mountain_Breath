@@ -275,13 +275,14 @@ func TestCreateOrder_SnapshotsTheCurrencyAndTheRate(t *testing.T) {
 		t.Errorf("order currency = %q, want AMD", order.Currency)
 	}
 	// Charged from the AMD shelf price — 7,600 × 3, not the dollar price
-	// converted — plus the AMD rate card's 1,900 base (E6): under the
-	// 33,500 free-shipping threshold, nothing chilled in the basket.
+	// converted. No shipping: this is the buyer's FIRST order, and E7's
+	// hive-club perk waives the base (the per-market rate card itself is
+	// pinned by TestHiveClubPerksAcrossTwoOrders, on an order that pays it).
 	if order.Totals.SubtotalMinor != 22800 {
 		t.Errorf("subtotal = %d, want 22800", order.Totals.SubtotalMinor)
 	}
-	if order.TotalMinor != 24700 {
-		t.Errorf("total = %d, want 24700 (22800 + 1900 shipping)", order.TotalMinor)
+	if order.TotalMinor != 22800 {
+		t.Errorf("total = %d, want 22800 (first delivery free)", order.TotalMinor)
 	}
 	if order.Items[0].PriceMinor != 7600 {
 		t.Errorf("item snapshot = %d, want 7600", order.Items[0].PriceMinor)
@@ -303,10 +304,9 @@ func TestCreateOrder_SnapshotsTheCurrencyAndTheRate(t *testing.T) {
 	if usdOrder.FxRateUsed != nil {
 		t.Errorf("fx_rate_used = %q for a USD order, want nil", *usdOrder.FxRateUsed)
 	}
-	// $16 of pollen + the $4 USD base rate — each market ships at ITS OWN
-	// rate card, not the other's fee converted.
-	if usdOrder.TotalMinor != 2000 {
-		t.Errorf("USD total = %d, want 2000 (1600 + 400 shipping)", usdOrder.TotalMinor)
+	// $16 of pollen, base waived — this buyer's first order too (E7).
+	if usdOrder.TotalMinor != 1600 {
+		t.Errorf("USD total = %d, want 1600 (first delivery free)", usdOrder.TotalMinor)
 	}
 }
 

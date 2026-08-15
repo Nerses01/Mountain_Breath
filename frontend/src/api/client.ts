@@ -19,6 +19,7 @@ import type {
   Order,
   OrderStatus,
   Paginated,
+  Preview,
   Product,
   ProductDetail,
   ProductSort,
@@ -246,6 +247,19 @@ export const api = {
     }),
   removeCartItem: (variantId: number) =>
     request<void>(`/api/v1/cart/items/${variantId}`, { method: 'DELETE' }),
+  // E7: the one calculator every money screen reads. POST with no body —
+  // everything it prices is server-side state plus the view in the URL.
+  checkoutPreview: () =>
+    request<Preview>(withView('/api/v1/checkout/preview'), { method: 'POST' }),
+  // Both promo calls answer with a fresh preview, because the caller's next
+  // question is always "so what does it cost now".
+  applyPromo: (code: string) =>
+    request<Preview>(withView('/api/v1/cart/promo'), {
+      method: 'POST',
+      body: { code },
+    }),
+  removePromo: () =>
+    request<Preview>(withView('/api/v1/cart/promo'), { method: 'DELETE' }),
   // The currency in the URL is what the customer is BILLED in — the server
   // reads it from the request, never from a body field, so a client cannot
   // name the cheaper of two markets for a basket priced in the dearer one.

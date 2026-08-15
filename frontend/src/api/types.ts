@@ -183,6 +183,17 @@ export interface User {
   id: number
   email: string
   role: 'customer' | 'admin'
+  /**
+   * E7: hive-club standing, derived by the SERVER from order history — the
+   * client renders these booleans, it never re-implements "after the first
+   * order".
+   */
+  hive: {
+    prior_orders: number
+    member: boolean
+    member_discount_percent: number
+    first_delivery_free: boolean
+  }
 }
 
 export interface Credentials {
@@ -224,21 +235,71 @@ export interface Cart {
   items: CartItem[]
   currency: Currency
   /**
-   * E6: total_minor now MEANS subtotal + shipping — what "Total" says on the
-   * design's summary card. subtotal_minor is the old sum-of-lines.
+   * E7 removed shipping and totals from the cart: what delivery costs now
+   * depends on WHO is asking (the hive club waives a first order's base) and
+   * what code the cart carries, so every summary figure comes from
+   * POST /checkout/preview instead. The cart is the list of lines; what
+   * remains here is what the contents alone determine.
    */
   subtotal_minor: number
-  shipping_minor: number
-  total_minor: number
   /** True when any line is chilled — the "Chilled shipping" label's flag. */
   has_cold_chain: boolean
   /**
-   * The same figures in every market, summed independently — never converted
+   * The sum-of-lines in every market, summed independently — never converted
    * from one to another, because rounding a sum is not the sum of roundings.
    * A market any line cannot be priced in is absent rather than understated.
    */
   subtotals: Money
-  shipping: Money
+}
+
+// --- Checkout preview (E7) ----------------------------------------------
+
+export interface Upsell {
+  /** What the banner's button adds — a cart line is a variant. */
+  variant_id: number
+  slug: string
+  name: string
+  price_minor: number
+}
+
+/**
+ * The one calculator's answer: every figure the cart page and the checkout
+ * sidebar draw. The client's remaining arithmetic is formatting (and the
+ * progress bar's width, which is display math, not money math).
+ */
+export interface Preview {
+  currency: Currency
+
+  subtotal_minor: number
+  shipping_minor: number
+  member_discount_minor: number
+  promo_discount_minor: number
+  discount_minor: number
+  /** Contained in the subtotal ("Prices include VAT") — display, never add. */
+  tax_minor: number
+  total_minor: number
+
+  has_cold_chain: boolean
+  /** The hive-club perk: this is the customer's first order, base waived. */
+  first_delivery_free: boolean
+  /** The base is waived for ANY reason (perk, threshold, free-ship promo). */
+  base_shipping_waived: boolean
+
+  /** Both present only while the bar has something to count toward. */
+  free_shipping_threshold_minor?: number
+  free_shipping_remaining_minor?: number
+  /** One product that would close the gap — the banner's CTA. */
+  upsell?: Upsell
+
+  /** The attached code, even when it cannot currently apply… */
+  promo_code?: string
+  promo_kind?: 'percent' | 'fixed' | 'free_shipping'
+  /** …and the validation code saying why not ('' / absent = it applied). */
+  promo_issue?: string
+
+  /** Grand total per market, for the muted second line. Same intersection
+   *  honesty as everywhere: a market the basket or its promo cannot be
+   *  priced in is absent. */
   totals: Money
 }
 
@@ -293,6 +354,11 @@ export interface Order {
   discount_minor: number
   tax_minor: number
   total_minor: number
+  /** E7: the composition of discount_minor — the receipt's two lines. */
+  member_discount_minor: number
+  promo_discount_minor: number
+  /** The frozen text of the redeemed code; absent when none was. */
+  promo_code?: string
 
   payment_method: PaymentMethod
   payment_status: PaymentStatus

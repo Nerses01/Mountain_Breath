@@ -27,10 +27,31 @@ type userResponse struct {
 	ID    int64  `json:"id"`
 	Email string `json:"email"`
 	Role  string `json:"role"`
+
+	// E7: the hive-club standing — the design's membership, which is not a
+	// stored tier but a reading of the customer's order history (decision
+	// #36). The SERVER derives the booleans: the client renders a badge and
+	// a promise line, it does not re-implement the rule.
+	Hive hiveResponse `json:"hive"`
 }
 
-func toUserResponse(u domain.User) userResponse {
-	return userResponse{ID: u.ID, Email: u.Email, Role: u.Role}
+type hiveResponse struct {
+	PriorOrders int `json:"prior_orders"`
+	// "8% less on every order after the first" — true from the second
+	// order on, with the percent alongside so the UI never hardcodes it.
+	Member                bool `json:"member"`
+	MemberDiscountPercent int  `json:"member_discount_percent"`
+	// "First order ships free" — the other perk, true until an order exists.
+	FirstDeliveryFree bool `json:"first_delivery_free"`
+}
+
+func toUserResponse(u domain.User, priorOrders int) userResponse {
+	hive := hiveResponse{PriorOrders: priorOrders, FirstDeliveryFree: priorOrders == 0}
+	if priorOrders >= 1 {
+		hive.Member = true
+		hive.MemberDiscountPercent = domain.MemberDiscountPercent
+	}
+	return userResponse{ID: u.ID, Email: u.Email, Role: u.Role, Hive: hive}
 }
 
 // newSessionToken returns 32 cryptographically random bytes as hex.
@@ -112,7 +133,9 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 		return
 	}
-	s.respondJSON(w, http.StatusCreated, toUserResponse(user))
+	// A brand-new account has zero orders by definition — no query needed
+	// for its hive standing.
+	s.respondJSON(w, http.StatusCreated, toUserResponse(user, 0))
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -144,7 +167,14 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 		return
 	}
-	s.respondJSON(w, http.StatusOK, toUserResponse(user))
+
+	prior, err := s.store.PriorOrders(r.Context(), user.ID)
+	if err != nil {
+		s.log.Error("counting prior orders", "error", err)
+		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
+	s.respondJSON(w, http.StatusOK, toUserResponse(user, prior))
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -172,5 +202,11 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		s.respondError(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 		return
 	}
-	s.respondJSON(w, http.StatusOK, toUserResponse(user))
+	prior, err := s.store.PriorOrders(r.Context(), user.ID)
+	if err != nil {
+		s.log.Error("counting prior orders", "error", err)
+		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
+	s.respondJSON(w, http.StatusOK, toUserResponse(user, prior))
 }

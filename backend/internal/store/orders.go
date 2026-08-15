@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
 )
@@ -38,6 +40,24 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 	// Rollback after a successful Commit is a harmless no-op; this line
 	// guarantees cleanup on every early return / panic path.
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	// E7: lock the customer's own user row FIRST. This serializes two
+	// parallel checkouts by the SAME user, which closes two races in one
+	// statement: both counting zero prior orders (two free first
+	// deliveries), and both redeeming a once-per-customer code (the unique
+	// index would refuse the second anyway, but as a constraint explosion
+	// mid-transaction rather than a clean wait-then-recount). Different
+	// users' checkouts don't touch each other's row, so the parallelism
+	// that matters — strangers buying the same jar — is untouched.
+	//
+	// It also EXTENDS the deadlock-avoidance ordering, which every new lock
+	// must re-prove: user row → cart variants (ascending id) → promo row →
+	// products (ascending id). Every checkout acquires in that sequence, so
+	// no two can hold what the other wants.
+	if _, err := tx.Exec(ctx,
+		`SELECT FROM users WHERE id = $1 FOR UPDATE`, userID); err != nil {
+		return domain.Order{}, fmt.Errorf("locking user row: %w", err)
+	}
 
 	// Lock the variant rows for this cart (FOR UPDATE OF v): concurrent
 	// checkouts of the same variant must wait for us to finish, so stock
@@ -130,7 +150,63 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 		return domain.Order{}, fmt.Errorf("reading shipping rate: %w", err)
 	}
 
-	totals := domain.ComputeTotals(subtotal, rate.ShippingFor(subtotal, hasColdChain), 0)
+	// E7: the promo the cart is carrying, locked FOR UPDATE. The lock is
+	// what turns max_redemptions from a hope into a rule — the count below
+	// happens while no other checkout can insert a redemption for this code,
+	// exactly the stock pattern one table over. FOR UPDATE OF p keeps the
+	// lock off cart_promos, which nobody else is waiting on.
+	var promo *domain.Promo
+	{
+		p, err := scanPromo(tx.QueryRow(ctx, `
+			SELECT `+promoColumns+`
+			FROM cart_promos cp
+			JOIN promo_codes p ON p.id = cp.code_id
+			WHERE cp.user_id = $1
+			FOR UPDATE OF p`,
+			userID))
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			// No code applied — the normal cart.
+		case err != nil:
+			return domain.Order{}, fmt.Errorf("locking cart promo: %w", err)
+		default:
+			if err := attachPromoValues(ctx, tx, &p); err != nil {
+				return domain.Order{}, err
+			}
+			promo = &p
+		}
+	}
+
+	// The hive-club fact, read inside the transaction (and safe from the
+	// same-user race by the user-row lock above): how many non-cancelled
+	// orders came before this one.
+	var priorOrders int
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*)::int FROM orders
+		WHERE user_id = $1 AND status <> 'cancelled'`,
+		userID).Scan(&priorOrders); err != nil {
+		return domain.Order{}, fmt.Errorf("counting prior orders: %w", err)
+	}
+
+	// One calculator for every screen: the same domain.Price the cart page
+	// and the checkout preview rendered from now decides what is charged.
+	// If the code stopped being valid between apply and this moment
+	// (expired, sold out, basket shrank below its floor), the checkout
+	// REFUSES rather than silently charging a total the customer never saw.
+	breakdown := domain.Price(domain.PriceInput{
+		Currency:      currency,
+		SubtotalMinor: subtotal,
+		HasColdChain:  hasColdChain,
+		Rate:          rate,
+		PriorOrders:   priorOrders,
+		Promo:         promo,
+		Now:           time.Now(),
+	})
+	if promo != nil && breakdown.PromoIssue != "" {
+		return domain.Order{}, fmt.Errorf("%w: %s (%s)",
+			domain.ErrPromoInvalid, promo.Code, breakdown.PromoIssue)
+	}
+	totals := breakdown.OrderTotals
 
 	// The rate on file at this instant, purely so the order stays reportable
 	// later. Nothing above depends on it: the total is a sum of shelf prices.
@@ -160,19 +236,29 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 		// admin flips it; the column exists so that flip is a recorded fact.
 		PaymentStatus: domain.PaymentUnpaid,
 	}
+	// The code's TEXT is snapshotted onto the order (NULL when none), the
+	// same rule as product names in order_items: the receipt keeps saying
+	// "HONEY10" whatever later happens to the code row.
+	var promoCode *string
+	if promo != nil {
+		promoCode = &promo.Code
+		order.PromoCode = promo.Code
+	}
 	err = tx.QueryRow(ctx, `
 		INSERT INTO orders (user_id, status, total_minor, currency, fx_rate_used,
 		                    subtotal_minor, shipping_minor, discount_minor, tax_minor,
+		                    member_discount_minor, promo_discount_minor, promo_code,
 		                    payment_method, payment_status,
 		                    ship_first_name, ship_last_name, ship_phone, ship_street,
 		                    ship_city, ship_postal_code, ship_country,
 		                    delivery_note, leave_with_neighbour)
 		VALUES ($1, $2, $3, $4, $5::numeric,
-		        $6, $7, $8, $9, $10, $11,
-		        $12, $13, $14, $15, $16, $17, $18, $19, $20)
+		        $6, $7, $8, $9, $10, $11, $12, $13, $14,
+		        $15, $16, $17, $18, $19, $20, $21, $22, $23)
 		RETURNING id, created_at`,
 		userID, order.Status, totals.TotalMinor, currency, fxRate,
 		totals.SubtotalMinor, totals.ShippingMinor, totals.DiscountMinor, totals.TaxMinor,
+		totals.MemberDiscountMinor, totals.PromoDiscountMinor, promoCode,
 		order.PaymentMethod, order.PaymentStatus,
 		in.Address.FirstName, in.Address.LastName, in.Address.Phone, in.Address.Street,
 		in.Address.City, in.Address.PostalCode, in.Address.Country,
@@ -180,6 +266,25 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 	).Scan(&order.ID, &order.CreatedAt)
 	if err != nil {
 		return domain.Order{}, fmt.Errorf("inserting order: %w", err)
+	}
+
+	// Record the redemption — the row the UNIQUE (code_id, user_id) index
+	// guards. Under the user-row and promo-row locks this insert cannot
+	// race, so a violation here means a bug in the locking, not a customer:
+	// translated to the sentinel anyway, because a 500 would tell the
+	// customer the shop broke when what happened is the code was spent.
+	if promo != nil {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO promo_redemptions (code_id, user_id, order_id)
+			VALUES ($1, $2, $3)`,
+			promo.ID, userID, order.ID); err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+				return domain.Order{}, fmt.Errorf("%w: %s (%s)",
+					domain.ErrPromoInvalid, promo.Code, domain.ValidationPromoUsed)
+			}
+			return domain.Order{}, fmt.Errorf("recording promo redemption: %w", err)
+		}
 	}
 
 	// The address book, updated in the SAME transaction: if the order fails,
@@ -247,6 +352,12 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 		`DELETE FROM cart_items WHERE user_id = $1`, userID); err != nil {
 		return domain.Order{}, fmt.Errorf("clearing cart: %w", err)
 	}
+	// The applied code goes with the cart it was applied to — a redeemed
+	// code left attached would greet the NEXT basket with "already used".
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM cart_promos WHERE user_id = $1`, userID); err != nil {
+		return domain.Order{}, fmt.Errorf("clearing cart promo: %w", err)
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return domain.Order{}, fmt.Errorf("committing checkout: %w", err)
@@ -275,7 +386,9 @@ const orderColumns = `orders.id, orders.user_id, orders.status,
 	orders.tax_minor, orders.payment_method, orders.payment_status,
 	orders.ship_first_name, orders.ship_last_name, orders.ship_phone,
 	orders.ship_street, orders.ship_city, orders.ship_postal_code,
-	orders.ship_country, orders.delivery_note, orders.leave_with_neighbour`
+	orders.ship_country, orders.delivery_note, orders.leave_with_neighbour,
+	orders.member_discount_minor, orders.promo_discount_minor,
+	COALESCE(orders.promo_code, '')`
 
 // scanOrder reads one row of orderColumns (plus whatever the caller
 // appended) into a domain.Order. The ship_* columns are nullable — orders
@@ -290,7 +403,9 @@ func scanOrder(row pgx.Row, extra ...any) (domain.Order, error) {
 		&o.Totals.DiscountMinor, &o.Totals.TaxMinor,
 		&o.PaymentMethod, &o.PaymentStatus,
 		&first, &last, &phone, &street, &city, &postal, &country,
-		&o.DeliveryNote, &o.LeaveWithNeighbour}
+		&o.DeliveryNote, &o.LeaveWithNeighbour,
+		&o.Totals.MemberDiscountMinor, &o.Totals.PromoDiscountMinor,
+		&o.PromoCode}
 	if err := row.Scan(append(dest, extra...)...); err != nil {
 		return domain.Order{}, err
 	}
@@ -398,6 +513,16 @@ func (s *Store) UpdateOrderStatus(ctx context.Context, orderID int64, to string)
 			WHERE oi.order_id = $1 AND v.id = oi.variant_id`,
 			orderID); err != nil {
 			return domain.Order{}, fmt.Errorf("restoring stock: %w", err)
+		}
+		// ...and the promo code, the same way: cancelling undoes the order's
+		// side effects, and a redemption is one of them. The order keeps its
+		// promo_code SNAPSHOT (what happened is still what happened); only
+		// the redemption row — the thing that blocks reuse and fills the
+		// global cap — is released. No-op for promo-less orders.
+		if _, err := tx.Exec(ctx, `
+			DELETE FROM promo_redemptions WHERE order_id = $1`,
+			orderID); err != nil {
+			return domain.Order{}, fmt.Errorf("releasing promo redemption: %w", err)
 		}
 	}
 

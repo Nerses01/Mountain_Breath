@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CheckoutPage } from './CheckoutPage'
-import type { Cart } from '../api/types'
+import type { Cart, Preview } from '../api/types'
 
 /**
  * The checkout's three contracts, tested at the component boundary:
@@ -28,11 +28,27 @@ const cartFixture: Cart = {
   ],
   currency: 'USD',
   subtotal_minor: 2800,
-  shipping_minor: 400,
-  total_minor: 3200,
   has_cold_chain: false,
   subtotals: { USD: 2800, AMD: 13400 },
-  shipping: { USD: 400, AMD: 1900 },
+}
+
+// E7: the money lives on the preview, not the cart — this fixture is what
+// /checkout/preview answers, and it is the only place the summary's figures
+// can come from.
+const previewFixture: Preview = {
+  currency: 'USD',
+  subtotal_minor: 2800,
+  shipping_minor: 400,
+  member_discount_minor: 0,
+  promo_discount_minor: 0,
+  discount_minor: 0,
+  tax_minor: 467,
+  total_minor: 3200,
+  has_cold_chain: false,
+  first_delivery_free: false,
+  base_shipping_waived: false,
+  free_shipping_threshold_minor: 7000,
+  free_shipping_remaining_minor: 4200,
   totals: { USD: 3200, AMD: 15300 },
 }
 
@@ -48,7 +64,12 @@ beforeEach(() => {
       requests.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined })
 
       let payload: unknown = {}
-      if (url.includes('/auth/me')) payload = { id: 1, email: 'anahit@example.com', role: 'customer' }
+      if (url.includes('/auth/me')) {
+        payload = {
+          id: 1, email: 'anahit@example.com', role: 'customer',
+          hive: { prior_orders: 1, member: true, member_discount_percent: 8, first_delivery_free: false },
+        }
+      } else if (url.includes('/checkout/preview')) payload = previewFixture
       else if (url.includes('/cart')) payload = cartFixture
       else if (url.includes('/account/address')) {
         return Promise.resolve(

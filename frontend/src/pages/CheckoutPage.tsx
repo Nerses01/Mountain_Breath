@@ -1,9 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useTranslation } from 'react-i18next'
-import { useCart, useCheckout, useDefaultAddress, useMe } from '../api/hooks'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCart, useCheckout, useDefaultAddress, useMe, usePreview } from '../api/hooks'
+import { ApiError } from '../api/client'
 import type { Address, PaymentMethod } from '../api/types'
 import { OrderSummary } from '../components/checkout/OrderSummary'
+import { PromoBox } from '../components/checkout/PromoBox'
 import { Button } from '../components/ui/Button'
 import { Checkbox } from '../components/ui/Checkbox'
 import { Input } from '../components/ui/Input'
@@ -53,8 +56,12 @@ export function CheckoutPage() {
   const { currency } = useCurrency()
   const navigate = useNavigate()
 
+  const qc = useQueryClient()
   const me = useMe()
   const cart = useCart(!!me.data)
+  // E7: every figure in the sidebar comes from the one calculator — the
+  // same domain.Price call that will price the order itself.
+  const preview = usePreview(!!me.data)
   const saved = useDefaultAddress(!!me.data)
   const checkout = useCheckout()
 
@@ -111,12 +118,22 @@ export function CheckoutPage() {
       {
         onSuccess: (order) =>
           navigate(localePath(`/orders/${order.id}`), { state: { placed: true } }),
+        onError: (err) => {
+          // 409 promo_invalid: the cart's code died between apply and
+          // "Place the order" (expired, sold out, basket shrank). The
+          // server refused rather than silently charging a different
+          // total; refetching the preview makes the promo box name the
+          // reason inline, next to the code it is about.
+          if (err instanceof ApiError && err.code === 'promo_invalid') {
+            void qc.invalidateQueries({ queryKey: ['preview'] })
+          }
+        },
       },
     )
   }
 
   // ── Guard states ────────────────────────────────────────────────────────
-  if (me.isPending || cart.isPending) {
+  if (me.isPending || cart.isPending || (me.data && preview.isPending)) {
     return <CheckoutShell step={1}>{t('common:state.loading')}</CheckoutShell>
   }
   if (!me.data) {
@@ -131,7 +148,7 @@ export function CheckoutPage() {
       </CheckoutShell>
     )
   }
-  if (!cart.data || cart.data.items.length === 0) {
+  if (!cart.data || !preview.data || cart.data.items.length === 0) {
     return (
       <CheckoutShell step={1}>
         <p className="text-ink-body">
@@ -314,12 +331,17 @@ export function CheckoutPage() {
         <div className="flex flex-col gap-4 self-start">
           <OrderSummary
             cart={cart.data}
+            preview={preview.data}
             action={
               <Button type="submit" size="lg" disabled={checkout.isPending}>
                 {checkout.isPending ? t('checkout:placing') : t('checkout:placeOrder')}
               </Button>
             }
           />
+          {/* The promo box rides on the checkout too — the mock's cart owns
+              it, but a code remembered here saves a trip back. Same
+              component, same preview, so the figures cannot disagree. */}
+          <PromoBox preview={preview.data} />
           <div className="flex flex-col gap-3 rounded-2xl bg-card p-6">
             {(['packed', 'replaced', 'labReport'] as const).map((key) => (
               <div key={key} className="flex items-start gap-2.5 text-sm text-ink-strong">

@@ -67,6 +67,16 @@ type fakeStore struct {
 	orders         []domain.Order
 	shippingRates  map[domain.Currency]domain.ShippingRate
 	defaultAddress *domain.Address
+
+	// E7 promotions. promos is the fake's promo_codes table (keyed by
+	// NORMALIZED code); cartPromo the applied one; priorOrders the hive-club
+	// fact; orderErr lets a test drive handleCreateOrder's promo_invalid
+	// mapping without a database producing the condition.
+	promos      map[string]domain.Promo
+	cartPromo   *domain.Promo
+	priorOrders int
+	upsell      *domain.Upsell
+	orderErr    error
 }
 
 func newFakeStore() *fakeStore {
@@ -299,6 +309,9 @@ func (f *fakeStore) DeleteCartItem(_ context.Context, _, _ int64) error     { re
 func (f *fakeStore) CreateOrder(_ context.Context, _ int64, currency domain.Currency, in domain.CheckoutInput) (domain.Order, error) {
 	f.lastCurrency = currency
 	f.lastCheckout = in
+	if f.orderErr != nil {
+		return domain.Order{}, f.orderErr
+	}
 	if len(f.cart) == 0 {
 		return domain.Order{}, domain.ErrEmptyCart
 	}
@@ -307,6 +320,43 @@ func (f *fakeStore) CreateOrder(_ context.Context, _ int64, currency domain.Curr
 		ShipTo: &in.Address, PaymentMethod: in.PaymentMethod,
 		PaymentStatus: domain.PaymentUnpaid,
 	}, nil
+}
+
+// --- PromoStore (E7) ---
+
+func (f *fakeStore) PromoForUser(_ context.Context, code string, _ int64) (domain.Promo, error) {
+	if p, ok := f.promos[domain.NormalizePromoCode(code)]; ok {
+		return p, nil
+	}
+	return domain.Promo{}, domain.ErrNotFound
+}
+
+func (f *fakeStore) CartPromoForUser(_ context.Context, _ int64) (*domain.Promo, error) {
+	return f.cartPromo, nil
+}
+
+func (f *fakeStore) SetCartPromo(_ context.Context, _ int64, codeID int64) error {
+	for _, p := range f.promos {
+		if p.ID == codeID {
+			promo := p
+			f.cartPromo = &promo
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
+func (f *fakeStore) ClearCartPromo(_ context.Context, _ int64) error {
+	f.cartPromo = nil
+	return nil
+}
+
+func (f *fakeStore) PriorOrders(_ context.Context, _ int64) (int, error) {
+	return f.priorOrders, nil
+}
+
+func (f *fakeStore) UpsellForGap(_ context.Context, _ domain.View, _ int64) (*domain.Upsell, error) {
+	return f.upsell, nil
 }
 
 func (f *fakeStore) GetOrder(_ context.Context, orderID int64) (domain.Order, error) {

@@ -109,6 +109,24 @@ type CheckoutStore interface {
 	DefaultAddress(ctx context.Context, userID int64) (domain.Address, error)
 }
 
+// PromoStore is E7's slice: codes, the cart's applied code, and the two
+// hive-club facts. PriorOrders lives here rather than on OrderStore because
+// its callers are the pricing path (preview, /auth/me), not order CRUD.
+type PromoStore interface {
+	// PromoForUser resolves a typed code WITH the asking user's usage state
+	// filled in, so domain.Promo.Issue can judge it without a second query.
+	PromoForUser(ctx context.Context, code string, userID int64) (domain.Promo, error)
+	// nil, nil when the cart carries no code — absence is the normal state,
+	// not an error.
+	CartPromoForUser(ctx context.Context, userID int64) (*domain.Promo, error)
+	SetCartPromo(ctx context.Context, userID, codeID int64) error
+	ClearCartPromo(ctx context.Context, userID int64) error
+	// Non-cancelled orders — the one number both hive-club perks derive from.
+	PriorOrders(ctx context.Context, userID int64) (int, error)
+	// The free-shipping banner's suggestion; nil when no product closes the gap.
+	UpsellForGap(ctx context.Context, view domain.View, gapMinor int64) (*domain.Upsell, error)
+}
+
 // Store embeds the per-entity interfaces into the one the Server depends on.
 type Store interface {
 	CategoryStore
@@ -119,6 +137,7 @@ type Store interface {
 	CartStore
 	OrderStore
 	CheckoutStore
+	PromoStore
 }
 
 // Server holds the dependencies of the HTTP layer. Handlers are methods on it,
@@ -195,6 +214,12 @@ func (s *Server) Routes() chi.Router {
 			r.Get("/cart", s.handleGetCart)
 			r.Put("/cart/items", s.handleSetCartItem)
 			r.Delete("/cart/items/{variantID}", s.handleDeleteCartItem)
+			// E7: the promo box and the one calculator every money screen
+			// reads. Preview is POST — a per-session computation, not an
+			// addressable resource.
+			r.Post("/cart/promo", s.handleApplyPromo)
+			r.Delete("/cart/promo", s.handleRemovePromo)
+			r.Post("/checkout/preview", s.handleCheckoutPreview)
 			r.Post("/orders", s.handleCreateOrder)
 			r.Get("/orders", s.handleListMyOrders)
 			r.Get("/orders/{id}", s.handleGetOrder)
