@@ -76,15 +76,24 @@ export function SiteHeader() {
               {t('common:brand')}
             </span>
             {/* ink-muted, not the design's #a9714b: at 11px that measures
-                3.6:1 and fails AA (see the token block). */}
-            <span className="mt-1 text-2xs uppercase tracking-eyebrow text-ink-muted">
+                3.6:1 and fails AA (see the token block).
+                Hidden between md and 2xl: that is the squeeze zone where the
+                nav and the icon row share the line, and the tagline is the
+                widest fixed item in the header once the labels are Armenian.
+                Phones keep it (the nav is in the sheet there) and full
+                desktop keeps the mock's complete brand block. */}
+            <span className="mt-1 text-2xs uppercase tracking-eyebrow text-ink-muted md:max-2xl:hidden">
               {t('common:tagline')}
             </span>
           </span>
         </Link>
 
+        {/* The nav and icon row step down one notch below 2xl — the mock's
+            spacing is a 1440px drawing, and the same header must also hold
+            five ARMENIAN labels at 1280 without wrapping the icon row onto
+            a second line. */}
         <nav aria-label={t('common:nav.home')} className="hidden md:block">
-          <ul className="flex flex-wrap items-center gap-6 font-display text-base font-medium">
+          <ul className="flex flex-wrap items-center gap-x-5 gap-y-1 font-display text-[15px] font-medium 2xl:gap-x-6 2xl:text-base">
             {NAV.map(({ key, to }) => {
               const label = t(`common:nav.${key}`)
               if (!to) {
@@ -114,7 +123,7 @@ export function SiteHeader() {
           </ul>
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 2xl:gap-3">
           <IconButton
             ref={searchButtonRef}
             label={t('common:actions.search')}
@@ -164,21 +173,10 @@ export function SiteHeader() {
             <UserIcon />
           </Link>
 
-          {/* Sign-out. The design draws no account menu at all, but a shop
-              that can be signed into must be signable out of — the old
-              AuthStatus component carried this, and replacing the header
-              would otherwise have silently dropped it. It moves into the
-              account area proper in E8. */}
-          {me.data && (
-            <button
-              type="button"
-              onClick={() => logout.mutate()}
-              className="hidden font-display text-sm font-medium text-ink-muted transition hover:text-ink md:inline"
-            >
-              {t('account:signOut')}
-            </button>
-          )}
-
+          {/* No sign-out here anymore: E8 gave the account area its own (and
+              the phone sheet keeps one), so the header carries only what
+              every visit needs — which is also what lets the Armenian
+              header fit on one line. */}
           <Link
             to={localePath('/cart')}
             className="inline-flex items-center gap-2 rounded-full bg-bark px-5 py-2.5 font-display text-sm font-semibold text-ink-on-dark transition hover:opacity-90"
