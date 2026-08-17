@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import type { Product } from '../api/types'
@@ -38,13 +39,40 @@ export function ProductCard({
   layout = 'compact',
 }: {
   product: Product
-  /** Absent until E2's shop page wires it; the button is disabled then. */
-  onAdd?: (product: Product) => void
+  /**
+   * Absent for a signed-out visitor; the button is disabled then. When the
+   * promise resolves to a count, the button flashes "In cart: N" — the
+   * confirmation state the mock never draws (§6 exception 2).
+   */
+  onAdd?: (product: Product) => void | Promise<number>
   /** 'compact' is the shop grid, 'feature' the home page's roomier card. */
   layout?: 'compact' | 'feature'
 }) {
   const { t } = useTranslation()
   const { localePath } = useLocale()
+
+  // The transient "In cart: N" flash. null is the resting label. The timer
+  // lives in a ref so a second click RESTARTS the window instead of letting
+  // the first click's timeout cut the second flash short.
+  const [addedQty, setAddedQty] = useState<number | null>(null)
+  const flashTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(flashTimer.current), [])
+
+  const handleAdd = async () => {
+    if (!onAdd) return
+    try {
+      const count = await onAdd(product)
+      // A void handler (tests, future callers) gets no flash — feedback is
+      // only ever shown for a count the server confirmed.
+      if (typeof count !== 'number' || count <= 0) return
+      setAddedQty(count)
+      clearTimeout(flashTimer.current)
+      flashTimer.current = setTimeout(() => setAddedQty(null), 1800)
+    } catch {
+      // A failed add (rare: a stock race the disabled state didn't catch)
+      // keeps the resting label; the cart cache stays truthful either way.
+    }
+  }
 
   // Variants arrive sorted by price, so the first is the "from" price.
   const cheapest = product.variants[0]
@@ -163,19 +191,39 @@ export function ProductCard({
         <button
           type="button"
           disabled={!inStock || !onAdd}
-          onClick={() => onAdd?.(product)}
+          onClick={handleAdd}
           className={cx(
             'relative z-10 shrink-0 rounded-full font-display text-xs font-semibold transition',
             'disabled:pointer-events-none disabled:opacity-50',
-            layout === 'feature'
+            // While the flash shows, the compact card's outline button goes
+            // solid too — the count reads as a confirmation, not a relabel.
+            addedQty !== null || layout === 'feature'
               ? 'bg-bark px-4.5 py-2.5 text-ink-on-dark hover:opacity-90'
               : 'border-[1.5px] border-bark px-4 py-2.5 text-ink hover:bg-bark hover:text-ink-on-dark',
           )}
         >
           {/* The mock writes a bare "Add" on the compact card; one action,
-              one name everywhere was preferred over the shorter chip. */}
-          {t('catalog:addToCart')}
+              one name everywhere was preferred over the shorter chip.
+              Keying the span by count remounts it on every successful
+              click, so the pop replays even when only the number changed. */}
+          <span
+            key={addedQty ?? 'resting'}
+            className={cx(
+              'inline-block',
+              addedQty !== null && 'animate-pop motion-reduce:animate-none',
+            )}
+          >
+            {addedQty !== null
+              ? t('catalog:inCart', { count: addedQty })
+              : t('catalog:addToCart')}
+          </span>
         </button>
+
+        {/* A button changing its own text is not announced by screen
+            readers — the live region is what says "In cart: 2" out loud. */}
+        <span aria-live="polite" className="sr-only">
+          {addedQty !== null ? t('catalog:inCart', { count: addedQty }) : ''}
+        </span>
       </div>
     </article>
   )

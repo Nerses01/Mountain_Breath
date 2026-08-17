@@ -7,6 +7,7 @@ import { usePageMeta } from '../lib/usePageMeta'
 import {
   useCart,
   useMe,
+  useQuickAdd,
   useProduct,
   useRelatedProducts,
   useSetCartItem,
@@ -59,6 +60,8 @@ export function ProductPage() {
   const me = useMe()
   const cart = useCart(!!me.data)
   const addToCart = useSetCartItem()
+  // The related grid's cards sell too — same quick-add as every other grid.
+  const quickAdd = useQuickAdd()
 
   // E10 SEO: schema.org Product + AggregateOffer (+ AggregateRating once
   // reviews exist — E4 and E5 are what make these claims TRUTHFUL: real
@@ -361,7 +364,7 @@ export function ProductPage() {
           />
           <div className="grid gap-5.5 sm:grid-cols-2 xl:grid-cols-4">
             {related.data?.map((r) => (
-              <ProductCard key={r.id} product={r} />
+              <ProductCard key={r.id} product={r} onAdd={quickAdd} />
             ))}
           </div>
         </section>

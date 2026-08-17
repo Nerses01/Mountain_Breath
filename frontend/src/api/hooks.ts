@@ -257,18 +257,23 @@ export function useSetCartItem() {
  * every click after the first silently re-set the same quantity and the
  * button looked dead. Returns undefined for a signed-out visitor, which the
  * card renders as a disabled button.
+ *
+ * The promise resolves to how many of this product the cart now holds —
+ * read from the RESPONSE, not assumed from what was sent, so the button's
+ * "In cart: 2" flash can never show a number the server did not confirm.
  */
-export function useQuickAdd(): ((product: Product) => void) | undefined {
+export function useQuickAdd(): ((product: Product) => Promise<number>) | undefined {
   const me = useMe()
   const cart = useCart(!!me.data)
   const setCartItem = useSetCartItem()
 
   if (!me.data) return undefined
-  return (product) => {
+  return async (product) => {
     const variant = product.variants.find((v) => v.stock_qty > 0)
-    if (!variant) return
+    if (!variant) return 0
     const inCart = cart.data?.items.find((it) => it.variant_id === variant.id)?.qty ?? 0
-    setCartItem.mutate({ variantId: variant.id, qty: inCart + 1 })
+    const updated = await setCartItem.mutateAsync({ variantId: variant.id, qty: inCart + 1 })
+    return updated.items.find((it) => it.variant_id === variant.id)?.qty ?? inCart + 1
   }
 }
 

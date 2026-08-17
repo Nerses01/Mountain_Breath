@@ -140,6 +140,32 @@ describe('ProductCard', () => {
     expect(onAdd).toHaveBeenCalledWith(product)
   })
 
+  it('flashes the confirmed cart count after an add, then rests again', async () => {
+    // The handler resolves to the count the SERVER answered with — the
+    // flash must show that number, not a local guess.
+    renderCard(product, () => Promise.resolve(2))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }))
+
+    expect(await screen.findByRole('button', { name: 'In cart: 2' })).toBeInTheDocument()
+    // ...and after the flash window the resting label returns. Generous
+    // timeout: the window itself is 1.8s of real time.
+    expect(
+      await screen.findByRole('button', { name: 'Add to cart' }, { timeout: 3000 }),
+    ).toBeInTheDocument()
+  }, 7000)
+
+  it('shows no flash when the handler resolves to nothing', async () => {
+    // A void handler (a caller that opted out of feedback) must not strand
+    // the button in a confirmation it cannot back up.
+    renderCard(product, () => {})
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }))
+
+    expect(screen.getByRole('button', { name: 'Add to cart' })).toBeInTheDocument()
+    expect(screen.queryByText(/In cart/)).not.toBeInTheDocument()
+  })
+
   it('disables Add when no handler is wired (anonymous visitor)', () => {
     renderCard(product)
 
