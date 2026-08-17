@@ -139,9 +139,13 @@ export function CheckIcon(props: IconProps) {
 }
 
 export function StarIcon({ filled = false, ...props }: IconProps & { filled?: boolean }) {
+  // A REGULAR star, not a hand-drawn one: ten vertices alternating between
+  // an outer radius of 9.6 and an inner one of 4.56 (the ★ glyph's chunky
+  // proportions, ~0.475 — a pentagram's 0.382 reads spiky at 14px), every
+  // 36° around (12, 12). Generated, so it is symmetric by construction.
   return (
     <IconBase {...props} filled={filled}>
-      <path d="m12 3.2 2.85 5.78 6.38.93-4.62 4.5 1.09 6.35L12 17.76l-5.7 3-1.09-6.35-4.62-4.5 6.38-.93z" />
+      <path d="M12 2.4 14.68 8.31 21.13 9.03 16.34 13.41 17.64 19.77 12 16.56 6.36 19.77 7.66 13.41 2.87 9.03 9.32 8.31 Z" />
     </IconBase>
   )
 }

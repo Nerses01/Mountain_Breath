@@ -30,17 +30,19 @@ describe('Stars', () => {
   it('fills exactly the fraction, without rounding to a half star', () => {
     const { container } = render(<Stars rating={4.67} count={3} />)
 
-    // 4.67 / 5 = 93.4%. Rounding this to 4.5 stars would put a visible lie
-    // on the page — the clip width is what keeps the picture honest.
+    // 4.67 stars × 14px = 65.38px of fill. Rounding this to 4.5 stars would
+    // put a visible lie on the page — the clip width keeps the picture
+    // honest (px, not %, so it cannot round through the container's width).
     const fill = container.querySelector('[style*="width"]') as HTMLElement
-    expect(fill.style.width).toBe('93.4%')
+    expect(fill.style.width).toBe('65.38px')
   })
 
   it('clamps a nonsense rating instead of overflowing its box', () => {
     const { container } = render(<Stars rating={9} count={1} />)
 
+    // Clamped to 5 stars × 14px — the full row, never past it.
     const fill = container.querySelector('[style*="width"]') as HTMLElement
-    expect(fill.style.width).toBe('100%')
+    expect(fill.style.width).toBe('70px')
   })
 
   it('says so plainly when nothing has been rated', () => {
