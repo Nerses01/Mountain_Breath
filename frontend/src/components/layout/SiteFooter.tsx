@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useCatalogFacets, useSubscribeNewsletter } from '../../api/hooks'
 import { useFieldErrors } from '../../i18n/useFieldErrors'
 import { useLocale } from '../../i18n/useLocale'
+import { scrollToTopState } from '../../lib/scrollToTopState'
 import { Button } from '../ui/Button'
 import { CurrencySwitcher } from '../ui/CurrencySwitcher'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
@@ -74,6 +75,11 @@ export function SiteFooter() {
               <li key={c.slug}>
                 <Link
                   to={`${localePath('/shop')}?category=${c.slug}`}
+                  // The reader is at the BOTTOM of a page asking for a fresh
+                  // one — and from /shop this is a query-only change that
+                  // ScrollToTop would otherwise leave put (the sidebar's
+                  // filters rely on that). The state carries the intent.
+                  state={scrollToTopState}
                   className="text-sm text-ink-on-dark-soft hover:text-ink-on-dark"
                 >
                   {c.name}
@@ -87,6 +93,9 @@ export function SiteFooter() {
               <li key={key}>
                 <Link
                   to={localePath(to)}
+                  // Also for the "already on that page" click, which changes
+                  // no URL at all and would otherwise do nothing visible.
+                  state={scrollToTopState}
                   className="text-sm text-ink-on-dark-soft transition hover:text-ink-on-dark"
                 >
                   {t(`footer:companyLinks.${key}`)}
@@ -101,10 +110,18 @@ export function SiteFooter() {
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-bark-soft pt-5 text-xs text-ink-on-dark-soft">
           <p>{t('footer:legal.rights', { year })}</p>
           <div className="flex flex-wrap items-center gap-6">
-            <Link to={localePath('/terms')} className="transition hover:text-ink-on-dark">
+            <Link
+              to={localePath('/terms')}
+              state={scrollToTopState}
+              className="transition hover:text-ink-on-dark"
+            >
               {t('footer:legal.terms')}
             </Link>
-            <Link to={localePath('/privacy')} className="transition hover:text-ink-on-dark">
+            <Link
+              to={localePath('/privacy')}
+              state={scrollToTopState}
+              className="transition hover:text-ink-on-dark"
+            >
               {t('footer:legal.privacy')}
             </Link>
             <CurrencySwitcher />
