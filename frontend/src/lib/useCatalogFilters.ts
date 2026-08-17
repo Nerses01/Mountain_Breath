@@ -45,7 +45,11 @@ function parseMinor(raw: string | null): number | undefined {
 export function useCatalogFilters() {
   const [params, setParams] = useSearchParams()
 
-  const filters: CatalogFilterParams = useMemo(
+  // `& { sort: ... }`: parseSort always supplies a default, so unlike the
+  // request params — where sort is optional — the PARSED filters always
+  // carry one. Saying so in the type is what lets the sort control take a
+  // value instead of a maybe.
+  const filters: CatalogFilterParams & { sort: ProductSort } = useMemo(
     () => ({
       category: params.get('category') ?? undefined,
       q: params.get('q') ?? undefined,

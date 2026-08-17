@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useCatalogFacets, useProducts, useQuickAdd } from '../api/hooks'
 import type { ProductSort } from '../api/types'
 import { ProductCard } from '../components/ProductCard'
-import { Breadcrumbs, Button, Card, IconButton, XIcon } from '../components/ui'
+import { Breadcrumbs, Button, Card, IconButton, PillSelect, XIcon } from '../components/ui'
 import { PriceRange } from '../components/ui/PriceRange'
 import { useLocale } from '../i18n/useLocale'
 import { cx } from '../lib/cx'
@@ -235,22 +235,18 @@ export function ShopPage() {
             )}
           </button>
 
-          {/* A bare <select> rather than the <Select> primitive: that one
-              renders a <label> above the box, and the design puts the label
-              INSIDE the control ("Sort: Most loved"). The accessible name
-              comes from aria-label instead, so the control is still named. */}
-          <select
-            aria-label={t('catalog:sortLabel')}
+          {/* PillSelect, not a native <select>: the OS draws a select's open
+              list and takes no CSS, and the design wants the popup on its
+              own palette. The prefix lives on the CLOSED pill only — inside
+              the list the rows say "Most loved", not "Sort: Most loved"
+              five times over. */}
+          <PillSelect
+            ariaLabel={t('catalog:sortLabel')}
+            prefix={t('catalog:sortPrefix')}
             value={filters.sort}
-            onChange={(e) => setFilter({ sort: e.target.value })}
-            className="rounded-full border-[1.5px] border-line bg-card px-5 py-2.5 font-display text-sm font-semibold text-ink"
-          >
-            {SORTS.map((s) => (
-              <option key={s} value={s}>
-                {t('catalog:sortPrefix')} {t(`catalog:sort.${s}`)}
-              </option>
-            ))}
-          </select>
+            onChange={(sort) => setFilter({ sort })}
+            options={SORTS.map((s) => ({ value: s, label: t(`catalog:sort.${s}`) }))}
+          />
         </div>
       </div>
 
