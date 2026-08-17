@@ -4,6 +4,34 @@ From an empty VPS to a live, HTTPS-served, auto-deploying shop. Written for
 Ubuntu 24.04 LTS on any provider (Hetzner/DigitalOcean/etc., smallest tier
 is plenty). Commands marked 💻 run on your Windows machine, 🖥️ on the server.
 
+## Interim: public demo URL with no VPS and no domain
+
+Until the VPS exists, a **Cloudflare quick tunnel** exposes the local
+containerized stack at a free `https://<random>.trycloudflare.com` URL —
+no account, no DNS, no open ports (cloudflared connects *outbound* to
+Cloudflare; visitors are relayed back down that connection). 💻:
+
+```powershell
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.tunnel.yml up -d --build
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.tunnel.yml logs cloudflared   # the URL is in here
+```
+
+Seed + admin promotion are the same as step 6 below (swap in
+`docker-compose.yml`). Limits to know about:
+
+- The URL is **random and changes every restart** of the cloudflared
+  container — re-share it each time. A stable URL needs a domain in
+  Cloudflare (named tunnel), which arrives with the VPS anyway.
+- The site is up only while this machine is on; no uptime promise.
+- Google sign-in stays off (its redirect URI must be registered per exact
+  origin — pointless with a churning URL). Leave the keys unset and the
+  button explains itself.
+- Password-reset emails would link to `MB_PUBLIC_URL`; with SMTP unset they
+  land in the api log anyway, so leave both alone for demos.
+- Keep `MB_ENV=dev`: the browser↔Cloudflare leg is HTTPS, but the
+  cloudflared→nginx leg is plain HTTP on the compose network, which is fine
+  for a demo and required until real TLS termination exists end-to-end.
+
 ## 0. What you need first
 
 - A VPS (2GB RAM is comfortable) — note its public IP
