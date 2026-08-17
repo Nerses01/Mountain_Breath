@@ -63,7 +63,6 @@ export const ru = {
     outOfStock: 'Нет в наличии',
     stockLeft: 'Осталось {{count}}',
     addToCart: 'В корзину',
-    add: 'Добавить',
     all: 'Все',
     back: '← Назад в каталог',
     notFound: 'Такого продукта больше нет.',

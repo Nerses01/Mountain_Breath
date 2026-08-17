@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useCatalogFacets, useMe, useProducts, useSetCartItem } from '../api/hooks'
-import type { Product, ProductSort } from '../api/types'
+import { useCatalogFacets, useProducts, useQuickAdd } from '../api/hooks'
+import type { ProductSort } from '../api/types'
 import { ProductCard } from '../components/ProductCard'
 import { Breadcrumbs, Button, Card, IconButton, XIcon } from '../components/ui'
 import { PriceRange } from '../components/ui/PriceRange'
@@ -36,8 +36,8 @@ export function ShopPage() {
   const products = useProducts(listParams)
   const facets = useCatalogFacets(filters)
 
-  const me = useMe()
-  const setCartItem = useSetCartItem()
+  // undefined while signed out, which the card renders as a disabled Add.
+  const quickAdd = useQuickAdd()
 
   // E10 SEO: whatever filters are in the query string, the canonical names
   // the CLEAN /shop — a thousand filter permutations must not compete with
@@ -75,15 +75,6 @@ export function ShopPage() {
     (filters.category ? 1 : 0) +
     (filters.benefits?.length ?? 0) +
     (filters.minPriceMinor !== undefined || filters.maxPriceMinor !== undefined ? 1 : 0)
-
-  // The card's Add button buys the cheapest variant — the one whose price it
-  // shows. Anything else would charge a price the visitor never saw. A
-  // product with real choices is better bought on its own page, which is
-  // where the variant picker lives (E3).
-  const addToCart = (product: Product) => {
-    const variant = product.variants.find((v) => v.stock_qty > 0)
-    if (variant) setCartItem.mutate({ variantId: variant.id, qty: 1 })
-  }
 
   const priceBounds = {
     min: facets.data?.price_min_minor ?? 0,
@@ -329,7 +320,7 @@ export function ShopPage() {
             )}
           >
             {products.data?.items.map((p) => (
-              <ProductCard key={p.id} product={p} onAdd={me.data ? addToCart : undefined} />
+              <ProductCard key={p.id} product={p} onAdd={quickAdd} />
             ))}
           </div>
 

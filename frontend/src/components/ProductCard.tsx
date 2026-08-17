@@ -172,7 +172,9 @@ export function ProductCard({
               : 'border-[1.5px] border-bark px-4 py-2.5 text-ink hover:bg-bark hover:text-ink-on-dark',
           )}
         >
-          {layout === 'feature' ? t('catalog:addToCart') : t('catalog:add')}
+          {/* The mock writes a bare "Add" on the compact card; one action,
+              one name everywhere was preferred over the shorter chip. */}
+          {t('catalog:addToCart')}
         </button>
       </div>
     </article>

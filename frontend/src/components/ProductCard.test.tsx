@@ -114,7 +114,7 @@ describe('ProductCard', () => {
     renderCard(soldOut)
 
     expect(screen.getByText('Out of stock')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add to cart' })).toBeDisabled()
   })
 
   it('stays in stock while ANY variant has some', () => {
@@ -128,14 +128,14 @@ describe('ProductCard', () => {
     renderCard(partial, () => {})
 
     expect(screen.queryByText('Out of stock')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Add to cart' })).toBeEnabled()
   })
 
   it('hands the product to the Add handler', () => {
     const onAdd = vi.fn()
     renderCard(product, onAdd)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }))
 
     expect(onAdd).toHaveBeenCalledWith(product)
   })
@@ -143,7 +143,7 @@ describe('ProductCard', () => {
   it('disables Add when no handler is wired (anonymous visitor)', () => {
     renderCard(product)
 
-    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add to cart' })).toBeDisabled()
   })
 
   it('links the name to the product page', () => {

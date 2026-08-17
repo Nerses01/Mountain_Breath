@@ -13,6 +13,7 @@ import type {
   ImageInput,
   NewReview,
   OrderStatus,
+  Product,
   ReviewStatus,
   UpdateProduct,
   User,
@@ -243,6 +244,32 @@ export function useSetCartItem() {
       qc.invalidateQueries({ queryKey: ['preview'] })
     },
   })
+}
+
+/**
+ * The product CARD's "Add to cart", shared by the home page, the shop grid
+ * and the wishlist. One contract in one place: the cheapest in-stock
+ * variant — the price the card is showing — one more than whatever the cart
+ * already holds.
+ *
+ * "+1", never "set to 1": setCartItem is a PUT of an absolute quantity, and
+ * three copies of this handler once disagreed on that — two sent qty 1, so
+ * every click after the first silently re-set the same quantity and the
+ * button looked dead. Returns undefined for a signed-out visitor, which the
+ * card renders as a disabled button.
+ */
+export function useQuickAdd(): ((product: Product) => void) | undefined {
+  const me = useMe()
+  const cart = useCart(!!me.data)
+  const setCartItem = useSetCartItem()
+
+  if (!me.data) return undefined
+  return (product) => {
+    const variant = product.variants.find((v) => v.stock_qty > 0)
+    if (!variant) return
+    const inCart = cart.data?.items.find((it) => it.variant_id === variant.id)?.qty ?? 0
+    setCartItem.mutate({ variantId: variant.id, qty: inCart + 1 })
+  }
 }
 
 export function useRemoveCartItem() {

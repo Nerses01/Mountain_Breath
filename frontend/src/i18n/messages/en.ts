@@ -99,7 +99,6 @@ export const en = {
     outOfStock: 'Out of stock',
     stockLeft: '{{count}} left',
     addToCart: 'Add to cart',
-    add: 'Add',
     all: 'All',
     back: '← Back to the catalogue',
     notFound: 'This product does not exist (anymore?).',

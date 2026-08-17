@@ -1,9 +1,8 @@
 import { Link } from 'react-router'
 import { Trans, useTranslation } from 'react-i18next'
-import { useCart, useMe, useSetCartItem, useWishlist } from '../api/hooks'
+import { useMe, useQuickAdd, useWishlist } from '../api/hooks'
 import { ProductCard } from '../components/ProductCard'
 import { useLocale } from '../i18n/useLocale'
-import type { Product } from '../api/types'
 
 /**
  * /wishlist — the saved shelf. The same ProductCard as the shop grid (a
@@ -16,8 +15,7 @@ export function WishlistPage() {
   const { localePath } = useLocale()
   const me = useMe()
   const wishlist = useWishlist(!!me.data)
-  const cart = useCart(!!me.data)
-  const setItem = useSetCartItem()
+  const quickAdd = useQuickAdd()
 
   if (me.isPending || (me.data && wishlist.isPending)) {
     return <Shell>{t('common:state.loading')}</Shell>
@@ -51,15 +49,6 @@ export function WishlistPage() {
 
   const products = wishlist.data ?? []
 
-  // The card's Add: same rule as the shop page — cheapest in-stock variant,
-  // one more than whatever the cart already holds.
-  function addToCart(product: Product) {
-    const variant = product.variants.find((v) => v.stock_qty > 0)
-    if (!variant) return
-    const inCart = cart.data?.items.find((it) => it.variant_id === variant.id)?.qty ?? 0
-    setItem.mutate({ variantId: variant.id, qty: inCart + 1 })
-  }
-
   return (
     <Shell>
       <h1 className="font-display text-display-md font-extrabold text-ink">
@@ -76,7 +65,7 @@ export function WishlistPage() {
       ) : (
         <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((p) => (
-            <ProductCard key={p.id} product={p} onAdd={addToCart} />
+            <ProductCard key={p.id} product={p} onAdd={quickAdd} />
           ))}
         </div>
       )}

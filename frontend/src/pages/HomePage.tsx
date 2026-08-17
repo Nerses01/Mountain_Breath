@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useMe, useProducts, useSetCartItem } from '../api/hooks'
-import type { Product } from '../api/types'
+import { useProducts, useQuickAdd } from '../api/hooks'
 import { ProductCard } from '../components/ProductCard'
 import {
   ArrowRightIcon,
@@ -31,15 +30,8 @@ export function HomePage() {
   // so the two pages agree about what "the shelf" looks like.
   const products = useProducts({ perPage: 6, sort: 'popular' })
 
-  const me = useMe()
-  const setCartItem = useSetCartItem()
-
-  // Same contract as the Shop page's Add: the cheapest in-stock variant —
-  // the price the card shows — one of it, straight into the cart.
-  const addToCart = (product: Product) => {
-    const variant = product.variants.find((v) => v.stock_qty > 0)
-    if (variant) setCartItem.mutate({ variantId: variant.id, qty: 1 })
-  }
+  // undefined while signed out, which the card renders as a disabled Add.
+  const quickAdd = useQuickAdd()
 
   // The home page IS the brand — bare title, the hero's blurb as the
   // description a search result shows.
@@ -213,14 +205,7 @@ export function HomePage() {
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
           {products.data?.items.map((p) => (
-            <ProductCard
-              key={p.id}
-              product={p}
-              layout="feature"
-              // Same rule as the shop grid: the cart needs an account, so a
-              // guest's button stays disabled rather than failing on click.
-              onAdd={me.data ? addToCart : undefined}
-            />
+            <ProductCard key={p.id} product={p} layout="feature" onAdd={quickAdd} />
           ))}
         </div>
       </section>

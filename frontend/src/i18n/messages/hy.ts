@@ -61,7 +61,6 @@ export const hy = {
     outOfStock: 'Առկա չէ',
     stockLeft: 'Մնացել է {{count}}',
     addToCart: 'Ավելացնել զամբյուղ',
-    add: 'Ավելացնել',
     all: 'Բոլորը',
     back: '← Վերադառնալ կատալոգ',
     notFound: 'Այս ապրանքը գոյություն չունի։',
