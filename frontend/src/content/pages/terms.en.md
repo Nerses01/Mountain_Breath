@@ -19,7 +19,7 @@ which returns it to us and we refund the goods.
 
 ## Returns
 
-Honey, tinctures and everything else edible are food: for safety we can
+Honey, propolis and everything else edible are food: for safety we can
 only take back unopened jars, within 14 days. Beeswax and candles come
 back within 14 days in any state that lets us sell them again. Broken or
 wrong deliveries are entirely on us — photo, message, replacement.

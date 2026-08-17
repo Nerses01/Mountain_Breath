@@ -237,7 +237,7 @@ export const en = {
       title: 'What the hive',
       titleAccent: 'does for you',
       blurb:
-        'Every jar and tincture on this shelf earns its place by what it does in the body. Here is the short version, with sources on each product page.',
+        'Every jar and pouch on this shelf earns its place by what it does in the body. Here is the short version, with sources on each product page.',
       link: 'See all benefits',
       items: {
         energy: { lead: 'Honey and pollen for', emphasis: 'steady natural energy' },

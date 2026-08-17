@@ -849,8 +849,8 @@
                   "pm.test(\"union of both chips\", () => {",
                   "    pm.expect(body.total).to.eql(4);",
                   "    pm.expect(slugs).to.include.members([",
-                  "        \"pure-beeswax-blocks\", \"raw-propolis-tincture\",",
-                  "        \"fresh-royal-jelly\", \"bee-venom-serum\"]);",
+                  "        \"pure-beeswax-blocks\", \"whole-propolis-crumbs\",",
+                  "        \"fresh-royal-jelly\", \"pure-bee-venom-powder\"]);",
                   "});",
                   "",
                   "pm.test(\"no product is listed twice\", () => {",
@@ -1073,7 +1073,7 @@
                   "    pm.expect(body.map(p => p.slug)).to.eql([",
                   "        \"mountain-wildflower-honey\",",
                   "        \"bee-pollen-granules\",",
-                  "        \"raw-propolis-tincture\"]);",
+                  "        \"whole-propolis-crumbs\"]);",
                   "});",
                   "",
                   "pm.test(\"related cards carry what a card renders\", () => {",
@@ -1189,13 +1189,13 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{apiV1}}/products/bee-venom-serum?lang=hy",
+              "raw": "{{apiV1}}/products/pure-bee-venom-powder?lang=hy",
               "host": [
                 "{{apiV1}}"
               ],
               "path": [
                 "products",
-                "bee-venom-serum"
+                "pure-bee-venom-powder"
               ],
               "query": [
                 {
@@ -1204,7 +1204,7 @@
                 }
               ]
             },
-            "description": "Decision #4 keys editorial rows BY LOCALE, so \"the Armenian bullets\" and \"the English bullets\" are separate lists rather than fields of one row. The fallback therefore happens per LIST: venom serum has Armenian highlights but no Armenian usage cards, so the whole English card set shows. Falling back per ROW would have interleaved two languages inside one panel."
+            "description": "Decision #4 keys editorial rows BY LOCALE, so \"the Armenian bullets\" and \"the English bullets\" are separate lists rather than fields of one row. The fallback therefore happens per LIST: venom powder has Armenian highlights but no Armenian usage cards, so the whole English card set shows. Falling back per ROW would have interleaved two languages inside one panel."
           },
           "event": [
             {
@@ -1685,13 +1685,13 @@
               }
             ],
             "url": {
-              "raw": "{{apiV1}}/products/bee-venom-serum/reviews",
+              "raw": "{{apiV1}}/products/pure-bee-venom-powder/reviews",
               "host": [
                 "{{apiV1}}"
               ],
               "path": [
                 "products",
-                "bee-venom-serum",
+                "pure-bee-venom-powder",
                 "reviews"
               ]
             },
@@ -3080,13 +3080,13 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{apiV1}}/products/raw-propolis-tincture?currency=AMD",
+              "raw": "{{apiV1}}/products/whole-propolis-crumbs?currency=AMD",
               "host": [
                 "{{apiV1}}"
               ],
               "path": [
                 "products",
-                "raw-propolis-tincture"
+                "whole-propolis-crumbs"
               ],
               "query": [
                 {
@@ -3095,7 +3095,7 @@
                 }
               ]
             },
-            "description": "The 100 ml tincture is seeded WITHOUT a dram shelf price, deliberately — it is the one variant that exercises the fallback. Its AMD figure is the USD price converted at the newest fx_rates row and snapped to the currency's rounding_step (10 drams), so it lands on 22,620 rather than a round number like its neighbours.\n\nA currency with neither a shelf price nor a rate produces no price at all: the storefront then shows one line instead of two, and checkout refuses with 409 price_unavailable rather than charging zero."
+            "description": "The 150 g pouch of propolis crumbs is seeded WITHOUT a dram shelf price, deliberately — it is the one variant that exercises the fallback. Its AMD figure is the USD price converted at the newest fx_rates row and snapped to the currency's rounding_step (10 drams), so it lands on 22,620 rather than a round number like its neighbours.\n\nA currency with neither a shelf price nor a rate produces no price at all: the storefront then shows one line instead of two, and checkout refuses with 409 price_unavailable rather than charging zero."
           },
           "response": [],
           "event": [
@@ -3106,7 +3106,7 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "",
-                  "const big = pm.response.json().variants.find((v) => v.label === \"100 ml\");",
+                  "const big = pm.response.json().variants.find((v) => v.label === \"150 g\");",
                   "",
                   "pm.test(\"converted price is a multiple of the rounding step\", () => {",
                   "    pm.expect(big.prices.AMD % 10).to.eql(0);",

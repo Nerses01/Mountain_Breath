@@ -1,8 +1,11 @@
 -- Development seed data: the six hive products of the design
 -- (docs/PLAN_ERA_2.md §1.1, decision #1 "catalog scope — apiary-only").
 --
--- Run with:
---   Get-Content backend\seed\seed.sql | docker exec -i mb-postgres psql -U mb -d mountain_breath
+-- Run by COPYING the file into the container, never by piping it through the
+-- console (Get-Content | psql re-encodes through the code page and silently
+-- mangles every non-ASCII byte — see CLAUDE.md "Migrations & seed"):
+--   docker compose -f deploy/docker-compose.dev.yml cp backend/seed/seed.sql postgres:/tmp/seed.sql
+--   docker compose -f deploy/docker-compose.dev.yml exec -T postgres psql -U mb -d mountain_breath -v ON_ERROR_STOP=1 -f /tmp/seed.sql
 --
 -- IDEMPOTENT AND CONVERGENT. Era I's seed used ON CONFLICT DO NOTHING, which
 -- makes re-running safe but not correct: a row that already exists keeps its
@@ -85,6 +88,24 @@ FROM (VALUES
 JOIN categories c ON c.slug = v.cat_slug
 ON CONFLICT (category_id, locale) DO UPDATE SET name = EXCLUDED.name;
 
+-- ── August 2026 renames: two products changed FORM, not just name ─────────
+-- The propolis is now sold as raw crumbs rather than a tincture, and the
+-- venom as pure dried powder rather than a serum. These are UPDATEs, not
+-- delete-and-reinsert: the product upsert below conflicts on slug, so a new
+-- slug would create a second product row and orphan the old one together
+-- with its reviews, wishlist rows and order history. Renaming in place keeps
+-- the ids, and a database that never had the old slugs matches zero rows and
+-- moves on — still convergent.
+UPDATE products SET slug = 'whole-propolis-crumbs' WHERE slug = 'raw-propolis-tincture';
+UPDATE products SET slug = 'pure-bee-venom-powder' WHERE slug = 'bee-venom-serum';
+
+-- Same reasoning one table down: order_items points at variant ids, so the
+-- SKUs are renamed rather than replaced. Labels change in the upsert below
+-- (ml became grams — a tincture is a liquid, crumbs and powder are weighed).
+UPDATE product_variants SET sku = 'PRO-CRM-50'  WHERE sku = 'PRO-TNC-30';
+UPDATE product_variants SET sku = 'PRO-CRM-150' WHERE sku = 'PRO-TNC-100';
+UPDATE product_variants SET sku = 'VEN-PWD-1'   WHERE sku = 'VEN-SRM-15';
+
 -- ── Products ──────────────────────────────────────────────────────────────
 -- badge is a KEY, not a sentence (migration 000009) — the three message
 -- catalogues own the wording. badge_tone is presentation: everything is the
@@ -103,8 +124,8 @@ FROM (VALUES
     ('beeswax', 'pure-beeswax-blocks', 'Pure Beeswax Blocks',
      'Oily wax secreted from bee glands to build honeycombs, used in candles and skin creams. Cast into 100 g blocks and boxed in fours.',
      'for_makers', 'honey', 42),
-    ('propolis', 'raw-propolis-tincture', 'Raw Propolis Tincture',
-     'Resinous bee glue collected from plants to seal and protect the hive, known for antimicrobial properties. Bottled in a dropper flask.',
+    ('propolis', 'whole-propolis-crumbs', 'Whole Propolis Crumbs',
+     'Resinous bee glue collected from plants to seal and protect the hive, known for antimicrobial properties. Frozen, cracked into crumbs and packed in a resealable pouch.',
      'immunity', 'honey', 96),
     ('royal-jelly', 'fresh-royal-jelly', 'Fresh Royal Jelly',
      'Milky fluid fed to queen larvae, used in health supplements and cosmetics. Kept chilled in a small dark jar from the hive to your door.',
@@ -112,8 +133,8 @@ FROM (VALUES
     ('bee-pollen', 'bee-pollen-granules', 'Bee Pollen Granules',
      'Flower pollen packed by bees, rich in protein and nutrients. Dried gently and sealed in a resealable pouch.',
      'protein', 'honey', 74),
-    ('bee-venom', 'bee-venom-serum', 'Bee Venom Serum',
-     'Secreted defense fluid sometimes used in alternative therapies. Blended into a light serum in a small glass bottle.',
+    ('bee-venom', 'pure-bee-venom-powder', 'Pure Bee Venom Powder',
+     'Secreted defense fluid sometimes used in alternative therapies. Collected on glass at the hive entrance, dried to a fine powder and sealed in a small glass vial.',
      'new', 'honey', 12)
 ) AS v(cat_slug, slug, name, description, badge, badge_tone, sales_count)
 JOIN categories c ON c.slug = v.cat_slug
@@ -132,7 +153,7 @@ ON CONFLICT (slug) DO UPDATE
 -- here is what makes an English full-text search rank this product properly
 -- rather than reaching two levels down to products.search_tsv.
 --
--- The container word ("jar", "dropper", "pouch") lives in this copy, because
+-- The container word ("jar", "pouch", "vial") lives in this copy, because
 -- variant labels are pure measurements — the E2 decision that the label is
 -- locale-invariant like sku and price_minor, so "500 g" needs no translation
 -- while "500 g jar" would.
@@ -153,12 +174,12 @@ FROM (VALUES
     ('pure-beeswax-blocks', 'ru', 'Чистый пчелиный воск в брусках',
      'Маслянистый воск, который пчёлы выделяют железами для постройки сот; идёт на свечи и кремы для кожи. Отлит брусками по 100 г, в коробке четыре.'),
 
-    ('raw-propolis-tincture', 'en', 'Raw Propolis Tincture',
-     'Resinous bee glue collected from plants to seal and protect the hive, known for antimicrobial properties. Bottled in a dropper flask.'),
-    ('raw-propolis-tincture', 'hy', 'Հում պրոպոլիսի թուրմ',
-     'Բույսերից հավաքված խեժային մեղվասոսինձ, որով մեղուները փակում և պաշտպանում են փեթակը. հայտնի է հակամանրէային հատկություններով։ Շշալցվում է կաթոցիկով սրվակի մեջ։'),
-    ('raw-propolis-tincture', 'ru', 'Настойка сырого прополиса',
-     'Смолистый пчелиный клей, собранный с растений: им пчёлы запечатывают и защищают улей. Известен антимикробными свойствами. Разлит во флакон с пипеткой.'),
+    ('whole-propolis-crumbs', 'en', 'Whole Propolis Crumbs',
+     'Resinous bee glue collected from plants to seal and protect the hive, known for antimicrobial properties. Frozen, cracked into crumbs and packed in a resealable pouch.'),
+    ('whole-propolis-crumbs', 'hy', 'Պրոպոլիսի ամբողջական փշրանք',
+     'Բույսերից հավաքված խեժային մեղվասոսինձ, որով մեղուները փակում և պաշտպանում են փեթակը. հայտնի է հակամանրէային հատկություններով։ Սառեցվում է, ջարդվում փշրանքի և փակվում կրկին փակվող տոպրակի մեջ։'),
+    ('whole-propolis-crumbs', 'ru', 'Крошка цельного прополиса',
+     'Смолистый пчелиный клей, собранный с растений: им пчёлы запечатывают и защищают улей. Известен антимикробными свойствами. Заморожен, раскрошен и упакован в пакет с застёжкой.'),
 
     ('fresh-royal-jelly', 'en', 'Fresh Royal Jelly',
      'Milky fluid fed to queen larvae, used in health supplements and cosmetics. Kept chilled in a small dark jar from the hive to your door.'),
@@ -174,12 +195,12 @@ FROM (VALUES
     ('bee-pollen-granules', 'ru', 'Гранулы пчелиной пыльцы',
      'Цветочная пыльца, собранная пчёлами: много белка и минералов. Бережно высушена и запечатана в пакет с застёжкой.'),
 
-    ('bee-venom-serum', 'en', 'Bee Venom Serum',
-     'Secreted defense fluid sometimes used in alternative therapies. Blended into a light serum in a small glass bottle.'),
-    ('bee-venom-serum', 'hy', 'Մեղվի թույնով շիճուկ',
-     'Պաշտպանական թույն, որը երբեմն կիրառվում է այլընտրանքային բուժման մեջ։ Խառնվում է թեթև շիճուկի մեջ՝ փոքրիկ ապակե սրվակով։'),
-    ('bee-venom-serum', 'ru', 'Сыворотка с пчелиным ядом',
-     'Защитный яд, который иногда применяют в альтернативной терапии. Смешан в лёгкую сыворотку во флаконе из стекла.')
+    ('pure-bee-venom-powder', 'en', 'Pure Bee Venom Powder',
+     'Secreted defense fluid sometimes used in alternative therapies. Collected on glass at the hive entrance, dried to a fine powder and sealed in a small glass vial.'),
+    ('pure-bee-venom-powder', 'hy', 'Մեղվի թույնի մաքուր փոշի',
+     'Պաշտպանական թույն, որը երբեմն կիրառվում է այլընտրանքային բուժման մեջ։ Հավաքվում է ապակու վրա՝ փեթակի մուտքի մոտ, չորացվում մանր փոշու և փակվում փոքրիկ ապակե սրվակի մեջ։'),
+    ('pure-bee-venom-powder', 'ru', 'Чистый порошок пчелиного яда',
+     'Защитный яд, который иногда применяют в альтернативной терапии. Собирается на стекле у летка, высушивается в мелкий порошок и запечатывается в маленький стеклянный флакон.')
 ) AS v(product_slug, locale, name, description)
 JOIN products p ON p.slug = v.product_slug
 ON CONFLICT (product_id, locale) DO UPDATE
@@ -199,14 +220,14 @@ FROM (VALUES
     ('mountain-wildflower-honey', 'energy'),
     ('mountain-wildflower-honey', 'sweetening'),
     ('pure-beeswax-blocks',       'skin'),
-    ('raw-propolis-tincture',     'immunity'),
+    ('whole-propolis-crumbs',     'immunity'),
     ('fresh-royal-jelly',         'energy'),
     ('fresh-royal-jelly',         'skin'),
     ('fresh-royal-jelly',         'recovery'),
     ('bee-pollen-granules',       'energy'),
     ('bee-pollen-granules',       'recovery'),
-    ('bee-venom-serum',           'recovery'),
-    ('bee-venom-serum',           'skin')
+    ('pure-bee-venom-powder',     'recovery'),
+    ('pure-bee-venom-powder',     'skin')
 ) AS v(product_slug, benefit_slug)
 JOIN products p ON p.slug = v.product_slug
 JOIN benefits b ON b.slug = v.benefit_slug
@@ -238,14 +259,14 @@ FROM (VALUES
     ('mountain-wildflower-honey', 'HON-WLD-1000', '1 kg',     18),
     ('pure-beeswax-blocks',       'WAX-BLK-4X100', '4 × 100 g', 25),
     ('pure-beeswax-blocks',       'WAX-BLK-10X100', '10 × 100 g', 8),
-    ('raw-propolis-tincture',     'PRO-TNC-30',  '30 ml',     30),
-    ('raw-propolis-tincture',     'PRO-TNC-100', '100 ml',     9),
+    ('whole-propolis-crumbs',     'PRO-CRM-50',  '50 g',      30),
+    ('whole-propolis-crumbs',     'PRO-CRM-150', '150 g',      9),
     ('fresh-royal-jelly',         'RJL-FRS-25',  '25 g',      14),
     ('fresh-royal-jelly',         'RJL-FRS-50',  '50 g',       6),
     ('fresh-royal-jelly',         'RJL-FRS-100', '100 g',      0),
     ('bee-pollen-granules',       'POL-GRN-250', '250 g',     35),
     ('bee-pollen-granules',       'POL-GRN-500', '500 g',     12),
-    ('bee-venom-serum',           'VEN-SRM-15',  '15 ml',     20)
+    ('pure-bee-venom-powder',     'VEN-PWD-1',   '1 g',       20)
 ) AS v(product_slug, sku, label, stock_qty)
 JOIN products p ON p.slug = v.product_slug
 ON CONFLICT (sku) DO UPDATE
@@ -268,32 +289,32 @@ FROM (VALUES
     ('HON-WLD-1000',   'USD',  2600), ('HON-WLD-1000',   'AMD', 12400),
     ('WAX-BLK-4X100',  'USD',   900), ('WAX-BLK-4X100',  'AMD',  4300),
     ('WAX-BLK-10X100', 'USD',  2000), ('WAX-BLK-10X100', 'AMD',  9600),
-    ('PRO-TNC-30',     'USD',  1900), ('PRO-TNC-30',     'AMD',  9100),
-    -- PRO-TNC-100 is deliberately left WITHOUT a dram price: it is the one
+    ('PRO-CRM-50',     'USD',  1900), ('PRO-CRM-50',     'AMD',  9100),
+    -- PRO-CRM-150 is deliberately left WITHOUT a dram price: it is the one
     -- variant that exercises the converted fallback, so the shop shows a
     -- computed 22,620 ֏ next to its round-numbered neighbours. Same argument
     -- as RJL-FRS-100's zero stock above — a dev database where every path is
     -- perfectly configured is one where the fallback is never looked at.
-    ('PRO-TNC-100',    'USD',  5800),
+    ('PRO-CRM-150',    'USD',  5800),
     ('RJL-FRS-25',     'USD',  3200), ('RJL-FRS-25',     'AMD', 15300),
     ('RJL-FRS-50',     'USD',  5800), ('RJL-FRS-50',     'AMD', 27700),
     ('RJL-FRS-100',    'USD', 10500), ('RJL-FRS-100',    'AMD', 50000),
     ('POL-GRN-250',    'USD',  1600), ('POL-GRN-250',    'AMD',  7600),
     ('POL-GRN-500',    'USD',  2900), ('POL-GRN-500',    'AMD', 13900),
-    ('VEN-SRM-15',     'USD',  2800), ('VEN-SRM-15',     'AMD', 13400)
+    ('VEN-PWD-1',      'USD',  2800), ('VEN-PWD-1',      'AMD', 13400)
 ) AS p(sku, currency, price_minor)
 JOIN product_variants v ON v.sku = p.sku
 ON CONFLICT (variant_id, currency) DO UPDATE
     SET price_minor = EXCLUDED.price_minor;
 
 -- Convergence, not tidiness: if an earlier run (or an admin experimenting in
--- dev) gave the 100 ml tincture a dram price, re-running the seed has to take
+-- dev) gave the 150 g pouch a dram price, re-running the seed has to take
 -- it away again, or the file stops describing the state it produces.
 DELETE FROM variant_prices vp
 USING product_variants v
 WHERE vp.variant_id = v.id
   AND vp.currency = 'AMD'
-  AND v.sku = 'PRO-TNC-100';
+  AND v.sku = 'PRO-CRM-150';
 
 -- ══════════════════════════════════════════════════════════════════════════
 -- E3: the product page's editorial half
@@ -319,13 +340,13 @@ SET lab_batch = v.lab_batch, is_cold_chain = v.is_cold_chain
 FROM (VALUES
     ('mountain-wildflower-honey', 'WH-0626', FALSE),
     ('pure-beeswax-blocks',       'BW-0526', FALSE),
-    ('raw-propolis-tincture',     'PR-0426', FALSE),
+    ('whole-propolis-crumbs',     'PR-0426', FALSE),
     -- The one product the design marks "Cold chain", and the reason the
     -- column is a BOOLEAN: E6 charges chilled shipping off this, and a
     -- translated string could not be reasoned about.
     ('fresh-royal-jelly',         'RJ-0626', TRUE),
     ('bee-pollen-granules',       'BP-0626', FALSE),
-    ('bee-venom-serum',           'BV-0326', FALSE)
+    ('pure-bee-venom-powder',     'BV-0326', FALSE)
 ) AS v(slug, lab_batch, is_cold_chain)
 WHERE p.slug = v.slug;
 
@@ -364,17 +385,17 @@ FROM (VALUES
      'Хранится годами в прохладном сухом шкафу. Холодильник не нужен.',
      'Июль 2026, ульи 3–9', 'Доставка 2–4 дня'),
 
-    ('raw-propolis-tincture', 'en',
+    ('whole-propolis-crumbs', 'en',
      'Not a medicine. Avoid if you are allergic to bee products.',
-     'Store the bottle upright in a dark place. The tincture keeps its strength for two years.',
+     'Keep the pouch sealed in a cool, dark cupboard. The crumbs soften in a warm hand and harden again — both are normal. They keep for years.',
      'April 2026, Hives 20–24', 'Ships in 2–4 days'),
-    ('raw-propolis-tincture', 'hy',
+    ('whole-propolis-crumbs', 'hy',
      'Դեղամիջոց չէ։ Խուսափեք, եթե ալերգիա ունեք մեղվի արտադրանքի նկատմամբ։',
-     'Պահել շիշը ուղղահայաց՝ մութ տեղում։ Թուրմը պահպանում է ուժը երկու տարի։',
+     'Պահեք տոպրակը փակ՝ զով, մութ պահարանում։ Փշրանքը տաք ձեռքում փափկում է և նորից պնդանում — երկուսն էլ բնական են։ Պահպանվում է տարիներ։',
      '2026 ապրիլ, փեթակներ 20–24', 'Առաքվում է 2–4 օրում'),
-    ('raw-propolis-tincture', 'ru',
+    ('whole-propolis-crumbs', 'ru',
      'Не лекарство. Избегайте при аллергии на продукты пчеловодства.',
-     'Храните флакон вертикально в тёмном месте. Настойка держит силу два года.',
+     'Держите пакет закрытым в прохладном тёмном шкафу. В тёплой руке крошка размягчается и снова твердеет — и то и другое нормально. Хранится годами.',
      'Апрель 2026, ульи 20–24', 'Доставка 2–4 дня'),
 
     ('fresh-royal-jelly', 'en',
@@ -403,17 +424,17 @@ FROM (VALUES
      'Закрывайте пакет после каждого раза и держите сухим. Холодильник продлевает срок, но не обязателен.',
      'Май 2026, ульи 5–11', 'Доставка 2–4 дня'),
 
-    ('bee-venom-serum', 'en',
-     'Not a medicine. Patch-test on a small area first, and do not use if you are allergic to bee stings.',
-     'Room temperature, cap closed, away from sunlight. Use within six months of opening.',
+    ('pure-bee-venom-powder', 'en',
+     'A potent raw material, not a medicine. Do not use if you are allergic to bee stings, and keep out of reach of children.',
+     'Keep the vial tightly closed, dry and away from light. Dry venom holds its potency for years.',
      'March 2026, Hives 30–33', 'Ships in 2–4 days'),
-    ('bee-venom-serum', 'hy',
-     'Դեղամիջոց չէ։ Նախ փորձարկեք փոքր հատվածի վրա և մի օգտագործեք, եթե ալերգիա ունեք մեղվի խայթոցի նկատմամբ։',
-     'Սենյակային ջերմաստիճան, փակ խցան, արևից հեռու։ Օգտագործել բացելուց հետո վեց ամսվա ընթացքում։',
+    ('pure-bee-venom-powder', 'hy',
+     'Հզոր հումք է, ոչ դեղամիջոց։ Մի օգտագործեք, եթե ալերգիա ունեք մեղվի խայթոցի նկատմամբ, և պահեք երեխաներից հեռու։',
+     'Պահեք սրվակը պինդ փակ՝ չոր և արևից հեռու։ Չոր թույնը պահպանում է ուժը տարիներ։',
      '2026 մարտ, փեթակներ 30–33', 'Առաքվում է 2–4 օրում'),
-    ('bee-venom-serum', 'ru',
-     'Не лекарство. Сначала сделайте тест на небольшом участке и не используйте при аллергии на укусы пчёл.',
-     'Комнатная температура, флакон закрыт, вдали от солнца. Использовать в течение шести месяцев после вскрытия.',
+    ('pure-bee-venom-powder', 'ru',
+     'Сильное сырьё, а не лекарство. Не используйте при аллергии на укусы пчёл и держите подальше от детей.',
+     'Держите флакон плотно закрытым, сухим и вдали от света. Сухой яд сохраняет силу годами.',
      'Март 2026, ульи 30–33', 'Доставка 2–4 дня')
 ) AS v(product_slug, locale, disclaimer, storage_note, harvest_note, shipping_note)
 JOIN products p ON p.slug = v.product_slug
@@ -429,8 +450,8 @@ WHERE t.product_id = p.id AND t.locale = v.locale;
 -- seed must CONVERGE, which for a positional collection means replace.
 DELETE FROM product_highlights
 WHERE product_id IN (SELECT id FROM products WHERE slug IN (
-    'mountain-wildflower-honey', 'pure-beeswax-blocks', 'raw-propolis-tincture',
-    'fresh-royal-jelly', 'bee-pollen-granules', 'bee-venom-serum'));
+    'mountain-wildflower-honey', 'pure-beeswax-blocks', 'whole-propolis-crumbs',
+    'fresh-royal-jelly', 'bee-pollen-granules', 'pure-bee-venom-powder'));
 
 INSERT INTO product_highlights (product_id, locale, sort_order, text)
 SELECT p.id, v.locale, v.sort_order, v.text
@@ -455,15 +476,15 @@ FROM (VALUES
     ('pure-beeswax-blocks', 'ru', 1, 'Горит медленно и без копоти в литых свечах'),
     ('pure-beeswax-blocks', 'ru', 2, 'Ничего не добавлено — ни парафина, ни отбеливания, ни отдушек'),
 
-    ('raw-propolis-tincture', 'en', 0, 'Known for antimicrobial and antifungal activity'),
-    ('raw-propolis-tincture', 'en', 1, 'Traditionally taken at the first sign of a sore throat'),
-    ('raw-propolis-tincture', 'en', 2, 'Collected by hand from the hive, never scraped from frames'),
-    ('raw-propolis-tincture', 'hy', 0, 'Հայտնի է հակամանրէային և հակասնկային ազդեցությամբ'),
-    ('raw-propolis-tincture', 'hy', 1, 'Ավանդաբար ընդունվում է կոկորդի ցավի առաջին նշանից'),
-    ('raw-propolis-tincture', 'hy', 2, 'Հավաքվում է ձեռքով փեթակից, երբեք չի քերվում շրջանակներից'),
-    ('raw-propolis-tincture', 'ru', 0, 'Известен противомикробным и противогрибковым действием'),
-    ('raw-propolis-tincture', 'ru', 1, 'Традиционно принимают при первых признаках боли в горле'),
-    ('raw-propolis-tincture', 'ru', 2, 'Собран вручную из улья, а не соскоблен с рамок'),
+    ('whole-propolis-crumbs', 'en', 0, 'Known for antimicrobial and antifungal activity'),
+    ('whole-propolis-crumbs', 'en', 1, 'Traditionally chewed a piece at a time at the first sign of a sore throat'),
+    ('whole-propolis-crumbs', 'en', 2, 'Cleaned by hand and left whole — nothing extracted, nothing added'),
+    ('whole-propolis-crumbs', 'hy', 0, 'Հայտնի է հակամանրէային և հակասնկային ազդեցությամբ'),
+    ('whole-propolis-crumbs', 'hy', 1, 'Ավանդաբար ծամում են կտոր առ կտոր՝ կոկորդի ցավի առաջին նշանից'),
+    ('whole-propolis-crumbs', 'hy', 2, 'Մաքրված է ձեռքով և թողնված ամբողջական — ոչինչ չի կորզվել, ոչինչ չի ավելացվել'),
+    ('whole-propolis-crumbs', 'ru', 0, 'Известен противомикробным и противогрибковым действием'),
+    ('whole-propolis-crumbs', 'ru', 1, 'Традиционно жуют по кусочку при первых признаках боли в горле'),
+    ('whole-propolis-crumbs', 'ru', 2, 'Очищен вручную и оставлен цельным — ничего не извлечено и не добавлено'),
 
     ('fresh-royal-jelly', 'en', 0, 'Supports energy and stamina through the season change'),
     ('fresh-royal-jelly', 'en', 1, 'Used in cosmetics for skin elasticity and repair'),
@@ -485,15 +506,15 @@ FROM (VALUES
     ('bee-pollen-granules', 'ru', 1, 'Медленный ровный подъём, а не сахарный скачок'),
     ('bee-pollen-granules', 'ru', 2, 'Сушится ниже температуры улья, поэтому ферменты сохраняются'),
 
-    ('bee-venom-serum', 'en', 0, 'Used in apitherapy for stiff joints and tired muscles'),
-    ('bee-venom-serum', 'en', 1, 'Blended at a low concentration into a light, fast-absorbing base'),
-    ('bee-venom-serum', 'en', 2, 'Venom collected without harming the bees'),
-    ('bee-venom-serum', 'hy', 0, 'Օգտագործվում է ապիթերապիայում՝ կարկամած հոդերի և հոգնած մկանների համար'),
-    ('bee-venom-serum', 'hy', 1, 'Խառնված է ցածր խտությամբ՝ թեթև, արագ ներծծվող հիմքի մեջ'),
-    ('bee-venom-serum', 'hy', 2, 'Թույնը հավաքվում է առանց մեղուներին վնասելու'),
-    ('bee-venom-serum', 'ru', 0, 'Применяется в апитерапии при скованных суставах и усталых мышцах'),
-    ('bee-venom-serum', 'ru', 1, 'Смешан в низкой концентрации с лёгкой, быстро впитывающейся основой'),
-    ('bee-venom-serum', 'ru', 2, 'Яд собирается без вреда для пчёл')
+    ('pure-bee-venom-powder', 'en', 0, 'Used in apitherapy for stiff joints and tired muscles'),
+    ('pure-bee-venom-powder', 'en', 1, 'Nothing but venom — dried whole, no base, no filler'),
+    ('pure-bee-venom-powder', 'en', 2, 'Venom collected without harming the bees'),
+    ('pure-bee-venom-powder', 'hy', 0, 'Օգտագործվում է ապիթերապիայում՝ կարկամած հոդերի և հոգնած մկանների համար'),
+    ('pure-bee-venom-powder', 'hy', 1, 'Ոչինչ, բացի թույնից — չորացված ամբողջությամբ, առանց հիմքի և լցանյութի'),
+    ('pure-bee-venom-powder', 'hy', 2, 'Թույնը հավաքվում է առանց մեղուներին վնասելու'),
+    ('pure-bee-venom-powder', 'ru', 0, 'Применяется в апитерапии при скованных суставах и усталых мышцах'),
+    ('pure-bee-venom-powder', 'ru', 1, 'Ничего, кроме яда — высушен целиком, без основы и наполнителей'),
+    ('pure-bee-venom-powder', 'ru', 2, 'Яд собирается без вреда для пчёл')
 ) AS v(product_slug, locale, sort_order, text)
 JOIN products p ON p.slug = v.product_slug;
 
@@ -503,8 +524,8 @@ JOIN products p ON p.slug = v.product_slug;
 -- which is the behaviour store.attachUsageCards implements.
 DELETE FROM product_usage_cards
 WHERE product_id IN (SELECT id FROM products WHERE slug IN (
-    'mountain-wildflower-honey', 'pure-beeswax-blocks', 'raw-propolis-tincture',
-    'fresh-royal-jelly', 'bee-pollen-granules', 'bee-venom-serum'));
+    'mountain-wildflower-honey', 'pure-beeswax-blocks', 'whole-propolis-crumbs',
+    'fresh-royal-jelly', 'bee-pollen-granules', 'pure-bee-venom-powder'));
 
 INSERT INTO product_usage_cards (product_id, locale, sort_order, kicker, title, body)
 SELECT p.id, v.locale, v.sort_order, v.kicker, v.title, v.body
@@ -515,11 +536,11 @@ FROM (VALUES
 
     ('pure-beeswax-blocks', 'en', 0, 'Balms', 'One part wax', 'Three parts oil to one part wax by weight gives a salve that holds its shape in a tin without going hard.'),
     ('pure-beeswax-blocks', 'en', 1, 'Candles', 'Melt low and slow', 'A water bath, never direct heat. Beeswax scorches, and scorched wax smells like nothing you want in a room.'),
-    ('pure-beeswax-blocks', 'en', 2, 'Pairs with', 'Propolis', 'A few drops of tincture in a balm base is the classic winter hand salve.'),
+    ('pure-beeswax-blocks', 'en', 2, 'Pairs with', 'Propolis', 'A spoonful of crumbs melted into the warm oil makes the classic winter hand salve.'),
 
-    ('raw-propolis-tincture', 'en', 0, 'Daily', 'Ten drops in water', 'The resin will cloud the glass — that is the propolis coming out of the alcohol, not a fault.'),
-    ('raw-propolis-tincture', 'en', 1, 'Course', 'Two weeks on', 'Then a week off. Most people run it through the changeable weeks of autumn.'),
-    ('raw-propolis-tincture', 'en', 2, 'Pairs with', 'Honey', 'A spoon of honey after the drops takes the sting out of the taste.'),
+    ('whole-propolis-crumbs', 'en', 0, 'Daily', 'A pea-sized piece', 'Chew it slowly like gum for half an hour. The resin sticks to teeth at first and stops once it warms.'),
+    ('whole-propolis-crumbs', 'en', 1, 'Course', 'Two weeks on', 'Then a week off. Most people run it through the changeable weeks of autumn.'),
+    ('whole-propolis-crumbs', 'en', 2, 'Pairs with', 'Honey', 'A spoon of honey after chewing takes the bitterness off the back of the tongue.'),
 
     ('fresh-royal-jelly', 'en', 0, 'Morning', 'A grain of rice', 'Under the tongue before breakfast, on an empty stomach. Let it dissolve rather than swallowing.'),
     ('fresh-royal-jelly', 'en', 1, 'Course', 'Three weeks on', 'Then a week off. Most people run a course at the turn of autumn and again in early spring.'),
@@ -535,9 +556,9 @@ FROM (VALUES
     ('bee-pollen-granules', 'en', 1, 'Daily', 'A teaspoon', 'In yoghurt, on porridge, or chewed on their own if you like the taste of a meadow.'),
     ('bee-pollen-granules', 'en', 2, 'Pairs with', 'Honey', 'Honey and pollen together are the oldest breakfast on this shelf.'),
 
-    ('bee-venom-serum', 'en', 0, 'First', 'Patch-test', 'Inside the forearm, and wait a day. Bee venom is exactly as serious as it sounds if you react to stings.'),
-    ('bee-venom-serum', 'en', 1, 'Use', 'A thin layer', 'Massage into the joint or muscle until it disappears. A warm tingle is expected; burning is not.'),
-    ('bee-venom-serum', 'en', 2, 'Pairs with', 'Beeswax balm', 'A wax balm over the top holds the serum against the skin for longer.')
+    ('pure-bee-venom-powder', 'en', 0, 'First', 'Patch-test', 'Mix a trace into a drop of oil on the inside of the forearm and wait a day. Bee venom is exactly as serious as it sounds if you react to stings.'),
+    ('pure-bee-venom-powder', 'en', 1, 'Use', 'A knife-tip, diluted', 'Never neat: blend a knife-tip into a balm or oil base and massage into the joint or muscle. A warm tingle is expected; burning is not.'),
+    ('pure-bee-venom-powder', 'en', 2, 'Pairs with', 'Beeswax balm', 'A wax balm is the classic carrier — it holds the venom against the skin and slows its release.')
 ) AS v(product_slug, locale, sort_order, kicker, title, body)
 JOIN products p ON p.slug = v.product_slug;
 
@@ -556,7 +577,7 @@ SELECT src.id, dst.id, v.sort_order
 FROM (VALUES
     ('fresh-royal-jelly', 'mountain-wildflower-honey', 0),
     ('fresh-royal-jelly', 'bee-pollen-granules',       1),
-    ('fresh-royal-jelly', 'raw-propolis-tincture',     2)
+    ('fresh-royal-jelly', 'whole-propolis-crumbs',     2)
 ) AS v(product_slug, related_slug, sort_order)
 JOIN products src ON src.slug = v.product_slug
 JOIN products dst ON dst.slug = v.related_slug
@@ -642,9 +663,9 @@ FROM (VALUES
     ('fresh-royal-jelly', 'sergey@example.com', 4, 'Doing the three-week course',
      'Too early to say much about the effect, but the quality is obvious and the instructions on the page were clear.', 'published'),
 
-    ('raw-propolis-tincture', 'vahe@example.com', 5, 'Kept a sore throat away',
-     'Ten drops in water at the first scratchy morning. Tastes medicinal, which I take as a good sign.', 'published'),
-    ('raw-propolis-tincture', 'mariam@example.com', 3, 'Works, but the taste is brutal',
+    ('whole-propolis-crumbs', 'vahe@example.com', 5, 'Kept a sore throat away',
+     'A pea-sized piece chewed at the first scratchy morning. Tastes medicinal, which I take as a good sign.', 'published'),
+    ('whole-propolis-crumbs', 'mariam@example.com', 3, 'Works, but the taste is brutal',
      'No complaints about the product itself. Follow their advice and chase it with honey.', 'published'),
 
     ('bee-pollen-granules', 'sergey@example.com', 5, 'On the morning yoghurt',
@@ -655,8 +676,8 @@ FROM (VALUES
 
     -- Awaiting moderation: the queue needs rows, and these also prove that
     -- pending reviews do NOT move the public average.
-    ('bee-venom-serum', 'anahit@example.com', 4, 'Careful with the patch test',
-     'Did the forearm test for a full day first, as they say to. Warm tingle, no reaction. Early days.', 'pending'),
+    ('pure-bee-venom-powder', 'anahit@example.com', 4, 'Careful with the patch test',
+     'Mixed a speck into oil for the forearm test and waited a full day, as they say to. Warm tingle, no reaction. Early days.', 'pending'),
     ('bee-pollen-granules', 'vahe@example.com', 2, 'Not for me',
      'No fault of theirs — I just could not get used to the taste.', 'pending')
 ) AS v(product_slug, email, rating, title, body, status)

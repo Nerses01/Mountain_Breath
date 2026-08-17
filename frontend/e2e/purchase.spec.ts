@@ -33,7 +33,7 @@ test('a new customer can buy a product end to end', async ({ page }) => {
   // makes it assertable from outside the app.
   await page.getByRole('button', { name: /^Propolis/ }).click()
   await expect(page).toHaveURL(/category=propolis/)
-  await expect(page.getByRole('link', { name: 'Raw Propolis Tincture' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Whole Propolis Crumbs' })).toBeVisible()
 
   // ...and the back button undoes it, which a useState implementation would
   // fail while passing every click-based test.

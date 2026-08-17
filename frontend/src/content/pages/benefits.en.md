@@ -1,6 +1,6 @@
 # What the hive does for you
 
-Every jar and tincture on this shelf earns its place by what it does in the
+Every jar and pouch on this shelf earns its place by what it does in the
 body. Here is the honest version — what tradition says, what studies
 suggest, and where the line is.
 
