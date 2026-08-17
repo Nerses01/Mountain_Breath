@@ -201,12 +201,7 @@ export function ProductPage() {
             <Stars rating={p.rating_avg} count={p.rating_count} />
           </div>
 
-          <div className="flex items-start justify-between gap-4">
-            <h1 className="font-display text-display-md font-extrabold text-ink lg:text-display-lg">{p.name}</h1>
-            {/* E8: the page-level heart — same shared component as the
-                card's, so the two can never disagree about this product. */}
-            <WishlistHeart productId={p.id} className="mt-2 shrink-0" />
-          </div>
+          <h1 className="font-display text-display-md font-extrabold text-ink lg:text-display-lg">{p.name}</h1>
 
           <p className="text-lg leading-relaxed text-ink-body">{p.description}</p>
 
@@ -323,9 +318,11 @@ export function ProductPage() {
               </Button>
             )}
 
-            {/* E10 audit find: this was still E3's disabled placeholder —
-                E8 wired the title heart and missed this one. Same shared
-                component now, so the two hearts cannot disagree. */}
+            {/* The page's ONE heart. The mock draws a second next to the
+                title; two controls doing the same thing on one page is a
+                choice a keyboard or screen-reader user pays for twice, so
+                the title heart was dropped and this one — beside the action
+                it belongs with — stayed. */}
             <WishlistHeart productId={p.id} className="size-13.5" />
           </div>
 
