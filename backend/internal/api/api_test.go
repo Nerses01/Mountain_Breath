@@ -91,7 +91,7 @@ type fakeStore struct {
 	// editorial fakes: handler tests prove requests become the right calls;
 	// the store's own behaviour has the Docker-backed suite.
 	wishlist        map[int64]bool // product id → hearted
-	wishlistItems   []domain.Product
+	wishlistItems   []domain.WishlistItem
 	savedForLater   int64
 	resetUserID     int64
 	resetToken      string
@@ -463,9 +463,15 @@ func (f *fakeStore) UpdateOrderStatus(_ context.Context, _ int64, _ string) (dom
 
 // --- AccountStore (E8) ---
 
-func (f *fakeStore) ListWishlist(_ context.Context, _ int64, view domain.View) ([]domain.Product, error) {
+func (f *fakeStore) ListWishlist(_ context.Context, _ int64, view domain.View) ([]domain.WishlistItem, error) {
 	f.lastCurrency = view.EffectiveCurrency()
 	return f.wishlistItems, nil
+}
+
+// AddWishlistToCart hands back a canned report, like Reorder — the merge
+// logic is the store suite's job.
+func (f *fakeStore) AddWishlistToCart(_ context.Context, _ int64) (domain.ReorderResult, error) {
+	return f.reorderResult, nil
 }
 
 func (f *fakeStore) AddWishlistItem(_ context.Context, _ int64, productID int64) error {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -21,21 +22,52 @@ import (
 // list, client-side: six products make membership a set lookup, not an
 // endpoint.
 
+// A3: the card shape plus WHEN it was saved. An embedded struct, so the
+// JSON stays flat — a wishlist row is a product card with one extra field,
+// not a wrapper object the client has to unwrap.
+type wishlistItemResponse struct {
+	productResponse
+	SavedAt time.Time `json:"saved_at"`
+}
+
 func (s *Server) handleListWishlist(w http.ResponseWriter, r *http.Request) {
 	user, _ := userFrom(r.Context())
 
 	view := viewFromContext(r.Context())
-	products, err := s.store.ListWishlist(r.Context(), user.ID, view)
+	items, err := s.store.ListWishlist(r.Context(), user.ID, view)
 	if err != nil {
 		s.log.Error("listing wishlist", "error", err)
 		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 		return
 	}
-	resp := make([]productResponse, 0, len(products))
-	for _, p := range products {
-		resp = append(resp, toProductResponse(p, view.EffectiveCurrency()))
+	resp := make([]wishlistItemResponse, 0, len(items))
+	for _, it := range items {
+		resp = append(resp, wishlistItemResponse{
+			productResponse: toProductResponse(it.Product, view.EffectiveCurrency()),
+			SavedAt:         it.SavedAt,
+		})
 	}
 	s.respondJSON(w, http.StatusOK, resp)
+}
+
+// POST /wishlist/add-all — one of each saved, in-stock product into the
+// cart (A3). The reorder endpoint's sibling: same store transaction shape,
+// same line-by-line response, same "200 even when everything was skipped".
+func (s *Server) handleWishlistAddAll(w http.ResponseWriter, r *http.Request) {
+	user, _ := userFrom(r.Context())
+
+	res, err := s.store.AddWishlistToCart(r.Context(), user.ID)
+	if err != nil {
+		s.log.Error("adding wishlist to cart", "error", err)
+		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
+
+	lines := make([]reorderLineResponse, 0, len(res.Lines))
+	for _, l := range res.Lines {
+		lines = append(lines, reorderLineResponse{Name: l.Name, Label: l.Label, Qty: l.Qty, Issue: l.Issue})
+	}
+	s.respondJSON(w, http.StatusOK, reorderResponse{Lines: lines})
 }
 
 // PUT and DELETE with set-semantics, like the cart: the URL names the

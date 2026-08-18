@@ -17,6 +17,48 @@ Template for an entry:
 
 ---
 
+## 2026-08-18 — Phase A3: the wishlist screen (canvas 08)
+
+**Worked on:** `saved_at` on the wishlist read (`domain.WishlistItem`
+embedding Product; the DTO embedding productResponse for flat JSON),
+`POST /wishlist/add-all` reusing A2's `ReorderResult` contract, the
+canvas-08 frontend — `WishlistCard` (saved-ago via
+`Intl.RelativeTimeFormat`), worth-total header, add-all with the shared
+`ReorderReport` banner, dashed save-more slot, the price-drop-alerts
+honest stub in the rail — strings ×3, tests at every layer.
+
+**Learned:**
+
+- **Embedding is the Go answer twice in one feature:** domain
+  `WishlistItem{Product; SavedAt}` promotes every Product field (no
+  is-a inheritance, just forwarding), and the DTO embeds
+  `productResponse` so JSON marshals FLAT — a wishlist row is a product
+  card plus one field, not a wrapper the client unwraps.
+- **A shared result contract is worth more than a shared endpoint.**
+  Add-all is not reorder, but returning the same `{lines: [...]}` shape
+  meant zero new client vocabulary: same banner, same issue codes, same
+  translations. Design the RESPONSE for reuse even when the requests
+  differ.
+- **Two queries can beat one parameter.** `saved_at` could have been
+  threaded through the shared `productCards` helper — four callers,
+  three of which would ignore the new column. A second tiny query in
+  the one caller that needs it keeps the helper's signature honest.
+- **Absent beats stubbed for per-item controls.** The screen-level
+  alerts card can carry a "not wired yet" note; a per-card "Notify me"
+  cannot — it would be twenty dead buttons. The deferral pattern
+  scales by SURFACE: one honest card, zero fake buttons.
+- **`Intl.RelativeTimeFormat` + fake timers:** the platform formats
+  "2 weeks ago" in all three languages; the test freezes `Date` (and
+  ONLY Date — faking all timers would stall the test's own promises)
+  so "14 days before now" is a constant.
+
+**Questions / to revisit:**
+- Add-all picks a product's first variant by id, not the cheapest
+  in-stock one — revisit if variant counts grow beyond royal jelly's
+  three.
+
+---
+
 ## 2026-08-18 — Phase A2: the orders screen (canvas 07)
 
 **Worked on:** settled PLAN_ACCOUNT.md's remaining decisions (#2–#8, log

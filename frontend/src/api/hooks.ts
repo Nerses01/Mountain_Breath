@@ -369,6 +369,18 @@ export function useReorder() {
   })
 }
 
+/** A3: the wishlist's "Add all to cart" — same contract as useReorder. */
+export function useAddWishlistToCart() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.addWishlistToCart,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cart'] })
+      qc.invalidateQueries({ queryKey: ['preview'] })
+    },
+  })
+}
+
 // The confirmation page's read. No locale or currency in the key: an order
 // is a frozen record — its snapshots do not change with the viewer's
 // language or market, so one cache entry serves every view of it.

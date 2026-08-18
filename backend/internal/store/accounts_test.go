@@ -184,6 +184,10 @@ func TestWishlist_ListsCardsNewestFirst(t *testing.T) {
 	if len(items[0].Variants) == 0 || items[0].Variants[0].PriceMinor != 1400 {
 		t.Error("wishlist card came back without its price — it must render like any grid card")
 	}
+	// A3: every card carries WHEN it was hearted.
+	if items[0].SavedAt.IsZero() {
+		t.Error("saved_at missing — the canvas's \"saved N ago\" line has nothing to render")
+	}
 
 	var rawRows int
 	if err := testPool.QueryRow(ctx,
@@ -311,4 +315,65 @@ func TestFindOrCreateOAuthUser(t *testing.T) {
 			t.Errorf("%d identities on the account, want 1", identities)
 		}
 	})
+}
+
+// A3: "Add all to cart" is the reorder merge's sibling — one of each saved
+// product, first variant with room, partial success reported per line.
+func TestAddWishlistToCart(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test (needs Docker)")
+	}
+	resetDB(t)
+	s := store.New(testPool)
+	ctx := context.Background()
+
+	seedPricedProduct(t, "honey", "HON-1", 10, domain.Money{domain.CurrencyUSD: 1400})
+	seedPricedProduct(t, "comb", "COMB-1", 0, domain.Money{domain.CurrencyUSD: 2200})
+	userID := seedUser(t, "addall@test.local")
+
+	var honeyID, combID int64
+	if err := testPool.QueryRow(ctx, `SELECT id FROM products WHERE slug = 'honey'`).Scan(&honeyID); err != nil {
+		t.Fatal(err)
+	}
+	if err := testPool.QueryRow(ctx, `SELECT id FROM products WHERE slug = 'comb'`).Scan(&combID); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []int64{honeyID, combID} {
+		if err := s.AddWishlistItem(ctx, userID, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	res, err := s.AddWishlistToCart(ctx, userID)
+	if err != nil {
+		t.Fatalf("AddWishlistToCart: %v", err)
+	}
+	if len(res.Lines) != 2 {
+		t.Fatalf("lines = %+v, want 2", res.Lines)
+	}
+
+	byName := map[string]domain.ReorderLine{}
+	for _, l := range res.Lines {
+		byName[l.Name] = l
+	}
+	if l := byName["honey"]; l.Qty != 1 || l.Issue != "" {
+		t.Errorf("honey line = %+v, want one added cleanly", l)
+	}
+	if l := byName["comb"]; l.Qty != 0 || l.Issue != domain.ReorderOutOfStock {
+		t.Errorf("comb line = %+v, want out_of_stock skip", l)
+	}
+
+	// Running it again MERGES: the honey line becomes qty 2.
+	if _, err := s.AddWishlistToCart(ctx, userID); err != nil {
+		t.Fatal(err)
+	}
+	var qty int
+	if err := testPool.QueryRow(ctx, `
+		SELECT COALESCE(sum(qty), 0) FROM cart_items WHERE user_id = $1`,
+		userID).Scan(&qty); err != nil {
+		t.Fatal(err)
+	}
+	if qty != 2 {
+		t.Errorf("cart qty = %d, want 2 (1 + 1 merged)", qty)
+	}
 }

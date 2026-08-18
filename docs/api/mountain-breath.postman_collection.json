@@ -4137,7 +4137,7 @@
                 "wishlist"
               ]
             },
-            "description": "Product CARDS, not a leaner wishlist DTO — a wishlist is a shelf of saved cards, and the heart's on/off state everywhere in the UI derives from this one list client-side."
+            "description": "Product CARDS, not a leaner wishlist DTO — a wishlist is a shelf of saved cards, and the heart's on/off state everywhere in the UI derives from this one list client-side. A3 adds `saved_at` to each card — when the heart was set, for the \"saved N ago\" line."
           },
           "response": [],
           "event": [
@@ -4151,6 +4151,46 @@
                   "pm.test(\"carries the hearted product as a full card\", () => {",
                   "    const ids = pm.response.json().map(p => p.id);",
                   "    pm.expect(ids).to.include(Number(pm.collectionVariables.get(\"wishlistProductId\")));",
+                  "});",
+                  "",
+                  "pm.test(\"each card says when it was saved (A3)\", () => {",
+                  "    for (const p of pm.response.json()) {",
+                  "        pm.expect(p.saved_at).to.be.a(\"string\");",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add all to cart",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/wishlist/add-all",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "wishlist",
+                "add-all"
+              ]
+            },
+            "description": "A3: one of each saved, in-stock product into the cart — the reorder endpoint's sibling (same transaction shape, same line-by-line response, same 200-even-if-all-skipped). Per product the first variant with room is chosen and qty 1 MERGES with any existing cart line. `issue` codes: \"\" added, `out_of_stock` skipped; translated client-side."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test(\"reports each line's fate\", () => {",
+                  "    pm.expect(pm.response.json().lines).to.be.an(\"array\");",
                   "});"
                 ]
               }

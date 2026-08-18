@@ -249,24 +249,32 @@ matches canvas 07 at 1440px.
 **Goal:** the saved shelf gets its own card (not the shop's), a header
 that totals it, and one-tap add-all.
 
-- [ ] `GET /wishlist` gains `saved_at` per item (the table has the
-      timestamp; the DTO just never carried it). Postman updated.
-- [ ] `WishlistCard`: canvas layout — image, filled heart (un-heart IS
-      removal, unchanged), badge, name, size · saved-ago line
-      (`Intl.RelativeTimeFormat`, which speaks all three locales for
-      free), price with muted AMD line, Add to cart / out-of-stock
-      state. "Notify me" per decision #6 (stub or absent).
-- [ ] Header row: count + worth-total (sum of the same `prices` maps the
-      cards render — display math, not money math) and **Add all to
-      cart** = the reorder machinery's sibling: same partial-success
-      contract, skipping out-of-stock lines with a note.
-- [ ] The dashed "Save more from the shop" slot appended to the grid;
-      the all-empty state keeps E8's existing copy, relocated into the
-      shell.
-- [ ] Rail promo card: "Price-drop alerts" — wired or stubbed per
-      decision #5.
-- [ ] Tests: card component (in-stock/out/badge/relative dates), add-all
-      partial success.
+- [x] `GET /wishlist` gains `saved_at` per item — `domain.WishlistItem`
+      embeds Product, the DTO embeds productResponse (flat JSON, one new
+      field). Postman updated.
+- [x] `WishlistCard`: canvas layout — image, shared heart (un-heart IS
+      removal), badge, name, size · saved-ago line
+      (`Intl.RelativeTimeFormat` speaks all three locales), "from" price
+      with muted second line, Add / out-of-stock state. **"Notify me" is
+      ABSENT, not stubbed** (decision #6): a per-card dead button is the
+      decorative control the project refuses — the sold-out label plus a
+      disabled Add tells the truth without promising an alert. Departure
+      recorded here.
+- [x] Header row: count + worth-total (sum of the same card prices —
+      display math, not money math) and **Add all to cart** =
+      `POST /wishlist/add-all`, the reorder endpoint's sibling: same
+      transaction shape, same per-line report (shared `ReorderReport`
+      banner, extracted from OrdersPage). Per product the first variant
+      with room is chosen, qty 1 merges.
+- [x] The dashed "Save more from the shop" slot appended to the grid;
+      the all-empty state keeps E8's existing copy inside the shell.
+- [x] Rail promo card: "Price-drop alerts" — the E6/E8 honest stub per
+      decision #87 (no live toggle; the card states it is not wired and
+      what it will do when the mailer exists).
+- [x] Tests: card component (relative dates under fake timers, in/out of
+      stock, no-Notify-me, "from" price); store suite for saved_at and
+      add-all (skip + merge-on-repeat); existing handler tests carry the
+      shape change through the fakeStore.
 
 **Done when:** the wishlist reads as canvas 08, remove/add still work,
 and the worth-total agrees with the cards to the minor unit.

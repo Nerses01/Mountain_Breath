@@ -384,6 +384,11 @@ export interface ReorderResult {
   lines: ReorderLine[]
 }
 
+/** A3: a saved product is a full card plus WHEN the heart was set. */
+export interface WishlistEntry extends Product {
+  saved_at: string
+}
+
 export interface Order {
   id: number
   status: OrderStatus

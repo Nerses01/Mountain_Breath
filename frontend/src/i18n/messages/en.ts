@@ -491,6 +491,21 @@ export const en = {
       empty: 'Nothing saved yet.',
       signInRequired: 'Please <1>sign in</1> to see your wishlist.',
       signInToSave: 'Sign in to save products',
+      // ---- A3: the wishlist screen (canvas 08) -----------------------
+      summary_one: '{{count}} saved item · worth {{total}} together',
+      summary_other: '{{count}} saved items · worth {{total}} together',
+      addAll: 'Add all to cart',
+      savedAgo: 'saved {{ago}}',
+      saveMoreTitle: 'Save more from the shop',
+      saveMoreBlurb: 'Tap the heart on any product to keep it here.',
+      browseShelf: 'Browse the shelf →',
+    },
+    railAlerts: {
+      title: 'Price-drop alerts',
+      blurb:
+        'We email you when a wishlisted jar goes on member offer or comes back from a new harvest.',
+      // Decision #87's honest stub: no sender exists, so no toggle lies.
+      comingSoon: 'Not wired up yet — alerts arrive with the wishlist mailer.',
     },
     // ---- E8: the two-panel sign-in (screen 06) -----------------------
     // The club copy is the design's, verbatim.

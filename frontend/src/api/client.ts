@@ -29,6 +29,7 @@ import type {
   ReorderResult,
   UpdateProduct,
   User,
+  WishlistEntry,
 } from './types'
 
 export class ApiError extends Error {
@@ -252,8 +253,13 @@ export const api = {
       body: { token, password },
     }),
 
-  // E8: the wishlist — set-semantics like the cart, product cards back.
-  getWishlist: () => request<Product[]>(withView('/api/v1/wishlist')),
+  // E8: the wishlist — set-semantics like the cart, product cards back
+  // (each with saved_at since A3).
+  getWishlist: () => request<WishlistEntry[]>(withView('/api/v1/wishlist')),
+  // A3: one of each saved, in-stock product into the cart — the reorder
+  // endpoint's sibling, same per-line report.
+  addWishlistToCart: () =>
+    request<ReorderResult>('/api/v1/wishlist/add-all', { method: 'POST' }),
   addWishlistItem: (productId: number) =>
     request<void>(`/api/v1/wishlist/${productId}`, { method: 'PUT' }),
   removeWishlistItem: (productId: number) =>

@@ -165,6 +165,7 @@ function AccountRail({ user }: { user: User }) {
       </nav>
 
       <RailReorderCard />
+      <RailAlertsCard />
     </div>
   )
 }
@@ -283,6 +284,33 @@ function RailLink({
         </>
       )}
     </NavLink>
+  )
+}
+
+/**
+ * A3: canvas 08's dark "Price-drop alerts" card — as the E6/E8 HONEST STUB
+ * (decision #87): no sender exists yet, so there is no live toggle to lie
+ * with. The card keeps the canvas's promise visible and states plainly
+ * that it is not wired; its real toggle arrives with the wishlist mailer.
+ */
+function RailAlertsCard() {
+  const { t } = useTranslation()
+  const { pathname } = useLocation()
+
+  if (!pathname.includes('/account/wishlist')) return null
+
+  return (
+    <section className="flex flex-col gap-2.5 rounded-3xl bg-bark p-6">
+      <h2 className="font-display text-base font-bold text-ink-on-dark">
+        {t('account:railAlerts.title')}
+      </h2>
+      <p className="text-sm leading-relaxed text-ink-on-dark-body">
+        {t('account:railAlerts.blurb')}
+      </p>
+      <p className="mt-1 rounded-xl bg-ink-on-dark/8 px-4 py-3 text-[0.8125rem] text-ink-on-dark-soft">
+        {t('account:railAlerts.comingSoon')}
+      </p>
+    </section>
   )
 }
 

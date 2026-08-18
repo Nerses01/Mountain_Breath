@@ -138,11 +138,15 @@ type PromoStore interface {
 // AccountStore is E8's slice: the hearts, the reset tokens, the address
 // book and the OAuth identities — everything the account grows this phase.
 type AccountStore interface {
-	// The wishlist answers with full product CARDS; the heart's on/off
-	// state everywhere derives from this one list client-side.
-	ListWishlist(ctx context.Context, userID int64, view domain.View) ([]domain.Product, error)
+	// The wishlist answers with full product CARDS (plus saved_at, A3);
+	// the heart's on/off state everywhere derives from this one list
+	// client-side.
+	ListWishlist(ctx context.Context, userID int64, view domain.View) ([]domain.WishlistItem, error)
 	AddWishlistItem(ctx context.Context, userID, productID int64) error
 	RemoveWishlistItem(ctx context.Context, userID, productID int64) error
+	// A3: one of each saved, in-stock product into the cart — the reorder
+	// merge's sibling, same partial-success result.
+	AddWishlistToCart(ctx context.Context, userID int64) (domain.ReorderResult, error)
 	// One transaction: the cart line and the wishlist row must never both
 	// exist, nor neither.
 	SaveForLater(ctx context.Context, userID, variantID int64) error
@@ -347,6 +351,8 @@ func (s *Server) Routes() chi.Router {
 			r.Put("/wishlist/{productID}", s.handleAddWishlistItem)
 			r.Delete("/wishlist/{productID}", s.handleRemoveWishlistItem)
 			r.Post("/wishlist/save-for-later", s.handleSaveForLater)
+			// A3: "Add all to cart" — the reorder endpoint's sibling.
+			r.Post("/wishlist/add-all", s.handleWishlistAddAll)
 			r.Get("/account/addresses", s.handleListAddresses)
 			r.Post("/account/addresses", s.handleCreateAddress)
 			r.Put("/account/addresses/{id}", s.handleUpdateAddress)
