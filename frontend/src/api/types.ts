@@ -362,6 +362,28 @@ export interface OrderItem {
   qty: number
 }
 
+/** A2: one step of the order's recorded history (order_status_events). */
+export interface OrderEvent {
+  status: OrderStatus
+  created_at: string
+}
+
+/**
+ * A2: one line's fate when a past order is merged back into the cart.
+ * `issue` is a CODE the client translates (the promo_issue contract):
+ * absent/'' = added in full.
+ */
+export interface ReorderLine {
+  name: string
+  label: string
+  qty: number
+  issue?: 'reduced' | 'out_of_stock' | 'unavailable'
+}
+
+export interface ReorderResult {
+  lines: ReorderLine[]
+}
+
 export interface Order {
   id: number
   status: OrderStatus
@@ -389,6 +411,15 @@ export interface Order {
   ship_to?: Address
   delivery_note?: string
   leave_with_neighbour: boolean
+  /**
+   * A2: the recorded timeline, oldest first — what the tracker dates its
+   * steps from. Orders older than the events table carry only their
+   * backfilled `pending` event; the tracker then shows position without
+   * dates rather than inventing them.
+   */
+  events: OrderEvent[]
+  /** A2: any line is a chilled product — the "chilled parcel" tag. */
+  has_cold_chain: boolean
   /**
    * What the customer was actually charged in. An order carries ONE currency
    * and no second price — unlike a cart, which is a live thing that can be

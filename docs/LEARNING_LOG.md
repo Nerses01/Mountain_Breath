@@ -17,6 +17,54 @@ Template for an entry:
 
 ---
 
+## 2026-08-18 — Phase A2: the orders screen (canvas 07)
+
+**Worked on:** settled PLAN_ACCOUNT.md's remaining decisions (#2–#8, log
+#85–#89) by explicit user confirmation; then A2 end to end — migration
+000021 (`order_status_events` + backfill, cycle-tested), event inserts in
+both order write paths, events + `has_cold_chain` on the order DTO,
+`POST /orders/{id}/reorder` with per-line issue codes, Postman, and the
+canvas-07 frontend: `OrderTracker`, filter pills, the featured-order
+card, history rows with collapse, the reorder banner, the rail's reorder
+card, `#MB-` display numbers, strings ×3. Tests at every layer.
+
+**Learned:**
+
+- **The cheapest event sourcing: keep the state column, add the log.**
+  `orders.status` still answers "what is it now?" in one read; the
+  append-only events table answers "how and when did it get here?". Full
+  event sourcing would DERIVE state from the log; storing both costs one
+  insert per transition and keeps every existing query untouched.
+- **Record the transition in the transaction that causes it.** The event
+  insert lives beside the UPDATE (and CreateOrder's event reuses the
+  order row's own timestamp), so history and state cannot disagree —
+  the same atomicity instinct as stock decrement inside checkout.
+- **A backfill may only assert what it knows.** Old orders got exactly
+  one synthetic `pending` event from `created_at`; their later steps
+  happened but are unrecoverable, and the tracker shows a dash rather
+  than fiction. Honesty is a schema property, not just a UI one.
+- **Partial success as a RESULT, not an error.** Reorder returns 200
+  with per-line fates ("reduced", "out_of_stock", "unavailable") — codes
+  the client translates, the promo_issue contract again. HTTP status
+  codes describe the request's fate; the body describes the domain's.
+- **Ownership placement is per-method, not per-layer.** GetOrder leaves
+  "may you look?" to the handler (admin may); Reorder answers it in the
+  store because the check and the cart write must share a transaction.
+  The interface comment records WHY the two differ.
+- **`aria-pressed` vs tabs; `aria-current="step"`:** filter pills toggle
+  a list in place (no panels → not tabs), and a tracker is an `<ol>`
+  whose current step carries the spec's exact value for "you are here".
+
+**Questions / to revisit:**
+- Old orders' trackers show dashes for pre-021 steps — acceptable
+  forever, or worth a one-off manual backfill by the family? (Data
+  entry, not code.)
+- The status chip's delivered green is the canvas's raw pair
+  (#4C7A3D on #EAF2E3, AA-checked) — promote to tokens if a second
+  green consumer appears.
+
+---
+
 ## 2026-08-18 — Phase A1: the account shell (PLAN_ACCOUNT.md)
 
 **Worked on:** the account canvas (07–10) arrived; wrote PLAN_ACCOUNT.md

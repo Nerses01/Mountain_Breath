@@ -201,34 +201,44 @@ keyboard-only walk.
 **Goal:** the flat list becomes the canvas's page: filters, the
 highlighted active order with its tracker, compact history rows.
 
-- [ ] Decisions #2, #3, #4 recorded first.
-- [ ] If decision #3 = history table: `order_status_events` migration
-      (order_id, status, created_at), the insert inside the existing
-      domain-validated transition, events included in the order DTO,
-      backfill = one synthetic `pending` event per existing order from
-      `created_at`. Postman: order responses change shape.
-- [ ] Filter pills (All / On the way / Delivered) — client-side over the
-      already-fetched list; a state pill count of zero hides its pill
-      (empty states are ours).
-- [ ] `OrderTracker`: the four mapped steps, done/current/future visual
-      states, per-step dates from the events; cancelled band design.
-      Semantically an `<ol>`, not divs — a tracker is a list of steps.
-- [ ] The active-order card (orange border) for the newest not-yet-
-      delivered order: tracker + item thumbnails + Details link (the
-      canvas's "Track parcel" per §1.3). No active order → no card, the
-      history list leads (a state the canvas never draws).
-- [ ] History rows in the canvas's grid (id, date · items, summary,
-      total in the ORDER's one currency, status chip, Reorder), "#MB-"
-      as a display format over the numeric id.
-- [ ] Reorder per decision #4, surfacing the partial-success note; the
-      rail's "Reorder in one tap" card derives from the latest delivered
-      order and calls the same path.
-- [ ] "Show N older orders ▾" collapse past the first three history rows.
-- [ ] `OrderDetailPage` inherits the shell + tracker (it is the "Details"
-      destination and should not look like a different site).
-- [ ] Tests: tracker mapping table-driven per status incl. cancelled;
-      reorder store test (stock-aware) + handler test; fakeStore grows
-      whatever the new interface method is.
+- [x] Decisions #2, #3, #4 recorded first (log #85, #86).
+- [x] `order_status_events` migration (000021, up→down→up tested): the
+      insert inside both write paths (CreateOrder shares the order's own
+      timestamp; UpdateOrderStatus in the same tx as its UPDATE), events
+      in the order DTO, backfill = one synthetic `pending` event per
+      existing order. Postman updated (order shape + new request). Bonus
+      from the gap table: `has_cold_chain` exposed on the order DTO,
+      derived live through the items' product joins.
+- [x] Filter pills (All / On the way / Delivered) — client-side over the
+      already-fetched list; a pill whose count is zero does not render.
+      `aria-pressed` toggles, not tabs — there is no tabpanel here.
+- [x] `OrderTracker`: the four mapped steps, done/current/future states,
+      per-step dates only from RECORDED events (unrecorded steps show a
+      dash); cancelled band. An `<ol>` with `aria-current="step"`.
+- [x] The active-order card (the orange border keeps `--color-brand` —
+      a border carries no text) for the newest still-moving order:
+      tracker + items band + Details link standing in for "Track parcel"
+      (§1.3). No active order → the history list leads. Item thumbnails
+      dropped: order items snapshot no image, and inventing one from the
+      live product would mislabel renamed products.
+- [x] History rows (id, date · items, summary, total in the ORDER's one
+      currency, status chip, Reorder on delivered/cancelled rows);
+      "#MB-{{id}}" display format in all three catalogues (e2e heading
+      regex updated with it).
+- [x] Reorder per decision #4: the endpoint merges with caps (stock and
+      the cart's 99-per-line rule) and reports per-line issue codes the
+      client translates (the promo_issue contract); the page banner
+      names the skips, and the rail's "Reorder in one tap" card (latest
+      delivered order) calls the same path with its own confirmation.
+- [x] "Show N older orders ▾" collapse past the first three history rows.
+- [x] `OrderDetailPage` renders the same tracker (it is the "Details"
+      destination and must not look like a different site).
+- [x] Tests: tracker table-driven per status incl. cancelled and the
+      dates-only-from-events rule; store suite for events (create,
+      transition, attach on list/get) and reorder (merge, cap, out-of-
+      stock, retired product, stranger → ErrNotFound); handler tests
+      (200 report / 404 stranger / 401 anonymous); fakeStore grew
+      Reorder with the real ownership contract.
 
 **Done when:** a pending→delivered order walks the tracker with real
 dates, reorder refills the cart and says what it skipped, and the page

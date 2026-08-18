@@ -60,6 +60,49 @@ type Order struct {
 	// product names in order_items: the receipt keeps saying "HONEY10" even
 	// if the family later renames or deletes the code. "" = no promo.
 	PromoCode string
+
+	// A2 (decision log #85). The recorded timeline, oldest first: one event
+	// per status transition, from order_status_events. Status stays the
+	// CURRENT state; this is how it got there and when. Orders created
+	// before the events table carry only their backfilled `pending` event —
+	// their later steps happened but were never recorded, and the tracker
+	// shows them without dates rather than with invented ones.
+	Events []OrderEvent
+
+	// A2. True when any line is a cold-chain product — the canvas's
+	// "chilled parcel" tag. Derived from the CURRENT product flags at read
+	// time (like the cart's), not snapshotted: it labels the parcel's
+	// handling, it is not part of the financial record.
+	HasColdChain bool
+}
+
+// OrderEvent is one step of an order's recorded history.
+type OrderEvent struct {
+	Status    string
+	CreatedAt time.Time
+}
+
+// A2 (decision log #86): why a reorder line could not be re-added in full.
+// Codes, not sentences — the client translates them, the same contract as
+// the checkout preview's promo_issue.
+const (
+	ReorderUnavailable = "unavailable"  // the product was retired since
+	ReorderOutOfStock  = "out_of_stock" // nothing left to add
+	ReorderReduced     = "reduced"      // added, but fewer than last time
+)
+
+// ReorderLine is one order line's fate when re-added to the cart.
+type ReorderLine struct {
+	Name  string // the order's SNAPSHOT name — what the customer remembers buying
+	Label string
+	Qty   int    // actually added to the cart; 0 when skipped
+	Issue string // "" = added in full, else one of the Reorder* codes
+}
+
+// ReorderResult reports the whole merge: partial success is the expected
+// case, not an error — an order from last month meeting today's stock.
+type ReorderResult struct {
+	Lines []ReorderLine
 }
 
 type OrderItem struct {

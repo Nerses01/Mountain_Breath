@@ -382,7 +382,9 @@ export const en = {
     saveForLater: 'Save for later',
   },
   account: {
-    orderNumber: 'Order #{{id}}',
+    // A2: the canvas's display format for the numeric id ("#MB-1047") —
+    // display only, the id underneath stays a number everywhere.
+    orderNumber: 'Order #MB-{{id}}',
     status: {
       pending: 'Pending',
       confirmed: 'Confirmed',
@@ -421,6 +423,49 @@ export const en = {
       memberTile: 'Member price',
       firstFreeTile: 'First delivery',
       firstFreeValue: 'Free',
+    },
+    // ---- A2: the orders screen (canvas 07) ---------------------------
+    ordersScreen: {
+      subtitle: 'Everything you have ordered from the meadow, newest first.',
+      filterAll: 'All',
+      filterActive: 'On the way',
+      filterDelivered: 'Delivered',
+      placed: 'Placed {{date}}',
+      itemCount_one: '{{count}} item',
+      itemCount_other: '{{count}} items',
+      chilled: 'chilled parcel',
+      details: 'Details',
+      reorder: 'Reorder',
+      showOlder_one: 'Show {{count}} older order ▾',
+      showOlder_other: 'Show {{count}} older orders ▾',
+      showFewer: 'Show fewer ▴',
+      reorderAdded_one: 'Added {{count}} item to your cart.',
+      reorderAdded_other: 'Added {{count}} items to your cart.',
+      reorderNothing: 'Nothing could be added:',
+      viewCart: 'View cart →',
+      // The reorder issue CODES the server sends, translated here — the
+      // promo_issue contract: server names the fact, client speaks it.
+      issue: {
+        reduced: 'fewer added than last time — low stock',
+        out_of_stock: 'sold out right now',
+        unavailable: 'no longer sold',
+      },
+    },
+    tracker: {
+      label: 'Order progress',
+      // Decision #2: the REAL state machine renamed in copy — "Placed" is
+      // pending's face, not a new state.
+      pending: 'Placed',
+      confirmed: 'Confirmed',
+      shipped: 'Shipped',
+      delivered: 'Delivered',
+      cancelledBand: 'This order was cancelled — its items went back to the shelf.',
+    },
+    railReorder: {
+      title: 'Reorder in one tap',
+      usual: 'Your usual: {{items}}.',
+      cta: 'Reorder · {{total}}',
+      done: 'Added to your cart.',
     },
     profile: {
       title: 'Profile',

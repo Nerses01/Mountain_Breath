@@ -352,6 +352,23 @@ export function useMyOrders() {
   })
 }
 
+/**
+ * A2: refill the cart from a past order. The server merges in one
+ * transaction and reports each line's fate; success here only means the
+ * MERGE ran — the caller reads result.lines to tell the customer what was
+ * added, capped, or skipped. Cart and preview caches are stale either way.
+ */
+export function useReorder() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.reorder,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cart'] })
+      qc.invalidateQueries({ queryKey: ['preview'] })
+    },
+  })
+}
+
 // The confirmation page's read. No locale or currency in the key: an order
 // is a frozen record — its snapshots do not change with the viewer's
 // language or market, so one cache entry serves every view of it.

@@ -92,6 +92,18 @@ type orderResponse struct {
 	ShipTo             *addressPayload `json:"ship_to,omitempty"`
 	DeliveryNote       string          `json:"delivery_note,omitempty"`
 	LeaveWithNeighbour bool            `json:"leave_with_neighbour"`
+
+	// A2: the recorded timeline (oldest first) the tracker draws its dates
+	// from, and the cold-chain flag behind the "chilled parcel" tag. An old
+	// order may carry only its backfilled `pending` event — the tracker
+	// then shows position without dates rather than invented ones.
+	Events       []orderEventResponse `json:"events"`
+	HasColdChain bool                 `json:"has_cold_chain"`
+}
+
+type orderEventResponse struct {
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 func toOrderResponse(o domain.Order) orderResponse {
@@ -101,9 +113,14 @@ func toOrderResponse(o domain.Order) orderResponse {
 			Name: it.Name, Label: it.Label, PriceMinor: it.PriceMinor, Qty: it.Qty,
 		})
 	}
+	events := make([]orderEventResponse, 0, len(o.Events))
+	for _, ev := range o.Events {
+		events = append(events, orderEventResponse{Status: ev.Status, CreatedAt: ev.CreatedAt})
+	}
 	resp := orderResponse{
 		ID: o.ID, Status: o.Status,
 		CreatedAt: o.CreatedAt, UserEmail: o.UserEmail, Items: items,
+		Events: events, HasColdChain: o.HasColdChain,
 		Currency: o.Currency, FxRateUsed: o.FxRateUsed,
 		SubtotalMinor: o.Totals.SubtotalMinor, ShippingMinor: o.Totals.ShippingMinor,
 		DiscountMinor: o.Totals.DiscountMinor, TaxMinor: o.Totals.TaxMinor,
@@ -244,6 +261,54 @@ func (s *Server) handleGetOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.respondJSON(w, http.StatusOK, toOrderResponse(order))
+}
+
+// A2: what the reorder merge did, line by line. `issue` is a CODE the
+// client translates (the promo_issue contract): "" added in full,
+// "reduced" capped by stock, "out_of_stock" / "unavailable" skipped.
+type reorderLineResponse struct {
+	Name  string `json:"name"`
+	Label string `json:"label"`
+	Qty   int    `json:"qty"`
+	Issue string `json:"issue,omitempty"`
+}
+
+type reorderResponse struct {
+	Lines []reorderLineResponse `json:"lines"`
+}
+
+// POST /orders/{id}/reorder — merge a past order's lines back into the
+// cart (decision log #86). 200 even when every line was skipped: the merge
+// itself succeeded, and the body says what it could and could not add —
+// partial success is a result, not an error status.
+func (s *Server) handleReorder(w http.ResponseWriter, r *http.Request) {
+	user, _ := userFrom(r.Context())
+
+	orderID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_id", "order id must be a number")
+		return
+	}
+
+	// Ownership lives in the store call itself (it writes to the caller's
+	// cart); a stranger's order id comes back as ErrNotFound — the same
+	// existence-hiding 404 as handleGetOrder.
+	res, err := s.store.Reorder(r.Context(), user.ID, orderID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			s.respondError(w, http.StatusNotFound, "not_found", "no such order")
+			return
+		}
+		s.log.Error("reordering", "id", orderID, "error", err)
+		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
+
+	lines := make([]reorderLineResponse, 0, len(res.Lines))
+	for _, l := range res.Lines {
+		lines = append(lines, reorderLineResponse{Name: l.Name, Label: l.Label, Qty: l.Qty, Issue: l.Issue})
+	}
+	s.respondJSON(w, http.StatusOK, reorderResponse{Lines: lines})
 }
 
 // GET /account/address — the saved address for pre-filling the checkout

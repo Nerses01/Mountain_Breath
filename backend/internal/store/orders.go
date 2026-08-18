@@ -268,6 +268,18 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 		return domain.Order{}, fmt.Errorf("inserting order: %w", err)
 	}
 
+	// A2 (log #85): the first history row — same transaction, and the SAME
+	// timestamp the order row got, so "placed" and "created" can never
+	// disagree by the microseconds between two now() calls.
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO order_status_events (order_id, status, created_at)
+		VALUES ($1, $2, $3)`,
+		order.ID, domain.OrderPending, order.CreatedAt); err != nil {
+		return domain.Order{}, fmt.Errorf("recording status event: %w", err)
+	}
+	order.Events = []domain.OrderEvent{{Status: domain.OrderPending, CreatedAt: order.CreatedAt}}
+	order.HasColdChain = hasColdChain
+
 	// Record the redemption — the row the UNIQUE (code_id, user_id) index
 	// guards. Under the user-row and promo-row locks this insert cannot
 	// race, so a violation here means a bug in the locking, not a customer:
@@ -438,6 +450,9 @@ func (s *Store) ListOrdersByUser(ctx context.Context, userID int64) ([]domain.Or
 	if err := s.attachOrderItems(ctx, orders); err != nil {
 		return nil, err
 	}
+	if err := s.attachOrderEvents(ctx, orders); err != nil {
+		return nil, err
+	}
 	return orders, nil
 }
 
@@ -469,6 +484,9 @@ func (s *Store) ListAllOrders(ctx context.Context) ([]domain.Order, error) {
 		return nil, fmt.Errorf("iterating order rows: %w", err)
 	}
 	if err := s.attachOrderItems(ctx, orders); err != nil {
+		return nil, err
+	}
+	if err := s.attachOrderEvents(ctx, orders); err != nil {
 		return nil, err
 	}
 	return orders, nil
@@ -504,6 +522,15 @@ func (s *Store) UpdateOrderStatus(ctx context.Context, orderID int64, to string)
 		return domain.Order{}, fmt.Errorf("updating status: %w", err)
 	}
 
+	// A2 (log #85): the transition becomes a recorded fact, in the same
+	// transaction as the update it describes — the history cannot commit
+	// without the state change, nor the state change without its history.
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO order_status_events (order_id, status)
+		VALUES ($1, $2)`, orderID, to); err != nil {
+		return domain.Order{}, fmt.Errorf("recording status event: %w", err)
+	}
+
 	if to == domain.OrderCancelled {
 		// Give the reserved stock back.
 		if _, err := tx.Exec(ctx, `
@@ -531,6 +558,114 @@ func (s *Store) UpdateOrderStatus(ctx context.Context, orderID int64, to string)
 	}
 	o.Status = to
 	return o, nil
+}
+
+// Reorder merges an order's lines back into the cart (A2, decision log
+// #86): one transaction, and PARTIAL SUCCESS is the designed outcome, not
+// an error — an order from last month meets today's stock, and the result
+// says line by line what happened. The interesting choices:
+//
+//   - Ownership is checked HERE (unlike GetOrder, which leaves it to the
+//     handler): reorder is a WRITE to the caller's cart, so "may you" and
+//     "do it" cannot be separated without a gap between them. A wrong
+//     owner gets ErrNotFound — same existence-hiding as the order page.
+//   - Quantities MERGE (cart qty + order qty, capped): a customer with 1
+//     jar already in the cart reordering 2 wants 3, not "2 replaces 1".
+//     The cap is the variant's stock and the cart's own 99-per-line rule.
+//   - No FOR UPDATE: the cart never guarantees availability — checkout
+//     re-validates under locks. The stock read here only shapes an honest
+//     REPORT, so locking would buy nothing but contention.
+func (s *Store) Reorder(ctx context.Context, userID, orderID int64) (domain.ReorderResult, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return domain.ReorderResult{}, fmt.Errorf("beginning reorder tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var owner int64
+	err = tx.QueryRow(ctx, `SELECT user_id FROM orders WHERE id = $1`, orderID).Scan(&owner)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ReorderResult{}, domain.ErrNotFound
+		}
+		return domain.ReorderResult{}, fmt.Errorf("reading order owner: %w", err)
+	}
+	if owner != userID {
+		return domain.ReorderResult{}, domain.ErrNotFound
+	}
+
+	rows, err := tx.Query(ctx, `
+		SELECT oi.name_snapshot, oi.label_snapshot, oi.qty, oi.variant_id,
+		       v.stock_qty, p.is_active, COALESCE(ci.qty, 0)
+		FROM order_items oi
+		JOIN product_variants v ON v.id = oi.variant_id
+		JOIN products p ON p.id = v.product_id
+		LEFT JOIN cart_items ci ON ci.user_id = $2 AND ci.variant_id = oi.variant_id
+		WHERE oi.order_id = $1
+		ORDER BY oi.id`,
+		orderID, userID)
+	if err != nil {
+		return domain.ReorderResult{}, fmt.Errorf("reading order lines: %w", err)
+	}
+
+	type line struct {
+		name, label string
+		qty         int
+		variantID   int64
+		stockQty    int
+		isActive    bool
+		inCart      int
+	}
+	var lines []line
+	for rows.Next() {
+		var l line
+		if err := rows.Scan(&l.name, &l.label, &l.qty, &l.variantID,
+			&l.stockQty, &l.isActive, &l.inCart); err != nil {
+			rows.Close()
+			return domain.ReorderResult{}, fmt.Errorf("scanning order line: %w", err)
+		}
+		lines = append(lines, l)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return domain.ReorderResult{}, fmt.Errorf("iterating order lines: %w", err)
+	}
+
+	// maxCartLine mirrors the API's qty validation (1–99 on PUT /cart/items):
+	// reorder must not build a cart the customer could not have built by hand.
+	const maxCartLine = 99
+
+	var result domain.ReorderResult
+	for _, l := range lines {
+		out := domain.ReorderLine{Name: l.name, Label: l.label}
+		room := min(l.stockQty, maxCartLine) - l.inCart
+		switch {
+		case !l.isActive:
+			out.Issue = domain.ReorderUnavailable
+		case room <= 0:
+			out.Issue = domain.ReorderOutOfStock
+		default:
+			add := min(l.qty, room)
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO cart_items (user_id, variant_id, qty)
+				VALUES ($1, $2, $3)
+				ON CONFLICT (user_id, variant_id)
+				DO UPDATE SET qty = cart_items.qty + EXCLUDED.qty`,
+				userID, l.variantID, add); err != nil {
+				return domain.ReorderResult{}, fmt.Errorf("merging cart line: %w", err)
+			}
+			out.Qty = add
+			if add < l.qty {
+				out.Issue = domain.ReorderReduced
+			}
+		}
+		result.Lines = append(result.Lines, out)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.ReorderResult{}, fmt.Errorf("committing reorder: %w", err)
+	}
+	return result, nil
 }
 
 func scanOrders(rows pgx.Rows) ([]domain.Order, error) {
@@ -567,6 +702,9 @@ func (s *Store) GetOrder(ctx context.Context, orderID int64) (domain.Order, erro
 	if err := s.attachOrderItems(ctx, orders); err != nil {
 		return domain.Order{}, err
 	}
+	if err := s.attachOrderEvents(ctx, orders); err != nil {
+		return domain.Order{}, err
+	}
 	return orders[0], nil
 }
 
@@ -585,11 +723,18 @@ func (s *Store) attachOrderItems(ctx context.Context, orders []domain.Order) err
 		orders[i].Items = make([]domain.OrderItem, 0)
 	}
 
+	// A2: the joins bring the LIVE cold-chain flag along — has_cold_chain
+	// labels the parcel's handling today, it is not part of the frozen
+	// financial record, so it reads like the cart's flag does.
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, order_id, variant_id, name_snapshot, label_snapshot, price_minor_snapshot, qty
-		FROM order_items
-		WHERE order_id = ANY($1)
-		ORDER BY id`,
+		SELECT oi.id, oi.order_id, oi.variant_id, oi.name_snapshot,
+		       oi.label_snapshot, oi.price_minor_snapshot, oi.qty,
+		       p.is_cold_chain
+		FROM order_items oi
+		JOIN product_variants v ON v.id = oi.variant_id
+		JOIN products p ON p.id = v.product_id
+		WHERE oi.order_id = ANY($1)
+		ORDER BY oi.id`,
 		ids)
 	if err != nil {
 		return fmt.Errorf("querying order items: %w", err)
@@ -599,14 +744,57 @@ func (s *Store) attachOrderItems(ctx context.Context, orders []domain.Order) err
 	for rows.Next() {
 		var orderID int64
 		var it domain.OrderItem
-		if err := rows.Scan(&it.ID, &orderID, &it.VariantID, &it.Name, &it.Label, &it.PriceMinor, &it.Qty); err != nil {
+		var coldChain bool
+		if err := rows.Scan(&it.ID, &orderID, &it.VariantID, &it.Name, &it.Label, &it.PriceMinor, &it.Qty, &coldChain); err != nil {
 			return fmt.Errorf("scanning order item: %w", err)
 		}
 		o := byID[orderID]
 		o.Items = append(o.Items, it)
+		o.HasColdChain = o.HasColdChain || coldChain
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("iterating order items: %w", err)
+	}
+	return nil
+}
+
+// attachOrderEvents batch-loads each order's recorded timeline (A2), the
+// same one-query shape as attachOrderItems.
+func (s *Store) attachOrderEvents(ctx context.Context, orders []domain.Order) error {
+	if len(orders) == 0 {
+		return nil
+	}
+
+	ids := make([]int64, len(orders))
+	byID := make(map[int64]*domain.Order, len(orders))
+	for i := range orders {
+		ids[i] = orders[i].ID
+		byID[orders[i].ID] = &orders[i]
+		orders[i].Events = make([]domain.OrderEvent, 0)
+	}
+
+	rows, err := s.pool.Query(ctx, `
+		SELECT order_id, status, created_at
+		FROM order_status_events
+		WHERE order_id = ANY($1)
+		ORDER BY created_at, id`,
+		ids)
+	if err != nil {
+		return fmt.Errorf("querying order events: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var orderID int64
+		var ev domain.OrderEvent
+		if err := rows.Scan(&orderID, &ev.Status, &ev.CreatedAt); err != nil {
+			return fmt.Errorf("scanning order event: %w", err)
+		}
+		o := byID[orderID]
+		o.Events = append(o.Events, ev)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterating order events: %w", err)
 	}
 	return nil
 }

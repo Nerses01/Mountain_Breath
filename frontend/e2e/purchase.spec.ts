@@ -91,7 +91,8 @@ test('a new customer can buy a product end to end', async ({ page }) => {
 
   // --- confirmation: the receipt with the snapshot ---
   await expect(page.getByText('Your order is in.')).toBeVisible()
-  await expect(page.getByRole('heading', { name: /Order #\d+/ })).toBeVisible()
+  // A2 gave order numbers their canvas display format (#MB-<id>).
+  await expect(page.getByRole('heading', { name: /Order #MB-\d+/ })).toBeVisible()
   await expect(page.getByText('14 Abovyan St, apt 6')).toBeVisible()
   await expect(page.getByText('Bank transfer')).toBeVisible()
   await expect(page.getByText('Payment pending')).toBeVisible()

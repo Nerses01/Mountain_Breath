@@ -103,6 +103,10 @@ type OrderStore interface {
 	ListOrdersByUser(ctx context.Context, userID int64) ([]domain.Order, error)
 	ListAllOrders(ctx context.Context) ([]domain.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID int64, to string) (domain.Order, error)
+	// A2: merge a past order's lines back into the cart. Ownership is the
+	// store's question here (unlike GetOrder) because the call WRITES to
+	// the caller's cart — a stranger's id returns ErrNotFound.
+	Reorder(ctx context.Context, userID, orderID int64) (domain.ReorderResult, error)
 }
 
 // CheckoutStore is E6's slice: the pieces a checkout screen needs before an
@@ -331,6 +335,8 @@ func (s *Server) Routes() chi.Router {
 			r.Post("/orders", s.handleCreateOrder)
 			r.Get("/orders", s.handleListMyOrders)
 			r.Get("/orders/{id}", s.handleGetOrder)
+			// A2: refill the cart from a past order (decision log #86).
+			r.Post("/orders/{id}/reorder", s.handleReorder)
 			// The saved address, for pre-filling the checkout form. Under
 			// /account rather than /addresses because E8's account page is
 			// its natural home and the URL should not have to move.

@@ -1,8 +1,9 @@
-import { Link, NavLink, Outlet } from 'react-router'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { Trans, useTranslation } from 'react-i18next'
-import { useAddresses, useLogout, useMe, useMyOrders, useWishlist } from '../../api/hooks'
+import { useAddresses, useLogout, useMe, useMyOrders, useReorder, useWishlist } from '../../api/hooks'
 import type { User } from '../../api/types'
 import { cx } from '../../lib/cx'
+import { formatMoney } from '../../lib/format'
 import { useLocale } from '../../i18n/useLocale'
 import {
   GearIcon,
@@ -162,7 +163,60 @@ function AccountRail({ user }: { user: User }) {
           {t('account:signOut')}
         </button>
       </nav>
+
+      <RailReorderCard />
     </div>
+  )
+}
+
+/**
+ * A2: the canvas's honey "Reorder in one tap" card — contextual to the
+ * orders screen (each screen gets its own rail promo, per the canvas), and
+ * only when there is a delivered order to repeat. It calls the SAME
+ * reorder path as the history rows; its own confirmation replaces the
+ * button so the rail never needs the page's banner.
+ */
+function RailReorderCard() {
+  const { t } = useTranslation()
+  const { localePath } = useLocale()
+  const { pathname } = useLocation()
+  const orders = useMyOrders()
+  const reorder = useReorder()
+
+  if (!pathname.includes('/account/orders')) return null
+  const last = orders.data?.find((o) => o.status === 'delivered')
+  if (!last) return null
+
+  return (
+    <section className="flex flex-col gap-2 rounded-3xl bg-honey p-6">
+      <h2 className="font-display text-base font-bold text-ink">
+        {t('account:railReorder.title')}
+      </h2>
+      <p className="text-sm leading-relaxed text-ink-strong">
+        {t('account:railReorder.usual', {
+          items: last.items.map((it) => it.name).join(' · '),
+        })}
+      </p>
+      {reorder.data ? (
+        <p role="status" className="mt-1 text-sm font-semibold text-ink">
+          {t('account:railReorder.done')}{' '}
+          <Link to={localePath('/cart')} className="underline">
+            {t('account:ordersScreen.viewCart')}
+          </Link>
+        </p>
+      ) : (
+        <button
+          type="button"
+          onClick={() => reorder.mutate(last.id)}
+          disabled={reorder.isPending}
+          className="mt-1 rounded-full bg-bark px-5 py-3 text-center font-display text-sm font-bold text-ink-on-dark transition hover:opacity-90 disabled:opacity-50"
+        >
+          {t('account:railReorder.cta', {
+            total: formatMoney(last.total_minor, last.currency),
+          })}
+        </button>
+      )}
+    </section>
   )
 }
 

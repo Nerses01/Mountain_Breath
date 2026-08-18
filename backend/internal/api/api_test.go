@@ -71,6 +71,12 @@ type fakeStore struct {
 	shippingRates  map[domain.Currency]domain.ShippingRate
 	defaultAddress *domain.Address
 
+	// A2 reorder: what the fake hands back, and which user/order the
+	// handler asked for — the merge logic itself is the store suite's job.
+	reorderResult domain.ReorderResult
+	reorderUser   int64
+	reorderOrder  int64
+
 	// E7 promotions. promos is the fake's promo_codes table (keyed by
 	// NORMALIZED code); cartPromo the applied one; priorOrders the hive-club
 	// fact; orderErr lets a test drive handleCreateOrder's promo_invalid
@@ -434,6 +440,21 @@ func (f *fakeStore) DefaultAddress(_ context.Context, _ int64) (domain.Address, 
 }
 func (f *fakeStore) ListOrdersByUser(_ context.Context, _ int64) ([]domain.Order, error) {
 	return nil, nil
+}
+
+// Reorder mirrors the real store's contract: ownership answered here, a
+// stranger's (or missing) order id → ErrNotFound.
+func (f *fakeStore) Reorder(_ context.Context, userID, orderID int64) (domain.ReorderResult, error) {
+	f.reorderUser, f.reorderOrder = userID, orderID
+	for _, o := range f.orders {
+		if o.ID == orderID {
+			if o.UserID != userID {
+				return domain.ReorderResult{}, domain.ErrNotFound
+			}
+			return f.reorderResult, nil
+		}
+	}
+	return domain.ReorderResult{}, domain.ErrNotFound
 }
 func (f *fakeStore) ListAllOrders(_ context.Context) ([]domain.Order, error) { return nil, nil }
 func (f *fakeStore) UpdateOrderStatus(_ context.Context, _ int64, _ string) (domain.Order, error) {

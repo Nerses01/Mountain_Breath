@@ -325,3 +325,167 @@ func TestCreateOrder_IncrementsSalesCount(t *testing.T) {
 		t.Errorf("sales_count after cancel = %d, want 5 (cancellation does not undo interest)", got)
 	}
 }
+
+// A2 (decision log #85): every transition leaves a recorded fact. The
+// timeline must grow with the order — pending at creation, each step of the
+// state machine after — and come back on every read, oldest first.
+func TestOrderStatusEvents_RecordedAndAttached(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test (needs Docker)")
+	}
+	resetDB(t)
+	s := store.New(testPool)
+	ctx := context.Background()
+
+	variantID := seedCatalog(t, 10)
+	userID := seedUserWithCart(t, "history@test.local", variantID, 1)
+
+	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, testCheckout())
+	if err != nil {
+		t.Fatalf("CreateOrder: %v", err)
+	}
+	if len(order.Events) != 1 || order.Events[0].Status != domain.OrderPending {
+		t.Fatalf("events after create = %+v, want one pending", order.Events)
+	}
+	// The first event carries the ORDER's timestamp — "placed" and
+	// "created" are the same instant by construction, not by luck.
+	if !order.Events[0].CreatedAt.Equal(order.CreatedAt) {
+		t.Errorf("pending event at %v, order created at %v", order.Events[0].CreatedAt, order.CreatedAt)
+	}
+
+	if _, err := s.UpdateOrderStatus(ctx, order.ID, domain.OrderConfirmed); err != nil {
+		t.Fatalf("confirming: %v", err)
+	}
+	if _, err := s.UpdateOrderStatus(ctx, order.ID, domain.OrderShipped); err != nil {
+		t.Fatalf("shipping: %v", err)
+	}
+
+	got, err := s.GetOrder(ctx, order.ID)
+	if err != nil {
+		t.Fatalf("GetOrder: %v", err)
+	}
+	want := []string{domain.OrderPending, domain.OrderConfirmed, domain.OrderShipped}
+	if len(got.Events) != len(want) {
+		t.Fatalf("events = %+v, want %v", got.Events, want)
+	}
+	for i, w := range want {
+		if got.Events[i].Status != w {
+			t.Errorf("events[%d] = %q, want %q", i, got.Events[i].Status, w)
+		}
+	}
+
+	// The list read attaches the same history.
+	orders, err := s.ListOrdersByUser(ctx, userID)
+	if err != nil {
+		t.Fatalf("ListOrdersByUser: %v", err)
+	}
+	if len(orders) != 1 || len(orders[0].Events) != 3 {
+		t.Errorf("listed order events = %+v, want 3", orders)
+	}
+}
+
+// A2 (decision log #86): reorder merges a past order into the cart and
+// reports each line's fate — full add, capped by stock, or skipped.
+func TestReorder(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test (needs Docker)")
+	}
+	resetDB(t)
+	s := store.New(testPool)
+	ctx := context.Background()
+
+	variantID := seedCatalog(t, 10)
+	userID := seedUserWithCart(t, "again@test.local", variantID, 3)
+
+	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, testCheckout())
+	if err != nil {
+		t.Fatalf("CreateOrder: %v", err)
+	}
+	// Checkout cleared the cart and left stock at 7.
+
+	cartQty := func() int {
+		t.Helper()
+		var n int
+		if err := testPool.QueryRow(ctx, `
+			SELECT COALESCE(sum(qty), 0) FROM cart_items WHERE user_id = $1`,
+			userID).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+
+	t.Run("full add into an empty cart", func(t *testing.T) {
+		res, err := s.Reorder(ctx, userID, order.ID)
+		if err != nil {
+			t.Fatalf("Reorder: %v", err)
+		}
+		if len(res.Lines) != 1 || res.Lines[0].Qty != 3 || res.Lines[0].Issue != "" {
+			t.Fatalf("lines = %+v, want one full add of 3", res.Lines)
+		}
+		if got := cartQty(); got != 3 {
+			t.Errorf("cart qty = %d, want 3", got)
+		}
+	})
+
+	t.Run("quantities merge, not replace", func(t *testing.T) {
+		if _, err := s.Reorder(ctx, userID, order.ID); err != nil {
+			t.Fatalf("second Reorder: %v", err)
+		}
+		if got := cartQty(); got != 6 {
+			t.Errorf("cart qty = %d, want 6 (3 + 3)", got)
+		}
+	})
+
+	t.Run("capped by stock and reported as reduced", func(t *testing.T) {
+		// Stock 7, cart already 6 → room for 1 of the requested 3.
+		res, err := s.Reorder(ctx, userID, order.ID)
+		if err != nil {
+			t.Fatalf("third Reorder: %v", err)
+		}
+		if res.Lines[0].Qty != 1 || res.Lines[0].Issue != domain.ReorderReduced {
+			t.Errorf("line = %+v, want qty 1 reduced", res.Lines[0])
+		}
+		if got := cartQty(); got != 7 {
+			t.Errorf("cart qty = %d, want 7 (capped at stock)", got)
+		}
+	})
+
+	t.Run("no room left is out_of_stock and adds nothing", func(t *testing.T) {
+		res, err := s.Reorder(ctx, userID, order.ID)
+		if err != nil {
+			t.Fatalf("fourth Reorder: %v", err)
+		}
+		if res.Lines[0].Qty != 0 || res.Lines[0].Issue != domain.ReorderOutOfStock {
+			t.Errorf("line = %+v, want out_of_stock", res.Lines[0])
+		}
+		if got := cartQty(); got != 7 {
+			t.Errorf("cart qty = %d, want 7 still", got)
+		}
+	})
+
+	t.Run("a retired product is unavailable", func(t *testing.T) {
+		if _, err := testPool.Exec(ctx,
+			`UPDATE products SET is_active = false WHERE slug = 'wild-honey'`); err != nil {
+			t.Fatal(err)
+		}
+		res, err := s.Reorder(ctx, userID, order.ID)
+		if err != nil {
+			t.Fatalf("Reorder on retired product: %v", err)
+		}
+		if res.Lines[0].Issue != domain.ReorderUnavailable {
+			t.Errorf("line = %+v, want unavailable", res.Lines[0])
+		}
+	})
+
+	t.Run("a stranger's order id is ErrNotFound", func(t *testing.T) {
+		var strangerID int64
+		if err := testPool.QueryRow(ctx, `
+			INSERT INTO users (email, password_hash) VALUES ('other@test.local', 'x')
+			RETURNING id`).Scan(&strangerID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.Reorder(ctx, strangerID, order.ID); !errors.Is(err, domain.ErrNotFound) {
+			t.Errorf("err = %v, want ErrNotFound", err)
+		}
+	})
+}

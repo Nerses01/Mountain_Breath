@@ -2956,7 +2956,7 @@
                 "orders"
               ]
             },
-            "description": "The logged-in user's orders, newest first, with item snapshots."
+            "description": "The logged-in user's orders, newest first, with item snapshots. A2 adds `events` — the recorded status timeline, oldest first, one `{status, created_at}` per transition (orders that predate the events table carry only their backfilled `pending` event) — and `has_cold_chain`, the live chilled-parcel flag."
           },
           "event": [
             {
@@ -2970,6 +2970,57 @@
                   "",
                   "pm.test(\"body is an array\", () => {",
                   "    pm.expect(pm.response.json()).to.be.an(\"array\");",
+                  "});",
+                  "",
+                  "pm.test(\"orders carry their status timeline (A2)\", () => {",
+                  "    const orders = pm.response.json();",
+                  "    if (orders.length === 0) return; // nothing to assert on an empty history",
+                  "    const o = orders[0];",
+                  "    pm.expect(o.events).to.be.an(\"array\").that.is.not.empty;",
+                  "    pm.expect(o.events[0].status).to.eql(\"pending\");",
+                  "    pm.expect(o).to.have.property(\"has_cold_chain\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Reorder a past order",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/orders/1/reorder",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "orders",
+                "1",
+                "reorder"
+              ]
+            },
+            "description": "A2 (decision log #86): merge the order's lines back into the cart — one transaction, quantities MERGE with what the cart already holds, capped by stock and the 99-per-line rule. Always 200 for the owner: partial success is a result, not an error. Each line reports its fate via `issue`: \"\" = added in full, `reduced` = capped, `out_of_stock` / `unavailable` = skipped. The codes are translated client-side (the promo_issue contract). A stranger's order id → the same existence-hiding 404 as GET /orders/{id}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"reports each line's fate\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.lines).to.be.an(\"array\");",
+                  "    for (const l of body.lines) {",
+                  "        pm.expect(l).to.have.property(\"name\");",
+                  "        pm.expect(l).to.have.property(\"qty\");",
+                  "    }",
                   "});"
                 ]
               }

@@ -1,6 +1,7 @@
 import { Link, useLocation, useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useOrder } from '../api/hooks'
+import { OrderTracker } from '../components/account/OrderTracker'
 import { useLocale } from '../i18n/useLocale'
 import { formatMoney } from '../lib/format'
 
@@ -71,6 +72,12 @@ export function OrderDetailPage() {
           {new Date(o.created_at).toLocaleDateString()} ·{' '}
           {t(`account:status.${o.status}`)}
         </span>
+      </div>
+
+      {/* A2: the same tracker as the orders screen — the detail page is
+          the "Details" destination and must not look like another site. */}
+      <div className="mt-6 rounded-2xl bg-card p-6">
+        <OrderTracker order={o} />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">

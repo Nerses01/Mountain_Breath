@@ -26,6 +26,7 @@ import type {
   Product,
   ProductDetail,
   ProductSort,
+  ReorderResult,
   UpdateProduct,
   User,
 } from './types'
@@ -321,6 +322,10 @@ export const api = {
     request<Order>(withView('/api/v1/orders'), { method: 'POST', body: input }),
   myOrders: () => request<Order[]>('/api/v1/orders'),
   getOrder: (id: number) => request<Order>(`/api/v1/orders/${id}`),
+  // A2: merge a past order's lines back into the cart. 200 even when lines
+  // were skipped — the body reports each line's fate.
+  reorder: (id: number) =>
+    request<ReorderResult>(`/api/v1/orders/${id}/reorder`, { method: 'POST' }),
   // 404 means "no saved address yet" — a first checkout — and the caller
   // renders an empty form for it rather than an error.
   defaultAddress: () => request<Address>('/api/v1/account/address'),
