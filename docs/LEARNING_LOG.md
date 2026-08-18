@@ -17,6 +17,49 @@ Template for an entry:
 
 ---
 
+## 2026-08-18 — Phase A4: the addresses screen (canvas 09)
+
+**Worked on:** migration 000022 (`addresses.leave_with_neighbour`,
+decision #88), the flag through domain/store/API/book form, checkout
+prefill widened to the full entry AND the checkout teaching the flag
+back to the book, the canvas-09 card grid (note row, dashed add card,
+two-step remove, pickup honest-stub), strings ×3, tests at every layer.
+
+**Learned:**
+
+- **Suggestion vs record, applied twice.** The address flag PREFILLS
+  the checkout; the order still snapshots what was chosen. And the
+  checkout writes the choice back to the book — prefill learns, the
+  record freezes. Naming which columns are suggestions and which are
+  records is what keeps the two from being conflated later.
+- **A two-step arming button is a confirm without a dialog:** the same
+  control re-labels to "Remove?" and disarms after three seconds — one
+  tab stop, announced by its own text. Dialogs earn their cost when
+  there is more to say than "are you sure?"; here there is not.
+- **Testing time-and-state together needs BOTH act() and fake timers:**
+  the timeout's setState is a React update, so advancing the clock
+  outside act() leaves the re-render pending — and TanStack mutations
+  run on microtasks, so asserting a DELETE right after click needs
+  waitFor. Two different asynchronies, two different tools.
+- **The mojibake trap is real and it is MINE too:** a PowerShell
+  `Get-Content | Set-Content` one-liner to rename a translation key
+  re-encoded the file through the console code page and turned every
+  em-dash into `â€”` — exactly the CLAUDE.md seed-file warning. Caught
+  by reading the diff; fixed by rewriting the file. Text transforms on
+  UTF-8 files go through tools that never re-encode (Edit/Write), not
+  through shell pipes.
+- **Widening a return type beats a parallel endpoint:** DefaultAddress
+  returning the entry (id/label riding along harmlessly) gave the
+  checkout the flag with zero new routes — the consumer strips what it
+  does not need, guarded by DisallowUnknownFields on the way back in.
+
+**Questions / to revisit:**
+- The checkout still shows its own neighbour checkbox; F5's address
+  PICKER will need the per-address flag to swap in as the selection
+  changes — wire that when the picker lands.
+
+---
+
 ## 2026-08-18 — Phase A3: the wishlist screen (canvas 08)
 
 **Worked on:** `saved_at` on the wishlist read (`domain.WishlistItem`

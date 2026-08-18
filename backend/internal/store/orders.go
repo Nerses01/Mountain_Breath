@@ -301,7 +301,7 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 
 	// The address book, updated in the SAME transaction: if the order fails,
 	// the book does not learn a half-checked-out address.
-	if err := upsertDefaultAddress(ctx, tx, userID, in.Address); err != nil {
+	if err := upsertDefaultAddress(ctx, tx, userID, in.Address, in.LeaveWithNeighbour); err != nil {
 		return domain.Order{}, err
 	}
 

@@ -53,6 +53,9 @@ type AddressEntry struct {
 	ID        int64
 	Label     string // "Home", "Office" — the customer's word, may be empty
 	IsDefault bool
+	// A4 (decision log #88): a fact about the place, not one delivery —
+	// prefills the checkout checkbox; the order still snapshots its own.
+	LeaveWithNeighbour bool
 	Address
 }
 

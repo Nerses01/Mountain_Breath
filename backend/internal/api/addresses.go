@@ -19,20 +19,25 @@ type addressEntryPayload struct {
 	ID        int64  `json:"id,omitempty"`
 	Label     string `json:"label"`
 	IsDefault bool   `json:"is_default"`
+	// A4 (log #88): a fact about the place — the checkout checkbox's
+	// prefill; the order still snapshots its own copy per delivery.
+	LeaveWithNeighbour bool `json:"leave_with_neighbour"`
 	addressPayload
 }
 
 func toAddressEntryPayload(e domain.AddressEntry) addressEntryPayload {
 	return addressEntryPayload{
 		ID: e.ID, Label: e.Label, IsDefault: e.IsDefault,
-		addressPayload: toAddressPayload(e.Address),
+		LeaveWithNeighbour: e.LeaveWithNeighbour,
+		addressPayload:     toAddressPayload(e.Address),
 	}
 }
 
 func (p addressEntryPayload) toDomain() domain.AddressEntry {
 	return domain.AddressEntry{
 		ID: p.ID, Label: p.Label, IsDefault: p.IsDefault,
-		Address: p.addressPayload.toDomain(),
+		LeaveWithNeighbour: p.LeaveWithNeighbour,
+		Address:            p.addressPayload.toDomain(),
 	}
 }
 

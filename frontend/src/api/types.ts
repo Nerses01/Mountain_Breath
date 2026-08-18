@@ -209,18 +209,22 @@ export interface LoginInput extends Credentials {
 
 // --- Account (E8) -------------------------------------------------------
 
-/** One row of the account page's address book: an Address with a name tag
- *  and the default flag the checkout prefills from. */
+/** One row of the account page's address book: an Address with a name tag,
+ *  the default flag the checkout prefills from, and (A4, log #88) the
+ *  neighbour flag — a fact about the PLACE that prefills the checkout
+ *  checkbox, while each order keeps its own snapshot. */
 export interface AddressEntry extends Address {
   id: number
   label: string
   is_default: boolean
+  leave_with_neighbour: boolean
 }
 
 /** What the book's forms send — the id lives in the URL on updates. */
 export interface AddressInput extends Address {
   label: string
   is_default: boolean
+  leave_with_neighbour: boolean
 }
 
 // Per-locale text. `name`/`description` on the parent objects are the ENGLISH

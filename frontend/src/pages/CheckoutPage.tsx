@@ -75,10 +75,14 @@ export function CheckoutPage() {
   // Pre-fill from the address book once it arrives. An effect rather than
   // initial state because the query resolves after the first render — and it
   // must not overwrite anything the customer already typed, hence the guard
-  // on a pristine form.
+  // on a pristine form. A4: the entry's book-keeping is STRIPPED before it
+  // becomes form state — the checkout posts an Address, and a smuggled
+  // `id` inside it would be refused by DisallowUnknownFields.
   useEffect(() => {
     if (saved.data && address === EMPTY_ADDRESS) {
-      setAddress(saved.data)
+      const { id: _id, label: _l, is_default: _d, leave_with_neighbour, ...addr } = saved.data
+      setAddress(addr)
+      setNeighbour(leave_with_neighbour)
     }
   }, [saved.data, address])
 

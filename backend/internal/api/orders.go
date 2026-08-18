@@ -327,7 +327,9 @@ func (s *Server) handleGetDefaultAddress(w http.ResponseWriter, r *http.Request)
 		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 		return
 	}
-	s.respondJSON(w, http.StatusOK, toAddressPayload(addr))
+	// The full entry payload (A4): the address fields plus the neighbour
+	// prefill; id/label ride along harmlessly.
+	s.respondJSON(w, http.StatusOK, toAddressEntryPayload(addr))
 }
 
 func (s *Server) handleListMyOrders(w http.ResponseWriter, r *http.Request) {

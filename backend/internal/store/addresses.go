@@ -18,12 +18,12 @@ import (
 // must behave exactly like address 17 not existing, and putting the rule in
 // the WHERE clause means no code path can forget it.
 
-const addressColumns = `id, label, is_default,
+const addressColumns = `id, label, is_default, leave_with_neighbour,
 	first_name, last_name, phone, street, city, postal_code, country`
 
 func scanAddressEntry(row pgx.Row) (domain.AddressEntry, error) {
 	var e domain.AddressEntry
-	err := row.Scan(&e.ID, &e.Label, &e.IsDefault,
+	err := row.Scan(&e.ID, &e.Label, &e.IsDefault, &e.LeaveWithNeighbour,
 		&e.FirstName, &e.LastName, &e.Phone, &e.Street,
 		&e.City, &e.PostalCode, &e.Country)
 	return e, err
@@ -86,12 +86,12 @@ func (s *Store) CreateAddress(ctx context.Context, userID int64, e domain.Addres
 	}
 
 	err = tx.QueryRow(ctx, `
-		INSERT INTO addresses (user_id, label, is_default,
+		INSERT INTO addresses (user_id, label, is_default, leave_with_neighbour,
 		                       first_name, last_name, phone, street,
 		                       city, postal_code, country)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id`,
-		userID, e.Label, e.IsDefault,
+		userID, e.Label, e.IsDefault, e.LeaveWithNeighbour,
 		e.FirstName, e.LastName, e.Phone, e.Street,
 		e.City, e.PostalCode, e.Country,
 	).Scan(&e.ID)
@@ -128,12 +128,12 @@ func (s *Store) UpdateAddress(ctx context.Context, userID int64, e domain.Addres
 
 	tag, err := tx.Exec(ctx, `
 		UPDATE addresses
-		SET label = $3, is_default = $4,
-		    first_name = $5, last_name = $6, phone = $7, street = $8,
-		    city = $9, postal_code = $10, country = $11,
+		SET label = $3, is_default = $4, leave_with_neighbour = $5,
+		    first_name = $6, last_name = $7, phone = $8, street = $9,
+		    city = $10, postal_code = $11, country = $12,
 		    updated_at = now()
 		WHERE id = $1 AND user_id = $2`,
-		e.ID, userID, e.Label, e.IsDefault,
+		e.ID, userID, e.Label, e.IsDefault, e.LeaveWithNeighbour,
 		e.FirstName, e.LastName, e.Phone, e.Street,
 		e.City, e.PostalCode, e.Country)
 	if err != nil {

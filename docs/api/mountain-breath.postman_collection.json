@@ -3498,7 +3498,7 @@
                 "address"
               ]
             },
-            "description": "The default address the last checkout saved. 404 for a first-time customer, which the form renders as EMPTY, not as an error. Note the two lifetimes: this row follows the customer's edits; the copy on each order does not."
+            "description": "The default address the last checkout saved. 404 for a first-time customer, which the form renders as EMPTY, not as an error. Note the two lifetimes: this row follows the customer's edits; the copy on each order does not. A4 (log #88): the response is the full book ENTRY, including `leave_with_neighbour` — the checkout checkbox's prefill."
           },
           "response": [],
           "event": [
@@ -4293,10 +4293,10 @@
                 "addresses"
               ]
             },
-            "description": "The account page's book behind the checkout prefill. The FIRST entry becomes the default whatever the flag says (a book with entries but no default would leave the prefill nothing to stand on); a later entry claiming the default demotes the old one inside one transaction, because the one-default-per-user partial unique index rejects the intermediate state. Validation uses the checkout's exact field keys (address.street …).",
+            "description": "The account page's book behind the checkout prefill. The FIRST entry becomes the default whatever the flag says (a book with entries but no default would leave the prefill nothing to stand on); a later entry claiming the default demotes the old one inside one transaction, because the one-default-per-user partial unique index rejects the intermediate state. Validation uses the checkout's exact field keys (address.street …). A4 adds `leave_with_neighbour` — a fact about the PLACE that prefills the checkout checkbox; each order still snapshots its own copy.",
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"label\": \"Postman test\", \"is_default\": false,\n    \"first_name\": \"Anahit\", \"last_name\": \"Sargsyan\",\n    \"phone\": \"+374 91 000000\", \"street\": \"14 Abovyan St\",\n    \"city\": \"Yerevan\", \"postal_code\": \"0009\", \"country\": \"AM\"\n}",
+              "raw": "{\n    \"label\": \"Postman test\", \"is_default\": false, \"leave_with_neighbour\": true,\n    \"first_name\": \"Anahit\", \"last_name\": \"Sargsyan\",\n    \"phone\": \"+374 91 000000\", \"street\": \"14 Abovyan St\",\n    \"city\": \"Yerevan\", \"postal_code\": \"0009\", \"country\": \"AM\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

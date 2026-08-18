@@ -212,7 +212,10 @@ func TestGetOrder(t *testing.T) {
 func TestGetDefaultAddress(t *testing.T) {
 	t.Run("a saved address comes back for pre-filling", func(t *testing.T) {
 		fake := newFakeStore()
-		fake.defaultAddress = &domain.Address{FirstName: "Anahit", City: "Yerevan", Country: "AM"}
+		fake.defaultAddress = &domain.AddressEntry{
+			LeaveWithNeighbour: true,
+			Address:            domain.Address{FirstName: "Anahit", City: "Yerevan", Country: "AM"},
+		}
 		cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleCustomer})
 
 		rec := doRequest(newTestServer(fake), http.MethodGet, "/api/v1/account/address", "", cookie)
@@ -220,13 +223,18 @@ func TestGetDefaultAddress(t *testing.T) {
 			t.Fatalf("status = %d", rec.Code)
 		}
 		var got struct {
-			City string `json:"city"`
+			City               string `json:"city"`
+			LeaveWithNeighbour bool   `json:"leave_with_neighbour"`
 		}
 		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 			t.Fatal(err)
 		}
 		if got.City != "Yerevan" {
 			t.Errorf("city = %q", got.City)
+		}
+		// A4: the neighbour prefill rides the same response (log #88).
+		if !got.LeaveWithNeighbour {
+			t.Error("leave_with_neighbour missing from the prefill response")
 		}
 	})
 

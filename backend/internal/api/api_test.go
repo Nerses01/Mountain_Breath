@@ -69,7 +69,7 @@ type fakeStore struct {
 	lastCheckout   domain.CheckoutInput
 	orders         []domain.Order
 	shippingRates  map[domain.Currency]domain.ShippingRate
-	defaultAddress *domain.Address
+	defaultAddress *domain.AddressEntry
 
 	// A2 reorder: what the fake hands back, and which user/order the
 	// handler asked for — the merge logic itself is the store suite's job.
@@ -432,9 +432,9 @@ func (f *fakeStore) ShippingRates(_ context.Context) (map[domain.Currency]domain
 	}, nil
 }
 
-func (f *fakeStore) DefaultAddress(_ context.Context, _ int64) (domain.Address, error) {
+func (f *fakeStore) DefaultAddress(_ context.Context, _ int64) (domain.AddressEntry, error) {
 	if f.defaultAddress == nil {
-		return domain.Address{}, domain.ErrNotFound
+		return domain.AddressEntry{}, domain.ErrNotFound
 	}
 	return *f.defaultAddress, nil
 }

@@ -377,3 +377,65 @@ func TestAddWishlistToCart(t *testing.T) {
 		t.Errorf("cart qty = %d, want 2 (1 + 1 merged)", qty)
 	}
 }
+
+// A4 (decision log #88): the neighbour flag is a fact about the address —
+// it round-trips through the book's CRUD, and a checkout teaches it to the
+// default entry the same way it teaches the address fields.
+func TestAddressNeighbourFlag(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test (needs Docker)")
+	}
+	resetDB(t)
+	s := store.New(testPool)
+	ctx := context.Background()
+
+	t.Run("round-trips through the book", func(t *testing.T) {
+		userID := seedUser(t, "flag@test.local")
+		created, err := s.CreateAddress(ctx, userID, domain.AddressEntry{
+			Label: "Home", LeaveWithNeighbour: true,
+			Address: domain.Address{
+				FirstName: "Anahit", LastName: "S", Phone: "+374",
+				Street: "14 Abovyan St", City: "Yerevan", PostalCode: "0009", Country: "AM",
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entries, err := s.ListAddresses(ctx, userID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) != 1 || !entries[0].LeaveWithNeighbour {
+			t.Fatalf("entries = %+v, want the flag back", entries)
+		}
+
+		created.LeaveWithNeighbour = false
+		if err := s.UpdateAddress(ctx, userID, created); err != nil {
+			t.Fatal(err)
+		}
+		entries, _ = s.ListAddresses(ctx, userID)
+		if entries[0].LeaveWithNeighbour {
+			t.Error("update did not clear the flag")
+		}
+	})
+
+	t.Run("checkout teaches the flag to the default entry", func(t *testing.T) {
+		variantID := seedPricedProduct(t, "honey", "HON-1", 10, domain.Money{domain.CurrencyUSD: 1400})
+		userID := seedUserWithCart(t, "teach@test.local", variantID, 1)
+
+		in := testCheckout()
+		in.LeaveWithNeighbour = true
+		if _, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, in); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, err := s.DefaultAddress(ctx, userID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !entry.LeaveWithNeighbour {
+			t.Error("checkout choice did not become the next prefill")
+		}
+	})
+}

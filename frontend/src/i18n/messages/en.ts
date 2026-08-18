@@ -500,6 +500,17 @@ export const en = {
       saveMoreBlurb: 'Tap the heart on any product to keep it here.',
       browseShelf: 'Browse the shelf →',
     },
+    // ---- A4: the addresses screen (canvas 09) ------------------------
+    addressesScreen: {
+      subtitle: 'Where we send the jars. The default one is used at checkout.',
+      addBlurb: 'Courier covers Yerevan daily; regions ship early in the week so chilled jars never sit over the weekend.',
+      confirmRemove: 'Remove?',
+    },
+    pickupStub: {
+      title: 'Pickup from the apiary',
+      blurb: 'Skip the courier — collect from the meadow gate and see the hives.',
+      comingSoon: 'Not bookable yet — pickup arrives as a delivery option later.',
+    },
     railAlerts: {
       title: 'Price-drop alerts',
       blurb:

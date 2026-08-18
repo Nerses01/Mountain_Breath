@@ -6,7 +6,7 @@ import {
 } from '@tanstack/react-query'
 import { api, ApiError, type CatalogFilterParams, type ProductListParams } from './client'
 import type {
-  Address,
+  AddressEntry,
   AddressInput,
   EditorialInput,
   Money,
@@ -497,7 +497,7 @@ export function useDeleteAddress() {
 // customer) resolves to null — an empty form is a normal state, not an error,
 // the same mapping useMe applies to 401.
 export function useDefaultAddress(enabled: boolean) {
-  return useQuery<Address | null>({
+  return useQuery<AddressEntry | null>({
     queryKey: ['default-address'],
     queryFn: async () => {
       try {

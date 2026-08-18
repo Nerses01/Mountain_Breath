@@ -42,22 +42,25 @@ func (s *Store) ShippingRates(ctx context.Context) (map[domain.Currency]domain.S
 
 // DefaultAddress returns the user's saved address for pre-filling the
 // checkout form, or ErrNotFound for a first-time customer — which the API
-// maps to an empty form, not an error page.
-func (s *Store) DefaultAddress(ctx context.Context, userID int64) (domain.Address, error) {
-	var a domain.Address
+// maps to an empty form, not an error page. A4 widened the return to the
+// ENTRY: the checkout now prefills the neighbour checkbox too (log #88).
+func (s *Store) DefaultAddress(ctx context.Context, userID int64) (domain.AddressEntry, error) {
+	var e domain.AddressEntry
 	err := s.pool.QueryRow(ctx, `
-		SELECT first_name, last_name, phone, street, city, postal_code, country
+		SELECT first_name, last_name, phone, street, city, postal_code, country,
+		       leave_with_neighbour
 		FROM addresses
 		WHERE user_id = $1 AND is_default`,
 		userID,
-	).Scan(&a.FirstName, &a.LastName, &a.Phone, &a.Street, &a.City, &a.PostalCode, &a.Country)
+	).Scan(&e.FirstName, &e.LastName, &e.Phone, &e.Street, &e.City, &e.PostalCode, &e.Country,
+		&e.LeaveWithNeighbour)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.Address{}, domain.ErrNotFound
+			return domain.AddressEntry{}, domain.ErrNotFound
 		}
-		return domain.Address{}, fmt.Errorf("querying default address: %w", err)
+		return domain.AddressEntry{}, fmt.Errorf("querying default address: %w", err)
 	}
-	return a, nil
+	return e, nil
 }
 
 // upsertDefaultAddress saves the address a checkout used as the user's
@@ -65,11 +68,14 @@ func (s *Store) DefaultAddress(ctx context.Context, userID int64) (domain.Addres
 // (one default per user) is what makes ON CONFLICT work here: the index is
 // a valid arbiter for the upsert, so "insert or update the default" is one
 // statement with no read-then-write race.
-func upsertDefaultAddress(ctx context.Context, tx pgx.Tx, userID int64, a domain.Address) error {
+// A4: the neighbour choice travels with the rest of the checkout's address
+// back into the book — what the customer chose THIS time becomes next
+// time's prefill, the same learn-from-checkout rule the address itself has.
+func upsertDefaultAddress(ctx context.Context, tx pgx.Tx, userID int64, a domain.Address, leaveWithNeighbour bool) error {
 	_, err := tx.Exec(ctx, `
 		INSERT INTO addresses (user_id, first_name, last_name, phone, street,
-		                       city, postal_code, country, is_default)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE)
+		                       city, postal_code, country, leave_with_neighbour, is_default)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE)
 		ON CONFLICT (user_id) WHERE is_default DO UPDATE SET
 		    first_name = EXCLUDED.first_name,
 		    last_name = EXCLUDED.last_name,
@@ -78,8 +84,10 @@ func upsertDefaultAddress(ctx context.Context, tx pgx.Tx, userID int64, a domain
 		    city = EXCLUDED.city,
 		    postal_code = EXCLUDED.postal_code,
 		    country = EXCLUDED.country,
+		    leave_with_neighbour = EXCLUDED.leave_with_neighbour,
 		    updated_at = now()`,
-		userID, a.FirstName, a.LastName, a.Phone, a.Street, a.City, a.PostalCode, a.Country)
+		userID, a.FirstName, a.LastName, a.Phone, a.Street, a.City, a.PostalCode, a.Country,
+		leaveWithNeighbour)
 	if err != nil {
 		return fmt.Errorf("saving default address: %w", err)
 	}

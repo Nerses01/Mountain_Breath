@@ -114,7 +114,9 @@ type OrderStore interface {
 // address for pre-filling the form.
 type CheckoutStore interface {
 	ShippingRates(ctx context.Context) (map[domain.Currency]domain.ShippingRate, error)
-	DefaultAddress(ctx context.Context, userID int64) (domain.Address, error)
+	// A4 widened this to the ENTRY: the checkout prefills the neighbour
+	// checkbox from the same read as the address fields (log #88).
+	DefaultAddress(ctx context.Context, userID int64) (domain.AddressEntry, error)
 }
 
 // PromoStore is E7's slice: codes, the cart's applied code, and the two

@@ -284,24 +284,31 @@ and the worth-total agrees with the cards to the minor unit.
 **Goal:** the E8 book, re-hung in the canvas's card grid. The CRUD,
 validation-error plumbing and default-flag logic all survive untouched.
 
-- [ ] Card grid (2-up ≥ lg): label + Default badge, address block, the
-      note row, Edit / Make default / Remove as the canvas's text
-      actions; the dashed "Add a new address" card replaces the header
-      link as the primary add affordance.
-- [ ] Decision #7: `addresses.leave_with_neighbour` migration + the flag
-      in `AddressInput`/`AddressEntry`; checkout prefills it from the
-      chosen address. Postman updated. (If declined: the note row renders
-      only on the canvas's checked style when the DEFAULT address's last
-      order said so — decide, don't fudge.)
-- [ ] The add/edit form keeps its field keys (server errors must keep
-      landing on inputs) but moves into the pane per the canvas —
-      inline card-turned-form or a panel below the grid, ours to design;
-      the canvas only draws the resting state.
-- [ ] Delete confirms before firing (destructive, and the canvas never
-      draws the confirm — ours).
-- [ ] Pickup card per decision #6 (stub style or absent).
-- [ ] Tests: existing AddressBook tests migrate with the markup; new
-      flag round-trips through create/update.
+- [x] Card grid (2-up ≥ lg): label + Default badge (default card gets the
+      brand border), address block, the note row (rendered in BOTH
+      states — a quiet unchecked box says "you could turn this on"),
+      Edit / Make default / Remove text actions; the dashed "Add a new
+      address" card is the primary add affordance.
+- [x] Decision #7 (log #88): migration 000022 (cycle-tested) puts the
+      flag on `addresses`; it rides `AddressEntry`/`AddressInput` and
+      the book's form. `DefaultAddress` widened to return the ENTRY, so
+      the checkout prefills the checkbox from the same read as the
+      address — and the checkout's upsert now TEACHES the flag back to
+      the book, the same learn-from-checkout rule as the fields.
+      Postman updated.
+- [x] The add/edit form keeps its field keys and became a full-width
+      panel below the grid (scrolled into view on open) — half a grid
+      column would squeeze nine inputs.
+- [x] Delete confirms before firing: a two-step ARMING button ("Remove?"
+      for three seconds, then disarms) — one keyboard-reachable control
+      announced by its own text, no dialog needed for one row.
+- [x] Pickup card: the honest-stub style, deliberately WITHOUT the
+      canvas's Saturday hours — inventing opening times is the
+      placeholder-facts trap Era III's audit flagged.
+- [x] Tests: page tests for the grid, the note row, and the two-step
+      remove (arm → fire, arm → lapse, under act + fake timers); store
+      tests for the flag round-trip and checkout-teaches-the-book;
+      handler test asserts the prefill response carries the flag.
 
 **Done when:** the book matches canvas 09, a full
 add→edit→default→remove cycle works with server-side validation errors

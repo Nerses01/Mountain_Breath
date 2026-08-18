@@ -1,6 +1,5 @@
 import type { Currency } from '../lib/currencies'
 import type {
-  Address,
   AddressEntry,
   AddressInput,
   AdminProduct,
@@ -333,8 +332,9 @@ export const api = {
   reorder: (id: number) =>
     request<ReorderResult>(`/api/v1/orders/${id}/reorder`, { method: 'POST' }),
   // 404 means "no saved address yet" — a first checkout — and the caller
-  // renders an empty form for it rather than an error.
-  defaultAddress: () => request<Address>('/api/v1/account/address'),
+  // renders an empty form for it rather than an error. A4: the response is
+  // the full book entry, so the neighbour checkbox prefills too.
+  defaultAddress: () => request<AddressEntry>('/api/v1/account/address'),
 
   // admin
   createCategory: (data: NewCategory) =>
