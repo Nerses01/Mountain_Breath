@@ -138,6 +138,52 @@ export function CheckIcon(props: IconProps) {
   )
 }
 
+// A1 (account canvas): the rail draws its nav with glyph characters
+// (▤ ♡ ⌂ ⚙ →). Characters render differently per OS font, so they become
+// icons in the same stroke style as the rest of the set. The heart reuses
+// HeartIcon above.
+
+/** The rail's "My orders" mark — a receipt-like card with lines. */
+export function OrdersIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <rect x="4.5" y="4" width="15" height="16" rx="2" />
+      <path d="M8.5 9h7M8.5 13h7M8.5 17h4" />
+    </IconBase>
+  )
+}
+
+/** The rail's "Addresses" mark — the canvas's ⌂. */
+export function HomeIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="m3.5 10.5 8.5-7 8.5 7" />
+      <path d="M5.5 9.2V20h13V9.2" />
+    </IconBase>
+  )
+}
+
+/** The rail's "Settings" mark — the canvas's ⚙ as hub-and-spokes. */
+export function GearIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 3.8v2.4M12 17.8v2.4M3.8 12h2.4M17.8 12h2.4M6.2 6.2l1.7 1.7M16.1 16.1l1.7 1.7M17.8 6.2l-1.7 1.7M7.9 16.1l-1.7 1.7" />
+    </IconBase>
+  )
+}
+
+/** The rail's "Log out" mark — the door-and-arrow convention, since the
+ *  canvas's bare → is ArrowRightIcon and already means "go somewhere". */
+export function LogoutIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M9.5 4H6a1.5 1.5 0 0 0-1.5 1.5v13A1.5 1.5 0 0 0 6 20h3.5" />
+      <path d="m14.5 8 4 4-4 4M18.5 12h-10" />
+    </IconBase>
+  )
+}
+
 export function StarIcon({ filled = false, ...props }: IconProps & { filled?: boolean }) {
   // A REGULAR star, not a hand-drawn one: ten vertices alternating between
   // an outer radius of 9.6 and an inner one of 4.56 (the ★ glyph's chunky

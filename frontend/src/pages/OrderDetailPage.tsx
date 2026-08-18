@@ -1,6 +1,6 @@
 import { Link, useLocation, useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
-import { useMe, useOrder } from '../api/hooks'
+import { useOrder } from '../api/hooks'
 import { useLocale } from '../i18n/useLocale'
 import { formatMoney } from '../lib/format'
 
@@ -23,25 +23,14 @@ export function OrderDetailPage() {
   const { localePath } = useLocale()
   const { id } = useParams()
   const location = useLocation()
-  const me = useMe()
   const order = useOrder(Number(id))
 
   const justPlaced = Boolean((location.state as { placed?: boolean } | null)?.placed)
 
-  if (me.isPending || order.isPending) {
+  // No signed-in guard here anymore (A1): AccountLayout renders this pane
+  // only for a signed-in user.
+  if (order.isPending) {
     return <Shell>{t('common:state.loading')}</Shell>
-  }
-  if (!me.data) {
-    return (
-      <Shell>
-        <p className="text-ink-body">
-          {t('checkout:signInFirst')}{' '}
-          <Link to={localePath('/login')} className="font-semibold text-brand-ink hover:underline">
-            {t('common:actions.signIn')}
-          </Link>
-        </p>
-      </Shell>
-    )
   }
   if (order.isError || !order.data) {
     return (
@@ -183,7 +172,7 @@ export function OrderDetailPage() {
           </section>
 
           <Link
-            to={localePath('/orders')}
+            to={localePath('/account/orders')}
             className="text-sm font-semibold text-brand-ink hover:underline"
           >
             {t('order:allOrders')}
@@ -203,6 +192,8 @@ function Row({ label, value, muted }: { label: string; value: string; muted?: bo
   )
 }
 
+// A1: this page now renders inside AccountLayout's pane, which owns the
+// page padding — the old centred `mx-auto px-6 py-10` here would pad twice.
 function Shell({ children }: { children: React.ReactNode }) {
-  return <div className="mx-auto max-w-5xl px-6 py-10">{children}</div>
+  return <div className="max-w-5xl">{children}</div>
 }

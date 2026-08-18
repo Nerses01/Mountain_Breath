@@ -1,11 +1,13 @@
-import { Route, Routes } from 'react-router'
+import { Navigate, Route, Routes, useParams } from 'react-router'
+import { AccountLayout } from './components/account/AccountLayout'
 import { Layout } from './components/layout/Layout'
+import { useLocale } from './i18n/useLocale'
 import { PREFIXED_LOCALES } from './i18n/locales'
+import { AddressesPage } from './pages/AddressesPage'
 import { AdminOrdersPage } from './pages/AdminOrdersPage'
 import { AdminPage } from './pages/AdminPage'
 import { AdminProductsPage } from './pages/AdminProductsPage'
 import { AdminReviewsPage } from './pages/AdminReviewsPage'
-import { AccountPage } from './pages/AccountPage'
 import { CartPage } from './pages/CartPage'
 import { ContentPage } from './pages/ContentPage'
 import { JournalPage, JournalPostPage } from './pages/JournalPage'
@@ -18,8 +20,25 @@ import { LoginPage } from './pages/LoginPage'
 import { OrdersPage } from './pages/OrdersPage'
 import { ProductPage } from './pages/ProductPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
+import { SettingsPage } from './pages/SettingsPage'
 import { ShopPage } from './pages/ShopPage'
 import { WishlistPage } from './pages/WishlistPage'
+
+/**
+ * A1: the old flat account paths redirect to their nested homes. A tiny
+ * component rather than a bare <Navigate>, for two reasons: the target must
+ * keep the LOCALE prefix (/hy/orders → /hy/account/orders — Navigate knows
+ * nothing about locales), and a `:param` in the pattern must survive the
+ * move (/orders/42 → /account/orders/42), which needs useParams at render
+ * time. `replace` keeps Back working: the redirect leaves no history entry
+ * to bounce off of.
+ */
+export function LegacyRedirect({ to }: { to: string }) {
+  const { localePath } = useLocale()
+  const params = useParams()
+  const target = to.replace(/:(\w+)/g, (_, name: string) => params[name] ?? '')
+  return <Navigate to={localePath(target)} replace />
+}
 
 /**
  * The storefront pages, defined once and mounted under every locale prefix.
@@ -37,13 +56,25 @@ function storefrontRoutes() {
     <Route key="product" path="products/:slug" element={<ProductPage />} />,
     <Route key="login" path="login" element={<LoginPage />} />,
     <Route key="cart" path="cart" element={<CartPage />} />,
-    <Route key="orders" path="orders" element={<OrdersPage />} />,
-    <Route key="order" path="orders/:id" element={<OrderDetailPage />} />,
-    // E8: the account area and the reset flow. The reset route's token is a
-    // URL param because that is what the EMAILED link carries — the page
-    // just posts it back.
-    <Route key="account" path="account" element={<AccountPage />} />,
-    <Route key="wishlist" path="wishlist" element={<WishlistPage />} />,
+    // A1 (account canvas): the four account screens nest under one layout
+    // route — AccountLayout renders the rail and guard, <Outlet /> renders
+    // whichever child matched (decision log #84). The index route makes bare
+    // /account land on orders, the canvas's first screen.
+    <Route key="account" path="account" element={<AccountLayout />}>
+      <Route index element={<Navigate to="orders" replace />} />
+      <Route path="orders" element={<OrdersPage />} />
+      <Route path="orders/:id" element={<OrderDetailPage />} />
+      <Route path="wishlist" element={<WishlistPage />} />
+      <Route path="addresses" element={<AddressesPage />} />
+      <Route path="settings" element={<SettingsPage />} />
+    </Route>,
+    // The E8-era flat paths live on as redirects — emailed links and
+    // bookmarks in every locale must keep working.
+    <Route key="orders-legacy" path="orders" element={<LegacyRedirect to="/account/orders" />} />,
+    <Route key="order-legacy" path="orders/:id" element={<LegacyRedirect to="/account/orders/:id" />} />,
+    <Route key="wishlist-legacy" path="wishlist" element={<LegacyRedirect to="/account/wishlist" />} />,
+    // E8: the reset flow. The reset route's token is a URL param because
+    // that is what the EMAILED link carries — the page just posts it back.
     <Route key="forgot" path="forgot-password" element={<ForgotPasswordPage />} />,
     <Route key="reset" path="reset-password/:token" element={<ResetPasswordPage />} />,
     // E9: the content pages (markdown in the repo, decision #3), the

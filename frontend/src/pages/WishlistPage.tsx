@@ -1,56 +1,33 @@
 import { Link } from 'react-router'
-import { Trans, useTranslation } from 'react-i18next'
-import { useMe, useQuickAdd, useWishlist } from '../api/hooks'
+import { useTranslation } from 'react-i18next'
+import { useQuickAdd, useWishlist } from '../api/hooks'
 import { ProductCard } from '../components/ProductCard'
 import { useLocale } from '../i18n/useLocale'
 
 /**
- * /wishlist — the saved shelf. The same ProductCard as the shop grid (a
- * wishlist is a grid of cards the customer picked), with the same Add
- * behaviour, and each card's own heart is how a row leaves this page —
- * un-hearting IS removal, no second delete control needed.
+ * /account/wishlist — the saved shelf as an account pane (A1).
+ *
+ * The signed-in guard moved to AccountLayout. Still the shop's ProductCard
+ * with the heart as removal (un-hearting IS removal); A3 replaces the card
+ * with canvas 08's own (saved date, worth total, add-all).
  */
 export function WishlistPage() {
   const { t } = useTranslation()
   const { localePath } = useLocale()
-  const me = useMe()
-  const wishlist = useWishlist(!!me.data)
+  const wishlist = useWishlist(true)
   const quickAdd = useQuickAdd()
 
-  if (me.isPending || (me.data && wishlist.isPending)) {
-    return <Shell>{t('common:state.loading')}</Shell>
-  }
-  if (!me.data) {
-    return (
-      <Shell>
-        <p className="text-ink-body">
-          <Trans
-            i18nKey="account:wishlist.signInRequired"
-            components={[
-              <span key="0" />,
-              <Link
-                key="1"
-                to={localePath('/login')}
-                className="font-semibold text-brand-ink hover:underline"
-              />,
-            ]}
-          />
-        </p>
-      </Shell>
-    )
+  if (wishlist.isPending) {
+    return <p className="text-ink-body">{t('common:state.loading')}</p>
   }
   if (wishlist.isError) {
-    return (
-      <Shell>
-        <p className="text-danger">{t('common:state.loadFailed')}</p>
-      </Shell>
-    )
+    return <p className="text-danger">{t('common:state.loadFailed')}</p>
   }
 
   const products = wishlist.data ?? []
 
   return (
-    <Shell>
+    <>
       <h1 className="font-display text-display-md font-extrabold text-ink">
         {t('account:wishlist.title')}
       </h1>
@@ -63,16 +40,12 @@ export function WishlistPage() {
           </Link>
         </p>
       ) : (
-        <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {products.map((p) => (
             <ProductCard key={p.id} product={p} onAdd={quickAdd} />
           ))}
         </div>
       )}
-    </Shell>
+    </>
   )
-}
-
-function Shell({ children }: { children: React.ReactNode }) {
-  return <div className="mx-auto max-w-360 px-6 py-10 lg:px-14">{children}</div>
 }

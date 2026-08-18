@@ -95,15 +95,16 @@ Recorded here so nobody "fixes" them back toward the mock:
 The user's calls (each gets an ARCHITECTURE.md decisions-log row when
 made). Numbers stay stable once referenced.
 
-- [ ] **1. Routes: nest under `/account/*` or keep the flat paths?**
-      The canvas's shell strongly implies `/account/orders`,
-      `/account/wishlist`, `/account/addresses`, `/account/settings` as
-      nested routes under one layout. That **reverses E8's recorded
-      choice** ("order history deliberately STAYS at `/orders`" —
-      AccountPage.tsx's own comment), so it is a real decision, not a
-      default. *Recommendation:* nest, with redirects from `/orders`,
-      `/orders/:id` → `/account/orders/:id`, `/wishlist` — old links in
-      three locales' emails and browser histories must keep working.
+- [x] **1. Routes: nest under `/account/*`.** The canvas's shell
+      implies `/account/orders`, `/account/wishlist`,
+      `/account/addresses`, `/account/settings` as nested routes under
+      one layout. This **reverses E8's recorded choice** ("order history
+      deliberately STAYS at `/orders`" — AccountPage.tsx's own comment):
+      that choice predated any design for the account area, and the
+      canvas is the newer authority. Old paths (`/orders`,
+      `/orders/:id`, `/wishlist`) become client redirects in every
+      locale prefix — emailed links and bookmarks must keep working.
+      *(Decided 2026-08-18, decision log #84.)*
 - [ ] **2. Tracker steps ↔ status machine mapping.** Backend states:
       `pending → confirmed → shipped → delivered` (+`cancelled`). Canvas
       steps: Packed → With courier → Out for delivery → Delivered — four
@@ -171,31 +172,34 @@ change, LEARNING_LOG entry after.
 **Goal:** one `AccountLayout` owns the two-column frame; the four
 screens become its children; the header grows the canvas's account menu.
 
-- [ ] Decisions #1 (routes) recorded; CLAUDE.md rule-#16 line lists the
-      second canvas.
-- [ ] `AccountLayout`: the `300px + 1fr` grid (canvas), collapsing to a
+- [x] Decisions #1 (routes) recorded (log #84); CLAUDE.md rule-#16 line
+      lists the second canvas.
+- [x] `AccountLayout`: the `300px + 1fr` grid (canvas), collapsing to a
       single column below `lg` — the canvas is a 1440px drawing; the
-      small-screen rail (probably a horizontal pill row above the pane)
-      is ours to design. Signed-out guard lives here once, replacing the
-      three per-page `signInRequired` blocks.
-- [ ] Rail part 1 — the dark profile card: initials avatar, name (email
+      small-screen rail (stacked above the pane) is ours to design.
+      Signed-out guard lives here once, replacing the three per-page
+      `signInRequired` blocks.
+- [x] Rail part 1 — the dark profile card: initials avatar, name (email
       until A5 ships `full_name`), hive standing, the two stat tiles
-      (orders count, member %). Data: `useMe` + `useMyOrders`; TanStack
-      cache means the counts cost nothing extra per screen.
-- [ ] Rail part 2 — the nav list: four items with active state (the
-      filled orange pill), counts on orders/wishlist/addresses, divider,
-      **Log out** (moves out of the profile section; it is the rail's
-      last row in the canvas).
-- [ ] Nested routes per decision #1 + permanent redirects from the old
-      paths, in all three locale prefixes.
-- [ ] Header: the signed-in icon becomes the canvas's dark pill (avatar
-      initials + first-name + ▾) opening an owned menu — the **menu
-      button** ARIA pattern (`aria-haspopup="menu"`, roving arrow keys,
-      Escape returns focus), a sibling of PillSelect's combobox but a
-      different pattern: menus fire actions, comboboxes pick values.
-      Signed-out keeps the current icon link to `/login`.
-- [ ] Component tests: layout guard, menu keyboard behaviour, redirect
-      routes.
+      (orders count, member % — a first-delivery-free tile for
+      non-members, a state the canvas never draws).
+- [x] Rail part 2 — the nav list: four items with active state (the
+      canvas's orange fill rendered as `--color-brand-ink`: white on
+      #E4761F fails AA, the same substitution every button makes),
+      counts on orders/wishlist/addresses, divider, **Log out**.
+- [x] Nested routes per decision #1 + `LegacyRedirect` from the old
+      paths, in all three locale prefixes (param-preserving:
+      `/orders/42 → /account/orders/42`). The old AccountPage split
+      apart: profile → rail, address book → AddressesPage, an interim
+      read-only SettingsPage holds the pane until A5.
+- [x] Header: the signed-in icon becomes the canvas's dark pill (avatar
+      initial + email local part + ▾) opening an owned menu — the
+      **menu button** ARIA pattern (`aria-haspopup="menu"`, roving
+      tabindex, Escape returns focus), a sibling of PillSelect's
+      combobox but a different pattern: menus fire actions, comboboxes
+      pick values. Signed-out keeps the icon link to `/login`.
+- [x] Component tests: layout guard, rail counts + aria-current, menu
+      keyboard contract, param- and locale-preserving redirects.
 
 **Done when:** all four paths render inside one shell with correct
 active states, the old URLs redirect, and the header menu passes a

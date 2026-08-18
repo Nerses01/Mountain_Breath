@@ -341,6 +341,21 @@ export const hy = {
     signOut: 'Ելք',
     working: 'Կատարվում է…',
     title: 'Ձեր հաշիվը',
+    shellSignIn: 'Խնդրում ենք <1>մուտք գործել</1>՝ ձեր հաշիվը բացելու համար։',
+    nav: {
+      orders: 'Իմ պատվերները',
+      wishlist: 'Ցանկությունների ցուցակ',
+      addresses: 'Հասցեներ',
+      settings: 'Կարգավորումներ',
+    },
+    rail: {
+      member: 'Փեթակի ակումբի անդամ',
+      guest: 'Նորեկ փեթակում',
+      ordersTile: 'Պատվերներ',
+      memberTile: 'Անդամի զեղչ',
+      firstFreeTile: 'Առաջին առաքումը',
+      firstFreeValue: 'Անվճար',
+    },
     profile: {
       title: 'Պրոֆիլ',
       memberLine: '{{percent}}% զեղչ ամեն պատվերի վրա',

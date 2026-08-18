@@ -402,6 +402,26 @@ export const en = {
     working: 'Working…',
     // ---- E8: the account area ----------------------------------------
     title: 'Your account',
+    // ---- A1: the account shell (canvas 07–10) ------------------------
+    // One guard sentence for the whole area (the per-page "…to see your
+    // orders" variants became dead when the shell took over the guard).
+    shellSignIn: 'Please <1>sign in</1> to open your account.',
+    // The rail's and header menu's shared labels — the canvas's wording.
+    nav: {
+      orders: 'My orders',
+      wishlist: 'Wishlist',
+      addresses: 'Addresses',
+      settings: 'Settings',
+    },
+    rail: {
+      member: 'Hive club member',
+      // The non-member line and tile are states the canvas never draws.
+      guest: 'New to the hive',
+      ordersTile: 'Orders',
+      memberTile: 'Member price',
+      firstFreeTile: 'First delivery',
+      firstFreeValue: 'Free',
+    },
     profile: {
       title: 'Profile',
       memberLine: '{{percent}}% off every order',

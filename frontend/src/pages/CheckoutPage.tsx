@@ -117,7 +117,7 @@ export function CheckoutPage() {
       },
       {
         onSuccess: (order) =>
-          navigate(localePath(`/orders/${order.id}`), { state: { placed: true } }),
+          navigate(localePath(`/account/orders/${order.id}`), { state: { placed: true } }),
         onError: (err) => {
           // 409 promo_invalid: the cart's code died between apply and
           // "Place the order" (expired, sold out, basket shrank). The

@@ -6,6 +6,7 @@ import { useLocale } from '../../i18n/useLocale'
 import { useCart, useLogout, useMe } from '../../api/hooks'
 import { IconButton } from '../ui/IconButton'
 import { HeartIcon, MenuIcon, SearchIcon, UserIcon, XIcon } from '../ui/icons'
+import { AccountMenu } from './AccountMenu'
 import { SearchOverlay } from './SearchOverlay'
 
 /**
@@ -137,7 +138,7 @@ export function SiteHeader() {
               Hidden on phones (it lives in the sheet there): five targets
               in a 375px row leaves none of them 44px wide. */}
           <Link
-            to={localePath('/wishlist')}
+            to={localePath('/account/wishlist')}
             aria-label={t('common:actions.wishlist')}
             className="hidden size-9.5 items-center justify-center rounded-full border-[1.5px] border-line-strong text-ink-muted transition hover:text-ink sm:inline-flex"
           >
@@ -148,19 +149,22 @@ export function SiteHeader() {
               standing (E8), and the header row is the tightest real estate
               in the app — Armenian labels already fight for the line. */}
 
-          {/* The design draws no account control at all, since it never
-              shows a signed-in state. The app has auth, so one is added
-              here (docs/PLAN_ERA_2.md §6, exception 2). */}
-          <Link
-            to={localePath(me.data ? '/account' : '/login')}
-            aria-label={
-              me.data ? t('common:actions.account') : t('common:actions.signIn')
-            }
-            title={me.data ? me.data.email : t('common:actions.signIn')}
-            className="hidden size-9.5 items-center justify-center rounded-full border-[1.5px] border-line-strong text-ink-muted transition hover:text-ink sm:inline-flex"
-          >
-            <UserIcon />
-          </Link>
+          {/* A1: the account canvas finally DRAWS the signed-in header —
+              the dark name pill with its menu — so the signed-in icon link
+              becomes AccountMenu. Signed-out keeps E8's icon-to-login (the
+              canvas still never draws that state). */}
+          {me.data ? (
+            <AccountMenu user={me.data} />
+          ) : (
+            <Link
+              to={localePath('/login')}
+              aria-label={t('common:actions.signIn')}
+              title={t('common:actions.signIn')}
+              className="hidden size-9.5 items-center justify-center rounded-full border-[1.5px] border-line-strong text-ink-muted transition hover:text-ink sm:inline-flex"
+            >
+              <UserIcon />
+            </Link>
+          )}
 
           {/* No sign-out here anymore: E8 gave the account area its own (and
               the phone sheet keeps one), so the header carries only what
@@ -222,13 +226,13 @@ export function SiteHeader() {
               )
             })}
             <li className="mt-1 border-t border-line-soft pt-1">
-              <Link to={localePath('/wishlist')} className="block py-3 text-ink-strong">
+              <Link to={localePath('/account/wishlist')} className="block py-3 text-ink-strong">
                 {t('common:actions.wishlist')}
               </Link>
             </li>
             <li>
               <Link
-                to={localePath(me.data ? '/account' : '/login')}
+                to={localePath(me.data ? '/account/orders' : '/login')}
                 className="block py-3 text-ink-strong"
               >
                 {me.data ? t('common:actions.account') : t('common:actions.signIn')}

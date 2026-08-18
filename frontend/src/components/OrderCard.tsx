@@ -29,7 +29,7 @@ export function OrderCard({ order, children }: { order: Order; children?: React.
       <div className="flex flex-wrap items-center gap-3">
         {/* E6 gave each order a page; the card's number is the way in. */}
         <Link
-          to={localePath(`/orders/${order.id}`)}
+          to={localePath(`/account/orders/${order.id}`)}
           className="font-semibold text-stone-800 hover:text-emerald-800 hover:underline"
         >
           {t('account:orderNumber', { id: order.id })}

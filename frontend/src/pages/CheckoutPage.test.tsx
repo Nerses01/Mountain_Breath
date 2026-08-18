@@ -101,7 +101,8 @@ function renderCheckout() {
       <QueryClientProvider client={qc}>
         <Routes>
           <Route path="/checkout" element={<CheckoutPage />} />
-          <Route path="/orders/:id" element={<p>order page</p>} />
+          {/* A1 moved the confirmation page under the account shell. */}
+          <Route path="/account/orders/:id" element={<p>order page</p>} />
         </Routes>
       </QueryClientProvider>
     </MemoryRouter>,

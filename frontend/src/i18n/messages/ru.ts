@@ -346,6 +346,21 @@ export const ru = {
     signOut: 'Выйти',
     working: 'Выполняется…',
     title: 'Ваш аккаунт',
+    shellSignIn: 'Пожалуйста, <1>войдите</1>, чтобы открыть аккаунт.',
+    nav: {
+      orders: 'Мои заказы',
+      wishlist: 'Список желаний',
+      addresses: 'Адреса',
+      settings: 'Настройки',
+    },
+    rail: {
+      member: 'Участник клуба улья',
+      guest: 'Новичок в улье',
+      ordersTile: 'Заказы',
+      memberTile: 'Скидка участника',
+      firstFreeTile: 'Первая доставка',
+      firstFreeValue: 'Бесплатно',
+    },
     profile: {
       title: 'Профиль',
       memberLine: 'скидка {{percent}}% на каждый заказ',

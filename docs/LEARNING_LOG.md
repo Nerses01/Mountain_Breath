@@ -17,6 +17,50 @@ Template for an entry:
 
 ---
 
+## 2026-08-18 — Phase A1: the account shell (PLAN_ACCOUNT.md)
+
+**Worked on:** the account canvas (07–10) arrived; wrote PLAN_ACCOUNT.md
+(gap audit, 8 decisions, phases A1–A5); decided #1 (nest under
+`/account/*`, decision log #84); built A1 — `AccountLayout` (rail +
+guard + `<Outlet/>`), nested routes with `LegacyRedirect` for the old
+paths, the header `AccountMenu` pill, pages stripped to panes, the old
+AccountPage split into rail/AddressesPage/interim SettingsPage, strings
+×3, component tests for guard/redirects/menu keyboard.
+
+**Learned:**
+
+- **A layout route is Template Method with the router doing the
+  virtual dispatch.** The frame (rail, guard) is written once;
+  `<Outlet/>` is the hole; children are chosen by URL, not by a call.
+  The guard living in the layout deleted three per-page copies — the
+  same de-duplication a base class buys, without inheritance.
+- **NavLink over manual `pathname === href`:** active-ness is a PREFIX
+  question (`/account/orders/42` should light "My orders"), and NavLink
+  answers it and sets `aria-current` from one source. The header's
+  manual comparison would have said "nowhere".
+- **Three popups, three ARIA patterns, chosen by JOB:** PillSelect is a
+  combobox (picks a value, points with `aria-activedescendant`), the
+  mobile nav is a disclosure (shows a region, no focus trap), the new
+  AccountMenu is a menu (list of commands, arrows move REAL focus —
+  roving tabindex). The role dictates the keyboard contract; right role
+  + wrong keys is worse than divs.
+- **Refs are populated at commit, not at `setState`.** "Open on the
+  last item" computed `items.length - 1` before the menu existed —
+  length 0, focus lost, caught by the test. The index math had to move
+  inside the `requestAnimationFrame` with the focus call: state now,
+  DOM later.
+- **A count is a thing that arrives.** The rail test asserted the badge
+  the instant the pane rendered; the orders query was still in flight.
+  `waitFor` is the test-side acknowledgment that queries resolve
+  independently.
+
+**Questions / to revisit:**
+- Decisions #2–#8 in PLAN_ACCOUNT.md §2 are still open; #3 (status
+  history) gates A2 and gets more expensive the longer it waits.
+- The interim SettingsPage shows profile facts read-only until A5.
+
+---
+
 ## 2026-08-15 — Phase E10: the audit phase, and the end of Era II
 
 **Worked on:** the mobile chrome (nav sheet, filter drawer, sticky

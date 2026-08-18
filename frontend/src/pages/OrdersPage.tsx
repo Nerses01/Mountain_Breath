@@ -1,53 +1,39 @@
-import { Link } from 'react-router'
-import { Trans, useTranslation } from 'react-i18next'
-import { useMe, useMyOrders } from '../api/hooks'
-import { useLocale } from '../i18n/useLocale'
+import { useTranslation } from 'react-i18next'
+import { useMyOrders } from '../api/hooks'
 import { OrderCard } from '../components/OrderCard'
 
+/**
+ * /account/orders — order history as an account pane (A1).
+ *
+ * The signed-in guard and page shell moved to AccountLayout; what remains is
+ * the list itself. A2 rebuilds this into canvas 07 (filter pills, the active
+ * order's tracker, compact history rows).
+ */
 export function OrdersPage() {
   const { t } = useTranslation()
-  const { localePath } = useLocale()
-  const me = useMe()
   const orders = useMyOrders()
 
-  if (me.isPending || orders.isPending) {
-    return <Shell>{t('common:state.loading')}</Shell>
-  }
-  if (!me.data) {
-    return (
-      <Shell>
-        <p className="text-stone-500">
-          <Trans
-            i18nKey="account:signInRequired"
-            components={[
-              <span key="0" />,
-              <Link key="1" to={localePath('/login')} className="text-emerald-700 underline" />,
-            ]}
-          />
-        </p>
-      </Shell>
-    )
+  if (orders.isPending) {
+    return <p className="text-ink-body">{t('common:state.loading')}</p>
   }
   if (orders.isError) {
-    return <Shell><p className="text-red-600">{t('common:state.loadFailed')}</p></Shell>
+    return <p className="text-danger">{t('common:state.loadFailed')}</p>
   }
 
   return (
-    <Shell>
-      <h2 className="text-xl font-bold text-stone-800">{t('account:ordersTitle')}</h2>
+    <>
+      <h1 className="font-display text-display-md font-extrabold text-ink">
+        {t('account:ordersTitle')}
+      </h1>
       {orders.data.length === 0 ? (
-        <p className="mt-4 text-stone-500">{t('account:noOrders')}</p>
+        <p className="mt-4 text-ink-body">{t('account:noOrders')}</p>
       ) : (
-        <div className="mt-4 space-y-4">
+        <div className="mt-7 space-y-4">
           {orders.data.map((o) => (
             <OrderCard key={o.id} order={o} />
           ))}
         </div>
       )}
-    </Shell>
+    </>
   )
-}
-
-function Shell({ children }: { children: React.ReactNode }) {
-  return <div className="mx-auto max-w-3xl px-4 py-8">{children}</div>
 }

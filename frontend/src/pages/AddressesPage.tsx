@@ -1,115 +1,30 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
-import { Trans, useTranslation } from 'react-i18next'
-import {
-  useAddresses,
-  useCreateAddress,
-  useDeleteAddress,
-  useLogout,
-  useMe,
-  useUpdateAddress,
-} from '../api/hooks'
+import { useTranslation } from 'react-i18next'
+import { useAddresses, useCreateAddress, useDeleteAddress, useUpdateAddress } from '../api/hooks'
 import type { AddressEntry, AddressInput } from '../api/types'
 import { Button } from '../components/ui/Button'
 import { Checkbox } from '../components/ui/Checkbox'
 import { Input } from '../components/ui/Input'
 import { useFieldErrors } from '../i18n/useFieldErrors'
-import { useLocale } from '../i18n/useLocale'
 
 /**
- * /account — the account area (E8): who you are (with your hive standing),
- * the address book behind the checkout's prefill, and the doors to orders
- * and the wishlist. Order history deliberately STAYS at /orders — it
- * already works there, and the account page is its front door, not its new
- * home.
+ * /account/addresses — the E8 address book as an account pane (A1).
+ *
+ * The book moved here unchanged from the old /account page: A1 only re-hangs
+ * it inside the shared shell (the shell owns the signed-in guard now, so the
+ * per-page guard is gone). A4 restyles it into the canvas's card grid.
  */
-export function AccountPage() {
+export function AddressesPage() {
   const { t } = useTranslation()
-  const { localePath } = useLocale()
-  const me = useMe()
-  const logout = useLogout()
-
-  if (me.isPending) {
-    return <Shell>{t('common:state.loading')}</Shell>
-  }
-  if (!me.data) {
-    return (
-      <Shell>
-        <p className="text-ink-body">
-          <Trans
-            i18nKey="account:signInRequired"
-            components={[
-              <span key="0" />,
-              <Link
-                key="1"
-                to={localePath('/login')}
-                className="font-semibold text-brand-ink hover:underline"
-              />,
-            ]}
-          />
-        </p>
-      </Shell>
-    )
-  }
-
-  const user = me.data
-
   return (
-    <Shell>
+    <>
       <h1 className="font-display text-display-md font-extrabold text-ink">
-        {t('account:title')}
+        {t('account:addresses.title')}
       </h1>
-
-      <div className="mt-7 grid items-start gap-6 lg:grid-cols-[360px_1fr]">
-        {/* ── Profile ────────────────────────────────────────────────── */}
-        <div className="flex flex-col gap-4">
-          <section className="flex flex-col gap-3 rounded-2xl bg-card p-6">
-            <h2 className="font-display text-sm font-bold uppercase tracking-label text-ink">
-              {t('account:profile.title')}
-            </h2>
-            <p className="text-[0.9375rem] text-ink-strong">{user.email}</p>
-            {user.hive.member ? (
-              <p className="flex items-center gap-2 text-sm text-ink-body">
-                <span className="rounded-full bg-honey px-3 py-1 font-display text-xs font-bold text-ink">
-                  {t('common:hive.badge')}
-                </span>
-                {t('account:profile.memberLine', {
-                  percent: user.hive.member_discount_percent,
-                })}
-              </p>
-            ) : (
-              <p className="text-sm text-ink-body">{t('account:profile.firstOrderLine')}</p>
-            )}
-            <button
-              type="button"
-              onClick={() => logout.mutate()}
-              className="self-start text-sm font-semibold text-brand-ink hover:underline"
-            >
-              {t('account:signOut')}
-            </button>
-          </section>
-
-          <nav className="flex flex-col gap-1 rounded-2xl bg-card p-3">
-            <AccountLink to={localePath('/orders')} label={t('account:ordersTitle')} />
-            <AccountLink to={localePath('/wishlist')} label={t('account:wishlist.title')} />
-          </nav>
-        </div>
-
-        {/* ── Address book ───────────────────────────────────────────── */}
+      <div className="mt-7">
         <AddressBook />
       </div>
-    </Shell>
-  )
-}
-
-function AccountLink({ to, label }: { to: string; label: string }) {
-  return (
-    <Link
-      to={to}
-      className="rounded-xl px-4 py-3 font-display text-[0.9375rem] font-semibold text-ink transition hover:bg-panel"
-    >
-      {label} →
-    </Link>
+    </>
   )
 }
 
@@ -133,8 +48,7 @@ const EMPTY_INPUT: AddressInput = {
  */
 function AddressBook() {
   const { t } = useTranslation()
-  const me = useMe()
-  const addresses = useAddresses(!!me.data)
+  const addresses = useAddresses(true)
   const create = useCreateAddress()
   const update = useUpdateAddress()
   const remove = useDeleteAddress()
@@ -300,8 +214,4 @@ function AddressBook() {
       )}
     </section>
   )
-}
-
-function Shell({ children }: { children: React.ReactNode }) {
-  return <div className="mx-auto max-w-360 px-6 py-10 lg:px-14">{children}</div>
 }
