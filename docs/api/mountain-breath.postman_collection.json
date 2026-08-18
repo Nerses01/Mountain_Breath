@@ -2383,6 +2383,54 @@
           "response": []
         },
         {
+          "name": "Update payment status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"payment_status\": \"paid\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{apiV1}}/admin/orders/1/payment",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "admin",
+                "orders",
+                "1",
+                "payment"
+              ]
+            },
+            "description": "F2: the OTHER state machine — whether money arrived, orthogonal to order status. unpaid → paid → refunded; no backward arrows (a mistaken paid is corrected by the compensating refund, never erased). Not one of the three words → 400 validation_failed; a real word refused from here → 409 invalid_transition."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"flip accepted (200) or correctly refused (409)\", () => {",
+                  "    pm.expect([200, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
           "name": "List all products (incl. inactive)",
           "request": {
             "method": "GET",

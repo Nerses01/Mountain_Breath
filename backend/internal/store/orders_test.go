@@ -259,6 +259,74 @@ func TestUpdateOrderStatus_CancelRestoresStock(t *testing.T) {
 	}
 }
 
+// F2: the payment machine's write path. The interesting assertions are the
+// re-reads — GetOrder after each flip proves the change was COMMITTED, not
+// just present on the struct the method handed back.
+func TestUpdateOrderPaymentStatus(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test (needs Docker)")
+	}
+	resetDB(t)
+	s := store.New(testPool)
+	ctx := context.Background()
+
+	variantID := seedCatalog(t, 10)
+	userID := seedUserWithCart(t, "payer@test.local", variantID, 2)
+
+	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, testCheckout())
+	if err != nil {
+		t.Fatalf("CreateOrder: %v", err)
+	}
+	if order.PaymentStatus != domain.PaymentUnpaid {
+		t.Fatalf("new order payment = %q, want unpaid", order.PaymentStatus)
+	}
+
+	// Refunding money never taken is refused before any write.
+	_, err = s.UpdateOrderPaymentStatus(ctx, order.ID, domain.PaymentRefunded)
+	if !errors.Is(err, domain.ErrInvalidTransition) {
+		t.Errorf("unpaid → refunded: err = %v, want ErrInvalidTransition", err)
+	}
+
+	if _, err := s.UpdateOrderPaymentStatus(ctx, order.ID, domain.PaymentPaid); err != nil {
+		t.Fatalf("marking paid: %v", err)
+	}
+	got, err := s.GetOrder(ctx, order.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.PaymentStatus != domain.PaymentPaid {
+		t.Errorf("after mark-paid, stored payment = %q, want paid", got.PaymentStatus)
+	}
+
+	// Orthogonality: flipping payment must not have touched order status.
+	if got.Status != domain.OrderPending {
+		t.Errorf("order status changed to %q by a payment flip", got.Status)
+	}
+
+	if _, err := s.UpdateOrderPaymentStatus(ctx, order.ID, domain.PaymentRefunded); err != nil {
+		t.Fatalf("refunding: %v", err)
+	}
+	got, err = s.GetOrder(ctx, order.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.PaymentStatus != domain.PaymentRefunded {
+		t.Errorf("after refund, stored payment = %q, want refunded", got.PaymentStatus)
+	}
+
+	// Refunded is terminal — no erasing, no re-paying.
+	_, err = s.UpdateOrderPaymentStatus(ctx, order.ID, domain.PaymentPaid)
+	if !errors.Is(err, domain.ErrInvalidTransition) {
+		t.Errorf("refunded → paid: err = %v, want ErrInvalidTransition", err)
+	}
+
+	// And a missing order is a missing order.
+	_, err = s.UpdateOrderPaymentStatus(ctx, 99999, domain.PaymentPaid)
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("unknown id: err = %v, want ErrNotFound", err)
+	}
+}
+
 // products.sales_count is denormalized data (migration 000010): it is only
 // correct because the checkout transaction maintains it, so the increment
 // needs a test the way an aggregate query would not.

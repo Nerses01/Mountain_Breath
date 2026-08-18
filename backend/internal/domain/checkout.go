@@ -87,6 +87,41 @@ func ValidPaymentMethod(m string) bool {
 	return false
 }
 
+// The payment lifecycle as data, the same shape as orderTransitions: money
+// arrives (unpaid → paid), and money already taken can go back (paid →
+// refunded). Note what is ABSENT: paid → unpaid. A money record follows the
+// bookkeeping rule that a mistake is corrected by a compensating entry (the
+// refund), never by erasing the fact — the same reason the order machine has
+// no backward arrows. `refunded` is terminal.
+//
+// F2 (the Era III audit's top gap): E6 modelled this pair and no write path
+// was ever built — this map is the missing half of that model.
+var paymentTransitions = map[string][]string{
+	PaymentUnpaid: {PaymentPaid},
+	PaymentPaid:   {PaymentRefunded},
+}
+
+func ValidPaymentTransition(from, to string) bool {
+	for _, allowed := range paymentTransitions[from] {
+		if allowed == to {
+			return true
+		}
+	}
+	return false
+}
+
+// ValidPaymentStatus answers "is this even one of the three words" —
+// the handler's 400-shaped question, distinct from the 409-shaped
+// ValidPaymentTransition above (same split as ValidOrderStatus /
+// ValidOrderTransition).
+func ValidPaymentStatus(s string) bool {
+	switch s {
+	case PaymentUnpaid, PaymentPaid, PaymentRefunded:
+		return true
+	}
+	return false
+}
+
 // ValidatePayment enforces the one cross-field rule the design states
 // outright: "Cash — on delivery, AMD only". A courier collecting dollars in
 // Yerevan is not a thing, so the rule lives HERE, in the domain, rather

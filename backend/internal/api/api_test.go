@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -467,6 +468,23 @@ func (f *fakeStore) Reorder(_ context.Context, userID, orderID int64) (domain.Re
 }
 func (f *fakeStore) ListAllOrders(_ context.Context) ([]domain.Order, error) { return nil, nil }
 func (f *fakeStore) UpdateOrderStatus(_ context.Context, _ int64, _ string) (domain.Order, error) {
+	return domain.Order{}, domain.ErrNotFound
+}
+
+// UpdateOrderPaymentStatus behaves rather than stubs: it asks the SAME
+// domain function the real store asks, so handler tests can walk the whole
+// 200/409 surface — without duplicating any SQL-shaped logic, because the
+// machine lives in domain, not in the store.
+func (f *fakeStore) UpdateOrderPaymentStatus(_ context.Context, orderID int64, to string) (domain.Order, error) {
+	for i, o := range f.orders {
+		if o.ID == orderID {
+			if !domain.ValidPaymentTransition(o.PaymentStatus, to) {
+				return domain.Order{}, fmt.Errorf("%w: payment %s → %s", domain.ErrInvalidTransition, o.PaymentStatus, to)
+			}
+			f.orders[i].PaymentStatus = to
+			return f.orders[i], nil
+		}
+	}
 	return domain.Order{}, domain.ErrNotFound
 }
 

@@ -403,3 +403,51 @@ func (s *Server) handleUpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 	}
 	s.respondJSON(w, http.StatusOK, toOrderResponse(order))
 }
+
+type updatePaymentRequest struct {
+	PaymentStatus string `json:"payment_status"`
+}
+
+// PATCH /admin/orders/{id}/payment — drive the OTHER state machine (F2):
+// whether money arrived, orthogonal to where the parcel is. This is the
+// write path the Era III audit found missing: E6 modelled the column and
+// nothing could ever flip it, so a bank-transfer order could never become
+// paid. The same three-way error split as the status handler: 400 for a
+// word that is not a payment status at all, 409 for a real status the
+// machine refuses from here, 404 for no such order.
+func (s *Server) handleUpdateOrderPayment(w http.ResponseWriter, r *http.Request) {
+	orderID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_id", "order id must be a number")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	var req updatePaymentRequest
+	if err := dec.Decode(&req); err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_json", "request body is not valid JSON: "+err.Error())
+		return
+	}
+	if !domain.ValidPaymentStatus(req.PaymentStatus) {
+		s.respondValidationError(w, map[string]string{"payment_status": "unknown payment status"})
+		return
+	}
+
+	order, err := s.store.UpdateOrderPaymentStatus(r.Context(), orderID, req.PaymentStatus)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrNotFound):
+			s.respondError(w, http.StatusNotFound, "not_found", "no such order")
+		case errors.Is(err, domain.ErrInvalidTransition):
+			s.respondError(w, http.StatusConflict, "invalid_transition", err.Error())
+		default:
+			s.log.Error("updating payment status", "error", err)
+			s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		}
+		return
+	}
+	s.respondJSON(w, http.StatusOK, toOrderResponse(order))
+}

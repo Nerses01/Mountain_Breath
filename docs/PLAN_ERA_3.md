@@ -25,12 +25,14 @@
 The re-read's most valuable products, because nothing else would ever have
 surfaced them:
 
-- [ ] **`payment_status` has no write path.** E6 modelled it ("the admin
+- [x] ~~**`payment_status` has no write path.**~~ E6 modelled it ("the admin
       flips it; the column exists so that flip is a recorded fact") and
       nobody ever built the flip — no endpoint, no button. Consequence: a
-      bank-transfer order can NEVER become `paid`, which blocks the shop's
-      stated operating model on day one. Small fix (one PATCH endpoint +
-      two buttons on the admin orders table), **top of F2**.
+      bank-transfer order could NEVER become `paid`. **Closed 2026-08-18
+      (decision #91):** `PATCH /admin/orders/{id}/payment` drives a
+      payment state machine in the domain (`unpaid → paid → refunded`, no
+      backward arrows), with mark-paid/mark-refunded buttons on the admin
+      orders table. F2's first item, done first as §4 suggested.
 - [ ] **The privacy page promises what the API cannot do.** E9's copy says
       "delete your account entirely" and "we will show you what we store" —
       there is no deletion endpoint and no export. A published promise is a
@@ -110,9 +112,11 @@ drill has actually run, and an alert reaches a phone.
 **Goal:** the family can run the store without psql. Era II built the
 customer's every screen; the admin got only what each phase needed.
 
-- [ ] **`PATCH /admin/orders/{id}/payment` + buttons** — mark
+- [x] **`PATCH /admin/orders/{id}/payment` + buttons** — mark
       paid/refunded, the §1 gap. The state pair stays orthogonal to order
-      status, as E6 modelled it.
+      status, as E6 modelled it. *Done 2026-08-18 (decision #91): domain
+      machine + store write (FOR UPDATE, no side effects), the endpoint,
+      the two buttons, tests at all three layers.*
 - [ ] **Order status-change emails** (the other half of Phase 11's
       "order e-mail notifications"): confirmed/shipped/delivered/cancelled
       notify the customer, through the existing Mailer + template pattern,

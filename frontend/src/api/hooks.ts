@@ -13,6 +13,7 @@ import type {
   ImageInput,
   NewReview,
   OrderStatus,
+  PaymentStatus,
   Product,
   ReviewStatus,
   UpdateProduct,
@@ -684,6 +685,22 @@ export function useUpdateOrderStatus() {
       // cancelling restores stock
       qc.invalidateQueries({ queryKey: ['products'] })
       qc.invalidateQueries({ queryKey: ['product'] })
+    },
+  })
+}
+
+// F2: flip an order's payment status (mark paid / refunded). Narrower
+// invalidation than its status sibling: a payment flip never touches
+// stock, so the product caches stay put — only the two order views
+// (the admin table and the customer's own pages) need a refetch.
+export function useUpdateOrderPayment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orderId, paymentStatus }: { orderId: number; paymentStatus: PaymentStatus }) =>
+      api.updateOrderPayment(orderId, paymentStatus),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-orders'] })
+      qc.invalidateQueries({ queryKey: ['orders'] })
     },
   })
 }

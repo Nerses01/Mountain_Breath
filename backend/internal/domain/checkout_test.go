@@ -124,3 +124,48 @@ func TestValidatePayment(t *testing.T) {
 		t.Errorf("unknown method: %v", f)
 	}
 }
+
+// F2: the payment machine, exhaustively — three states make nine ordered
+// pairs, so the table can simply list all of them plus the garbage cases.
+func TestValidPaymentTransition(t *testing.T) {
+	tests := []struct {
+		name string
+		from string
+		to   string
+		want bool
+	}{
+		{"money arrives", domain.PaymentUnpaid, domain.PaymentPaid, true},
+		{"money goes back", domain.PaymentPaid, domain.PaymentRefunded, true},
+
+		{"no refunding money never taken", domain.PaymentUnpaid, domain.PaymentRefunded, false},
+		{"no erasing a payment", domain.PaymentPaid, domain.PaymentUnpaid, false},
+		{"refunded is terminal (to paid)", domain.PaymentRefunded, domain.PaymentPaid, false},
+		{"refunded is terminal (to unpaid)", domain.PaymentRefunded, domain.PaymentUnpaid, false},
+		{"no self transition (unpaid)", domain.PaymentUnpaid, domain.PaymentUnpaid, false},
+		{"no self transition (paid)", domain.PaymentPaid, domain.PaymentPaid, false},
+		{"no self transition (refunded)", domain.PaymentRefunded, domain.PaymentRefunded, false},
+		{"unknown from-status", "garbage", domain.PaymentPaid, false},
+		{"unknown to-status", domain.PaymentUnpaid, "garbage", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := domain.ValidPaymentTransition(tt.from, tt.to); got != tt.want {
+				t.Errorf("ValidPaymentTransition(%q, %q) = %v, want %v", tt.from, tt.to, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidPaymentStatus(t *testing.T) {
+	for _, valid := range []string{domain.PaymentUnpaid, domain.PaymentPaid, domain.PaymentRefunded} {
+		if !domain.ValidPaymentStatus(valid) {
+			t.Errorf("ValidPaymentStatus(%q) = false, want true", valid)
+		}
+	}
+	for _, invalid := range []string{"", "PAID", "card"} {
+		if domain.ValidPaymentStatus(invalid) {
+			t.Errorf("ValidPaymentStatus(%q) = true, want false", invalid)
+		}
+	}
+}

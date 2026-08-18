@@ -560,6 +560,54 @@ func (s *Store) UpdateOrderStatus(ctx context.Context, orderID int64, to string)
 	return o, nil
 }
 
+// UpdateOrderPaymentStatus flips the OTHER state machine (F2): whether
+// money has arrived, orthogonal to where the parcel is. Same skeleton as
+// UpdateOrderStatus — lock, validate in the domain, write — but with no
+// side effects: nothing to restock, and no event row, because the column
+// itself is the recorded fact E6 modelled ("the admin flips it; the column
+// exists so that flip is a recorded fact").
+//
+// The read-then-write NEEDS the transaction + FOR UPDATE even though it is
+// two tiny statements: without the lock, two admins clicking "mark paid"
+// and "mark refunded" at once could both read `unpaid`, both pass
+// validation, and the losing write would land a refund on money the record
+// says never arrived. Same reasoning as the checkout's stock decrement,
+// at one row's scale.
+func (s *Store) UpdateOrderPaymentStatus(ctx context.Context, orderID int64, to string) (domain.Order, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return domain.Order{}, fmt.Errorf("beginning payment tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	o, err := scanOrder(tx.QueryRow(ctx, `
+		SELECT `+orderColumns+`
+		FROM orders WHERE id = $1
+		FOR UPDATE`,
+		orderID))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Order{}, domain.ErrNotFound
+		}
+		return domain.Order{}, fmt.Errorf("locking order: %w", err)
+	}
+
+	if !domain.ValidPaymentTransition(o.PaymentStatus, to) {
+		return domain.Order{}, fmt.Errorf("%w: payment %s → %s", domain.ErrInvalidTransition, o.PaymentStatus, to)
+	}
+
+	if _, err := tx.Exec(ctx,
+		`UPDATE orders SET payment_status = $1 WHERE id = $2`, to, orderID); err != nil {
+		return domain.Order{}, fmt.Errorf("updating payment status: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Order{}, fmt.Errorf("committing payment change: %w", err)
+	}
+	o.PaymentStatus = to
+	return o, nil
+}
+
 // Reorder merges an order's lines back into the cart (A2, decision log
 // #86): one transaction, and PARTIAL SUCCESS is the designed outcome, not
 // an error — an order from last month meets today's stock, and the result

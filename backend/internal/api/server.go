@@ -103,6 +103,9 @@ type OrderStore interface {
 	ListOrdersByUser(ctx context.Context, userID int64) ([]domain.Order, error)
 	ListAllOrders(ctx context.Context) ([]domain.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID int64, to string) (domain.Order, error)
+	// F2: the payment machine's write path — whether money arrived,
+	// orthogonal to UpdateOrderStatus's "where is the parcel".
+	UpdateOrderPaymentStatus(ctx context.Context, orderID int64, to string) (domain.Order, error)
 	// A2: merge a past order's lines back into the cart. Ownership is the
 	// store's question here (unlike GetOrder) because the call WRITES to
 	// the caller's cart — a stranger's id returns ErrNotFound.
@@ -387,6 +390,7 @@ func (s *Server) Routes() chi.Router {
 			r.Post("/categories", s.handleCreateCategory)
 			r.Get("/orders", s.handleAdminListOrders)
 			r.Patch("/orders/{id}/status", s.handleUpdateOrderStatus)
+			r.Patch("/orders/{id}/payment", s.handleUpdateOrderPayment)
 			r.Get("/products", s.handleAdminListProducts)
 			r.Post("/products", s.handleCreateProduct)
 			r.Put("/products/{id}", s.handleUpdateProduct)

@@ -20,6 +20,7 @@ import type {
   NewProduct,
   Order,
   OrderStatus,
+  PaymentStatus,
   Paginated,
   ChangePasswordInput,
   NotificationSettings,
@@ -410,5 +411,13 @@ export const api = {
     request<Order>(`/api/v1/admin/orders/${orderId}/status`, {
       method: 'PATCH',
       body: { status },
+    }),
+  // F2: the OTHER state machine — whether money arrived, orthogonal to
+  // where the parcel is. unpaid → paid → refunded; an illegal flip is the
+  // backend's 409, not something this client pre-filters.
+  updateOrderPayment: (orderId: number, paymentStatus: PaymentStatus) =>
+    request<Order>(`/api/v1/admin/orders/${orderId}/payment`, {
+      method: 'PATCH',
+      body: { payment_status: paymentStatus },
     }),
 }

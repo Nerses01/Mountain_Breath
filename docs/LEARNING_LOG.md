@@ -17,6 +17,43 @@ Template for an entry:
 
 ---
 
+## 2026-08-18 — Phase F2 begins: the payment-status write path (Era III §1's top gap)
+
+**Worked on:** the first Era III cut, exactly the one §4 nominated: E6
+modelled `payment_status` as the orthogonal twin of order status and nobody
+ever built the flip — a bank-transfer order could never become `paid`. Now:
+a second tiny state machine in `domain` (`unpaid → paid → refunded`),
+`store.UpdateOrderPaymentStatus` (same lock-validate-write skeleton as its
+status sibling, minus every side effect), `PATCH /admin/orders/{id}/payment`,
+mark-paid/mark-refunded buttons on the admin orders table, tests at all
+three layers, decision #91.
+
+**Learned:**
+- *No backward arrows in money machines* — bookkeeping corrects a mistake
+  with a compensating entry (the refund), never by erasing the fact, so
+  `paid → unpaid` deliberately does not exist. Same reason the order
+  machine has no undo; now stated as a principle rather than an accident.
+- *Two orthogonal machines beat one merged enum* — a cancelled order can
+  still owe a refund; combining parcel-state and money-state into one
+  status would make that unrepresentable. C++ analogue: two small enums
+  over one enum with every combination spelled out.
+- *400 vs 409 is "not a word" vs "not from here"* — `ValidPaymentStatus`
+  answers the request-shaped question (422-ish validation), the
+  transition table answers the state-shaped one (409 conflict). Two
+  functions because they back two different HTTP answers.
+- *A behaving fake beats a stub when the brain lives in `domain`* — the
+  fakeStore's payment method calls the same `ValidPaymentTransition` the
+  real store calls, so handler tests walk 200/409/404 with zero duplicated
+  logic. That's the payoff of the `api → domain ← store` layering, visible.
+- *FOR UPDATE even for a two-statement flip* — two admins clicking
+  paid/refunded at once could both read `unpaid` and both pass validation;
+  the row lock serializes them. The checkout's reasoning at one row's scale.
+
+**Questions / to revisit:**
+- F4 will flip this same column from a provider webhook — does the webhook
+  call the same store method, or does a provider event deserve its own
+  recorded fact (a payments/events table) the way status transitions got one?
+
 ## 2026-08-18 — Phase A5: settings (canvas 10) — and the account plan closes
 
 **Worked on:** migration 000023 (`full_name`, `phone`,
