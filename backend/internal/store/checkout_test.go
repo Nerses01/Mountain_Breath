@@ -25,7 +25,7 @@ func TestCreateOrder_AddressSnapshotSurvivesAnEdit(t *testing.T) {
 
 	in := testCheckout()
 	in.Address.Street = "14 Abovyan St, apt 6"
-	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, in)
+	order, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyUSD}, in)
 	if err != nil {
 		t.Fatalf("CreateOrder: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestCheckout_UpsertsOneDefaultAddress(t *testing.T) {
 
 	first := testCheckout()
 	first.Address.City = "Yerevan"
-	if _, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, first); err != nil {
+	if _, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyUSD}, first); err != nil {
 		t.Fatal(err)
 	}
 
@@ -83,7 +83,7 @@ func TestCheckout_UpsertsOneDefaultAddress(t *testing.T) {
 	}
 	second := testCheckout()
 	second.Address.City = "Gyumri"
-	if _, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, second); err != nil {
+	if _, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyUSD}, second); err != nil {
 		t.Fatal(err)
 	}
 
@@ -119,7 +119,7 @@ func TestCreateOrder_CashOnDeliveryLandsUnpaid(t *testing.T) {
 
 	in := testCheckout()
 	in.PaymentMethod = domain.PayCashOnDelivery
-	order, err := s.CreateOrder(ctx, userID, domain.CurrencyAMD, in)
+	order, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyAMD}, in)
 	if err != nil {
 		t.Fatalf("CreateOrder: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestCreateOrder_ColdChainSurcharge(t *testing.T) {
 	}
 	userID := seedUserWithCart(t, "chilled@test.local", jellyID, 1)
 
-	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, testCheckout())
+	order, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyUSD}, testCheckout())
 	if err != nil {
 		t.Fatalf("CreateOrder: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestListAllOrders_JoinsTheCustomerEmail(t *testing.T) {
 
 	variantID := seedPricedProduct(t, "honey", "HON-1", 10, domain.Money{domain.CurrencyUSD: 1400})
 	userID := seedUserWithCart(t, "admin-view@test.local", variantID, 1)
-	placed, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, testCheckout())
+	placed, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyUSD}, testCheckout())
 	if err != nil {
 		t.Fatalf("CreateOrder: %v", err)
 	}
@@ -265,7 +265,7 @@ func TestPreviewMatchesTheCharge(t *testing.T) {
 		Now:           time.Now(),
 	})
 
-	order, err := s.CreateOrder(ctx, userID, domain.CurrencyAMD, testCheckout())
+	order, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyAMD}, testCheckout())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,5 +278,47 @@ func TestPreviewMatchesTheCharge(t *testing.T) {
 	// charge must have honoured it: 2 × 7,600 ֏ with no 1,900 ֏ base.
 	if order.TotalMinor != 15200 {
 		t.Errorf("total = %d, want 15200 (first delivery free)", order.TotalMinor)
+	}
+}
+
+// F2: the locale snapshot — the language the checkout happened in becomes
+// a fact on the order, read back like any other column, defaulting the
+// same way the currency does when the View carries no opinion.
+func TestCreateOrder_StampsLocale(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test (needs Docker)")
+	}
+	resetDB(t)
+	s := store.New(testPool)
+	ctx := context.Background()
+
+	variantID := seedPricedProduct(t, "honey", "HON-1", 10, domain.Money{domain.CurrencyUSD: 1400})
+
+	userID := seedUserWithCart(t, "armenian@test.local", variantID, 1)
+	order, err := s.CreateOrder(ctx, userID,
+		domain.View{Currency: domain.CurrencyUSD, Locale: domain.LocaleHY}, testCheckout())
+	if err != nil {
+		t.Fatalf("CreateOrder: %v", err)
+	}
+	got, err := s.GetOrder(ctx, order.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Locale != domain.LocaleHY {
+		t.Errorf("stored locale = %q, want hy", got.Locale)
+	}
+
+	// A bare View means the defaults, not empty strings in the database.
+	userID2 := seedUserWithCart(t, "defaulter@test.local", variantID, 1)
+	order2, err := s.CreateOrder(ctx, userID2, domain.View{Currency: domain.CurrencyUSD}, testCheckout())
+	if err != nil {
+		t.Fatalf("CreateOrder: %v", err)
+	}
+	got2, err := s.GetOrder(ctx, order2.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got2.Locale != domain.DefaultLocale {
+		t.Errorf("defaulted locale = %q, want %q", got2.Locale, domain.DefaultLocale)
 	}
 }

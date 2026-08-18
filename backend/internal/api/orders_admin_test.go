@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/Nerses01/Mountain_Breath/backend/internal/api"
 	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
 )
 
@@ -99,6 +101,86 @@ func TestUpdateOrderPayment(t *testing.T) {
 		}
 		if fake.orders[0].PaymentStatus != domain.PaymentRefunded {
 			t.Errorf("stored payment = %q, want refunded", fake.orders[0].PaymentStatus)
+		}
+	})
+}
+
+// F2: the status-change mails. The fixture order's locale is ARMENIAN while
+// every request in the test is plain English — which is exactly the point:
+// the mail must follow the order's snapshot, not anyone's Accept-Language.
+func TestUpdateOrderStatus_EmailsCustomer(t *testing.T) {
+	newFake := func(notify bool) *fakeStore {
+		fake := newFakeStore()
+		fake.orders = []domain.Order{{
+			ID: 12, UserID: 7, Status: domain.OrderPending,
+			Locale: domain.LocaleHY, Currency: domain.CurrencyAMD,
+			PaymentMethod: domain.PayBankTransfer, PaymentStatus: domain.PaymentUnpaid,
+		}}
+		fake.usersByID[7] = domain.User{
+			ID: 7, Email: "anahit@test.local", NotifyOrderUpdates: notify,
+		}
+		return fake
+	}
+
+	patchStatus := func(fake *fakeStore, mailer *fakeMailer, body string) *httptest.ResponseRecorder {
+		srv := newTestServerOpts(fake, api.Options{Mailer: mailer, PublicURL: "https://shop.example"})
+		cookie := loginAs(fake, domain.User{ID: 2, Role: domain.RoleAdmin})
+		return doRequest(srv, http.MethodPatch, "/api/v1/admin/orders/12/status", body, cookie)
+	}
+
+	t.Run("confirming mails the customer in the order's language", func(t *testing.T) {
+		fake, mailer := newFake(true), &fakeMailer{}
+		if rec := patchStatus(fake, mailer, `{"status":"confirmed"}`); rec.Code != http.StatusOK {
+			t.Fatalf("status = %d; body %s", rec.Code, rec.Body)
+		}
+		if len(mailer.sent) != 1 {
+			t.Fatalf("%d mails sent, want 1", len(mailer.sent))
+		}
+		msg := mailer.sent[0]
+		if msg.To != "anahit@test.local" {
+			t.Errorf("to = %q, want the CUSTOMER, not the admin", msg.To)
+		}
+		if !strings.Contains(msg.Subject, "#12") || !strings.Contains(msg.Subject, "Պատվեր") {
+			t.Errorf("subject = %q, want the Armenian confirmed subject", msg.Subject)
+		}
+		if !strings.Contains(msg.Text, "https://shop.example/hy/orders/12") {
+			t.Errorf("body lacks the localized order link: %q", msg.Text)
+		}
+	})
+
+	t.Run("the notify toggle off means the change happens silently", func(t *testing.T) {
+		fake, mailer := newFake(false), &fakeMailer{}
+		if rec := patchStatus(fake, mailer, `{"status":"confirmed"}`); rec.Code != http.StatusOK {
+			t.Fatalf("status = %d; body %s", rec.Code, rec.Body)
+		}
+		if fake.orders[0].Status != domain.OrderConfirmed {
+			t.Errorf("status = %q — the toggle must gate the MAIL, not the change", fake.orders[0].Status)
+		}
+		if len(mailer.sent) != 0 {
+			t.Errorf("%d mails sent past an opted-out toggle", len(mailer.sent))
+		}
+	})
+
+	t.Run("a refused transition sends nothing", func(t *testing.T) {
+		fake, mailer := newFake(true), &fakeMailer{}
+		if rec := patchStatus(fake, mailer, `{"status":"delivered"}`); rec.Code != http.StatusConflict {
+			t.Fatalf("pending → delivered: status = %d, want 409", rec.Code)
+		}
+		if len(mailer.sent) != 0 {
+			t.Errorf("%d mails sent for a transition that never happened", len(mailer.sent))
+		}
+	})
+
+	t.Run("payment flips never mail — only the parcel's machine writes letters", func(t *testing.T) {
+		fake, mailer := newFake(true), &fakeMailer{}
+		srv := newTestServerOpts(fake, api.Options{Mailer: mailer, PublicURL: "https://shop.example"})
+		cookie := loginAs(fake, domain.User{ID: 2, Role: domain.RoleAdmin})
+		rec := doRequest(srv, http.MethodPatch, "/api/v1/admin/orders/12/payment", `{"payment_status":"paid"}`, cookie)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d; body %s", rec.Code, rec.Body)
+		}
+		if len(mailer.sent) != 0 {
+			t.Errorf("%d mails sent by a payment flip", len(mailer.sent))
 		}
 	})
 }

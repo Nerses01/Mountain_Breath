@@ -67,8 +67,10 @@ type fakeStore struct {
 	cart         []domain.CartItem
 
 	// E6 checkout.
-	lastCheckout   domain.CheckoutInput
-	orders         []domain.Order
+	lastCheckout domain.CheckoutInput
+	orders       []domain.Order
+	// F2: who the status mailer finds when it looks up an order's customer.
+	usersByID      map[int64]domain.User
 	shippingRates  map[domain.Currency]domain.ShippingRate
 	defaultAddress *domain.AddressEntry
 
@@ -126,8 +128,9 @@ type fakeStore struct {
 
 func newFakeStore() *fakeStore {
 	return &fakeStore{
-		sessions: make(map[string]domain.User),
-		wishlist: make(map[int64]bool),
+		sessions:  make(map[string]domain.User),
+		wishlist:  make(map[int64]bool),
+		usersByID: make(map[int64]domain.User),
 	}
 }
 
@@ -342,6 +345,15 @@ func (f *fakeStore) GetUserByEmail(_ context.Context, email string) (domain.User
 	return domain.User{}, domain.ErrNotFound
 }
 
+// F2: the status mailer's read. A map, because the mail tests need users
+// with DIFFERENT notify toggles side by side; empty map = nobody exists.
+func (f *fakeStore) GetUserByID(_ context.Context, userID int64) (domain.User, error) {
+	if u, ok := f.usersByID[userID]; ok {
+		return u, nil
+	}
+	return domain.User{}, domain.ErrNotFound
+}
+
 func (f *fakeStore) CreateSession(_ context.Context, token string, userID int64, _ time.Time) error {
 	f.sessions[token] = domain.User{ID: userID}
 	return nil
@@ -367,8 +379,8 @@ func (f *fakeStore) GetCart(_ context.Context, _ int64, view domain.View) ([]dom
 }
 func (f *fakeStore) SetCartItem(_ context.Context, _, _ int64, _ int) error { return nil }
 func (f *fakeStore) DeleteCartItem(_ context.Context, _, _ int64) error     { return nil }
-func (f *fakeStore) CreateOrder(_ context.Context, _ int64, currency domain.Currency, in domain.CheckoutInput) (domain.Order, error) {
-	f.lastCurrency = currency
+func (f *fakeStore) CreateOrder(_ context.Context, _ int64, view domain.View, in domain.CheckoutInput) (domain.Order, error) {
+	f.lastCurrency = view.EffectiveCurrency()
 	f.lastCheckout = in
 	if f.orderErr != nil {
 		return domain.Order{}, f.orderErr
@@ -377,7 +389,8 @@ func (f *fakeStore) CreateOrder(_ context.Context, _ int64, currency domain.Curr
 		return domain.Order{}, domain.ErrEmptyCart
 	}
 	return domain.Order{
-		ID: 1, Status: domain.OrderPending, Currency: currency,
+		ID: 1, Status: domain.OrderPending,
+		Currency: view.EffectiveCurrency(), Locale: view.EffectiveLocale(),
 		ShipTo: &in.Address, PaymentMethod: in.PaymentMethod,
 		PaymentStatus: domain.PaymentUnpaid,
 	}, nil
@@ -467,7 +480,21 @@ func (f *fakeStore) Reorder(_ context.Context, userID, orderID int64) (domain.Re
 	return domain.ReorderResult{}, domain.ErrNotFound
 }
 func (f *fakeStore) ListAllOrders(_ context.Context) ([]domain.Order, error) { return nil, nil }
-func (f *fakeStore) UpdateOrderStatus(_ context.Context, _ int64, _ string) (domain.Order, error) {
+
+// UpdateOrderStatus graduated from stub to behaving fake when F2's status
+// mailer gave handler tests something to observe after a 200 — same shape
+// as its payment sibling below: the transition brain is the domain's, so
+// the fake borrows it rather than duplicating it.
+func (f *fakeStore) UpdateOrderStatus(_ context.Context, orderID int64, to string) (domain.Order, error) {
+	for i, o := range f.orders {
+		if o.ID == orderID {
+			if !domain.ValidOrderTransition(o.Status, to) {
+				return domain.Order{}, fmt.Errorf("%w: %s → %s", domain.ErrInvalidTransition, o.Status, to)
+			}
+			f.orders[i].Status = to
+			return f.orders[i], nil
+		}
+	}
 	return domain.Order{}, domain.ErrNotFound
 }
 

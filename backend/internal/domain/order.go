@@ -41,6 +41,12 @@ type Order struct {
 	// into a double.
 	FxRateUsed *string
 
+	// F2. The language the checkout happened in — Currency's sibling
+	// snapshot, and for the same reason: a status-change email is sent
+	// days later by the ADMIN's request, whose negotiated language is the
+	// admin's. The customer's language is a fact about the order.
+	Locale Locale
+
 	// E6. The frozen copy of where this order went — see the comment on
 	// migration 000017 for why it is columns, not a reference into the
 	// editable address book. Nil for orders that predate checkout-with-

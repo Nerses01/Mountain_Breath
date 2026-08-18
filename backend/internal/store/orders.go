@@ -17,21 +17,26 @@ import (
 // happens in ONE transaction: either the whole checkout succeeds, or the
 // database is left exactly as it was.
 //
-// `currency` is what the customer is CHARGED in, and the order is stamped
-// with it. A cart is a live thing that can be read in either market; an
+// `view` carries the two edge-negotiated facts the order is stamped with
+// (F2 widened this from a bare Currency — the Parameter Object paying out
+// exactly as its comment promised). The CURRENCY is what the customer is
+// CHARGED in: a cart is a live thing that can be read in either market; an
 // order is a fact about a transaction that happened in exactly one of them,
 // which is why nothing below is dual and every number that follows is
-// denominated in this one currency.
+// denominated in that one currency. The LOCALE is the language the
+// checkout happened in, snapshotted for the same reason as the prices: a
+// status email sent weeks later is triggered by the ADMIN's request, and
+// the customer's language is a fact about the order, not about whoever
+// pressed the button.
 //
 // E6 added `in` — the customer's CHOICES (address, method, note), already
 // validated by the API layer. Note what the function still computes for
 // itself: the subtotal from locked shelf prices, the shipping from the
 // rates table, the totals from domain arithmetic. Nothing in `in` is money,
 // so nothing a client sends can change what is charged.
-func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.Currency, in domain.CheckoutInput) (domain.Order, error) {
-	if currency == "" {
-		currency = domain.DefaultCurrency
-	}
+func (s *Store) CreateOrder(ctx context.Context, userID int64, view domain.View, in domain.CheckoutInput) (domain.Order, error) {
+	currency := view.EffectiveCurrency()
+	locale := view.EffectiveLocale()
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -226,7 +231,7 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 
 	order := domain.Order{
 		UserID: userID, Status: domain.OrderPending, TotalMinor: totals.TotalMinor,
-		Currency: currency, FxRateUsed: fxRate,
+		Currency: currency, Locale: locale, FxRateUsed: fxRate,
 		ShipTo: &in.Address, DeliveryNote: in.DeliveryNote,
 		LeaveWithNeighbour: in.LeaveWithNeighbour,
 		Totals:             totals,
@@ -251,10 +256,10 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 		                    payment_method, payment_status,
 		                    ship_first_name, ship_last_name, ship_phone, ship_street,
 		                    ship_city, ship_postal_code, ship_country,
-		                    delivery_note, leave_with_neighbour)
+		                    delivery_note, leave_with_neighbour, locale)
 		VALUES ($1, $2, $3, $4, $5::numeric,
 		        $6, $7, $8, $9, $10, $11, $12, $13, $14,
-		        $15, $16, $17, $18, $19, $20, $21, $22, $23)
+		        $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
 		RETURNING id, created_at`,
 		userID, order.Status, totals.TotalMinor, currency, fxRate,
 		totals.SubtotalMinor, totals.ShippingMinor, totals.DiscountMinor, totals.TaxMinor,
@@ -262,7 +267,7 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, currency domain.C
 		order.PaymentMethod, order.PaymentStatus,
 		in.Address.FirstName, in.Address.LastName, in.Address.Phone, in.Address.Street,
 		in.Address.City, in.Address.PostalCode, in.Address.Country,
-		in.DeliveryNote, in.LeaveWithNeighbour,
+		in.DeliveryNote, in.LeaveWithNeighbour, locale,
 	).Scan(&order.ID, &order.CreatedAt)
 	if err != nil {
 		return domain.Order{}, fmt.Errorf("inserting order: %w", err)
@@ -400,7 +405,7 @@ const orderColumns = `orders.id, orders.user_id, orders.status,
 	orders.ship_street, orders.ship_city, orders.ship_postal_code,
 	orders.ship_country, orders.delivery_note, orders.leave_with_neighbour,
 	orders.member_discount_minor, orders.promo_discount_minor,
-	COALESCE(orders.promo_code, '')`
+	COALESCE(orders.promo_code, ''), orders.locale`
 
 // scanOrder reads one row of orderColumns (plus whatever the caller
 // appended) into a domain.Order. The ship_* columns are nullable — orders
@@ -417,7 +422,7 @@ func scanOrder(row pgx.Row, extra ...any) (domain.Order, error) {
 		&first, &last, &phone, &street, &city, &postal, &country,
 		&o.DeliveryNote, &o.LeaveWithNeighbour,
 		&o.Totals.MemberDiscountMinor, &o.Totals.PromoDiscountMinor,
-		&o.PromoCode}
+		&o.PromoCode, &o.Locale}
 	if err := row.Scan(append(dest, extra...)...); err != nil {
 		return domain.Order{}, err
 	}

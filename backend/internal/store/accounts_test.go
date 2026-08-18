@@ -426,7 +426,7 @@ func TestAddressNeighbourFlag(t *testing.T) {
 
 		in := testCheckout()
 		in.LeaveWithNeighbour = true
-		if _, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, in); err != nil {
+		if _, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyUSD}, in); err != nil {
 			t.Fatal(err)
 		}
 
@@ -542,4 +542,44 @@ func TestSettingsStore(t *testing.T) {
 			t.Errorf("after unsubscribe = %q", got)
 		}
 	})
+}
+
+// F2: GetUserByID, the status mailer's read — the email plus the toggle
+// that gates it, including the toggle's round trip through the A5 setter.
+func TestGetUserByID(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test (needs Docker)")
+	}
+	resetDB(t)
+	s := store.New(testPool)
+	ctx := context.Background()
+
+	userID := seedUser(t, "lookup@test.local")
+
+	u, err := s.GetUserByID(ctx, userID)
+	if err != nil {
+		t.Fatalf("GetUserByID: %v", err)
+	}
+	if u.Email != "lookup@test.local" {
+		t.Errorf("email = %q", u.Email)
+	}
+	// The migration's default: everyone starts opted in.
+	if !u.NotifyOrderUpdates {
+		t.Error("new user's notify_order_updates = false, want the TRUE default")
+	}
+
+	if err := s.SetNotifyOrderUpdates(ctx, userID, false); err != nil {
+		t.Fatal(err)
+	}
+	u, err = s.GetUserByID(ctx, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.NotifyOrderUpdates {
+		t.Error("toggle did not round-trip to false")
+	}
+
+	if _, err := s.GetUserByID(ctx, 99999); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("unknown id: err = %v, want ErrNotFound", err)
+	}
 }

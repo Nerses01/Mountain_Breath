@@ -67,7 +67,7 @@ func TestCreateOrder_RedeemsThePromo(t *testing.T) {
 	userID := seedUserWithCart(t, "member@test.local", variantID, 1)
 
 	// Order one makes them a member (and spends the first-delivery perk).
-	if _, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, testCheckout()); err != nil {
+	if _, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyUSD}, testCheckout()); err != nil {
 		t.Fatalf("first order: %v", err)
 	}
 
@@ -80,7 +80,7 @@ func TestCreateOrder_RedeemsThePromo(t *testing.T) {
 	}
 	attachPromo(t, userID, codeID)
 
-	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, testCheckout())
+	order, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyUSD}, testCheckout())
 	if err != nil {
 		t.Fatalf("second order: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestCreateOrder_RefusesAStaleCode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, testCheckout())
+	_, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyUSD}, testCheckout())
 	if !errors.Is(err, domain.ErrPromoInvalid) {
 		t.Fatalf("err = %v, want ErrPromoInvalid", err)
 	}
@@ -183,7 +183,7 @@ func TestCancelReleasesTheRedemption(t *testing.T) {
 	codeID := seedPromo(t, "ONEUSE", domain.PromoPercent, 10, &one, nil)
 	attachPromo(t, userID, codeID)
 
-	order, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, testCheckout())
+	order, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyUSD}, testCheckout())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +250,7 @@ func TestCreateOrder_ParallelCheckoutsCannotOverRedeem(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			_, errs[i] = s.CreateOrder(ctx, userIDs[i], domain.CurrencyUSD, testCheckout())
+			_, errs[i] = s.CreateOrder(ctx, userIDs[i], domain.View{Currency: domain.CurrencyUSD}, testCheckout())
 		}(i)
 	}
 	wg.Wait()
@@ -300,7 +300,7 @@ func TestHiveClubPerksAcrossTwoOrders(t *testing.T) {
 	variantID := seedPricedProduct(t, "honey", "HON-1", 10, domain.Money{domain.CurrencyUSD: 3000})
 	userID := seedUserWithCart(t, "newbee@test.local", variantID, 1)
 
-	first, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, testCheckout())
+	first, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyUSD}, testCheckout())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +314,7 @@ func TestHiveClubPerksAcrossTwoOrders(t *testing.T) {
 		userID, variantID); err != nil {
 		t.Fatal(err)
 	}
-	second, err := s.CreateOrder(ctx, userID, domain.CurrencyUSD, testCheckout())
+	second, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyUSD}, testCheckout())
 	if err != nil {
 		t.Fatal(err)
 	}

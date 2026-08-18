@@ -73,6 +73,9 @@ type ReviewStore interface {
 type UserStore interface {
 	CreateUser(ctx context.Context, u *domain.User) error
 	GetUserByEmail(ctx context.Context, email string) (domain.User, error)
+	// F2: the status mailer's read — an order knows its customer only as
+	// user_id, and the mail needs the email plus the toggle that gates it.
+	GetUserByID(ctx context.Context, userID int64) (domain.User, error)
 }
 
 type SessionStore interface {
@@ -96,7 +99,7 @@ type OrderStore interface {
 	// the edge (withCurrency) and stamped on the order — not read back off
 	// the cart, which has no single currency of its own. The CheckoutInput
 	// carries the customer's CHOICES and no money; see domain.CheckoutInput.
-	CreateOrder(ctx context.Context, userID int64, currency domain.Currency, in domain.CheckoutInput) (domain.Order, error)
+	CreateOrder(ctx context.Context, userID int64, view domain.View, in domain.CheckoutInput) (domain.Order, error)
 	// GetOrder is unscoped; the handler decides who may see it (owner or
 	// admin) — the store answers "what is order 12", not "may you look".
 	GetOrder(ctx context.Context, orderID int64) (domain.Order, error)

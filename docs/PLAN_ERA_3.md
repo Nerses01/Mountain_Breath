@@ -117,10 +117,14 @@ customer's every screen; the admin got only what each phase needed.
       status, as E6 modelled it. *Done 2026-08-18 (decision #91): domain
       machine + store write (FOR UPDATE, no side effects), the endpoint,
       the two buttons, tests at all three layers.*
-- [ ] **Order status-change emails** (the other half of Phase 11's
+- [x] **Order status-change emails** (the other half of Phase 11's
       "order e-mail notifications"): confirmed/shipped/delivered/cancelled
       notify the customer, through the existing Mailer + template pattern,
-      in the order's locale.
+      in the order's locale. *Done 2026-08-18 (decision #92): migration
+      000024 snapshots the checkout's locale onto the order,
+      `CreateOrder` widened to take `domain.View`, the status handler
+      sends non-fatally honoring `notify_order_updates` (#87's promise),
+      trilingual copy flagged for the F3 native review.*
 - [ ] **Customer-facing cancellation** while `pending` (Phase 11 line):
       one endpoint (the domain state machine already allows it and
       restores stock + promo redemptions), one button on the order page.

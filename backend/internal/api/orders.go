@@ -172,8 +172,14 @@ func (s *Server) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 
 	// The currency comes from the EDGE, never from the request body. A client
 	// that could name what it pays in could name the cheaper of two markets
-	// for a basket priced in the dearer one.
-	currency := currencyFromContext(r.Context())
+	// for a basket priced in the dearer one. The locale rides along in the
+	// same View (F2): the order snapshots the language the checkout happened
+	// in, so later mails about it speak to the customer, not to the admin
+	// whose click triggered them.
+	view := domain.View{
+		Currency: currencyFromContext(r.Context()),
+		Locale:   localeFromContext(r.Context()),
+	}
 
 	in := domain.CheckoutInput{
 		Address:            req.Address.toDomain(),
@@ -181,12 +187,12 @@ func (s *Server) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 		DeliveryNote:       req.DeliveryNote,
 		LeaveWithNeighbour: req.LeaveWithNeighbour,
 	}
-	if fields := domain.ValidateCheckout(in, currency); len(fields) > 0 {
+	if fields := domain.ValidateCheckout(in, view.EffectiveCurrency()); len(fields) > 0 {
 		s.respondValidationError(w, fields)
 		return
 	}
 
-	order, err := s.store.CreateOrder(r.Context(), user.ID, currency, in)
+	order, err := s.store.CreateOrder(r.Context(), user.ID, view, in)
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrEmptyCart):
@@ -214,14 +220,15 @@ func (s *Server) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 	s.metrics.ordersCreated.Inc()
 
 	// E8: the confirmation mail, from the order's SNAPSHOTS (names and
-	// prices as charged), in the language the checkout happened in.
+	// prices as charged), in the language the checkout happened in — read
+	// back off the ORDER now that F2 snapshots it, so this mail and every
+	// later status mail derive the language from the same recorded fact.
 	// Non-fatal by design: the order EXISTS — a mail hiccup after commit is
 	// a logged nuisance, never a 500 telling the customer their real order
 	// failed.
-	locale := localeFromContext(r.Context())
-	orderURL := fmt.Sprintf("%s%s/orders/%d", s.publicURL, localePathPrefix(locale), order.ID)
+	orderURL := fmt.Sprintf("%s%s/orders/%d", s.publicURL, localePathPrefix(order.Locale), order.ID)
 	if err := s.mailer.Send(r.Context(),
-		mail.OrderConfirmation(locale, user.Email, order, orderURL)); err != nil {
+		mail.OrderConfirmation(order.Locale, user.Email, order, orderURL)); err != nil {
 		s.log.Error("sending order confirmation", "order", order.ID, "error", err)
 	}
 
@@ -401,6 +408,24 @@ func (s *Server) handleUpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 		}
 		return
 	}
+
+	// F2: tell the customer — in the ORDER's language (its snapshot), not
+	// the admin's, and only if their notify_order_updates toggle says so
+	// (decision #87 promised this check when the toggle shipped). Non-fatal
+	// like the confirmation mail: the transition is committed, and a mail
+	// problem is a logged nuisance, never a 500 telling the admin the
+	// status change failed.
+	if customer, uerr := s.store.GetUserByID(r.Context(), order.UserID); uerr != nil {
+		s.log.Error("loading customer for status mail", "order", order.ID, "error", uerr)
+	} else if customer.NotifyOrderUpdates {
+		orderURL := fmt.Sprintf("%s%s/orders/%d", s.publicURL, localePathPrefix(order.Locale), order.ID)
+		if msg, ok := mail.OrderStatusUpdate(customer.Email, order, orderURL); ok {
+			if err := s.mailer.Send(r.Context(), msg); err != nil {
+				s.log.Error("sending status mail", "order", order.ID, "error", err)
+			}
+		}
+	}
+
 	s.respondJSON(w, http.StatusOK, toOrderResponse(order))
 }
 

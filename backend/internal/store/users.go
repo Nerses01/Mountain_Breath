@@ -47,6 +47,28 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (domain.User, 
 	return u, nil
 }
 
+// GetUserByID is GetUserByEmail's sibling read, added for F2's status
+// mailer: an order knows its customer only as user_id, and the mail needs
+// the email plus the notify_order_updates toggle that gates it.
+func (s *Store) GetUserByID(ctx context.Context, userID int64) (domain.User, error) {
+	var u domain.User
+	err := s.pool.QueryRow(ctx, `
+		SELECT id, email, password_hash, role, created_at,
+		       full_name, phone, notify_order_updates
+		FROM users
+		WHERE id = $1`,
+		userID,
+	).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.CreatedAt,
+		&u.FullName, &u.Phone, &u.NotifyOrderUpdates)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.User{}, domain.ErrNotFound
+		}
+		return domain.User{}, fmt.Errorf("querying user by id: %w", err)
+	}
+	return u, nil
+}
+
 // UpdateProfile writes the settings form's two fields (A5). Whole-value
 // semantics like every PUT-shaped write here: the form shows both fields,
 // so it sends both.

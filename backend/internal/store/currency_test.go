@@ -280,7 +280,7 @@ func TestCreateOrder_SnapshotsTheCurrencyAndTheRate(t *testing.T) {
 	})
 	userID := seedUserWithCart(t, "amd-buyer@test.local", variantID, 3)
 
-	order, err := s.CreateOrder(ctx, userID, domain.CurrencyAMD, testCheckout())
+	order, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyAMD}, testCheckout())
 	if err != nil {
 		t.Fatalf("CreateOrder: %v", err)
 	}
@@ -311,7 +311,7 @@ func TestCreateOrder_SnapshotsTheCurrencyAndTheRate(t *testing.T) {
 	// A base-currency order involves no rate, and says so with NULL rather
 	// than with a decorative 1.0.
 	userID2 := seedUserWithCart(t, "usd-buyer@test.local", variantID, 1)
-	usdOrder, err := s.CreateOrder(ctx, userID2, domain.CurrencyUSD, testCheckout())
+	usdOrder, err := s.CreateOrder(ctx, userID2, domain.View{Currency: domain.CurrencyUSD}, testCheckout())
 	if err != nil {
 		t.Fatalf("CreateOrder(USD): %v", err)
 	}
@@ -355,7 +355,7 @@ func TestCreateOrder_RefusesAMarketItCannotPrice(t *testing.T) {
 		t.Fatal("the view invented a EUR price with no shelf price and no rate")
 	}
 
-	_, err := s.CreateOrder(ctx, userID, "EUR", testCheckout())
+	_, err := s.CreateOrder(ctx, userID, domain.View{Currency: "EUR"}, testCheckout())
 	if !errors.Is(err, domain.ErrPriceUnavailable) {
 		t.Fatalf("CreateOrder in EUR: err = %v, want ErrPriceUnavailable", err)
 	}

@@ -123,6 +123,68 @@ func NewsletterConfirmMessage(locale domain.Locale, to, link string) Message {
 	}
 }
 
+// F2: the status-change mails — one short note per step of the order
+// machine. The locale comes from the ORDER (its snapshot column), not from
+// the request that triggered the send: that request is the admin's, and
+// its negotiated language is the admin's. No entry for `pending`: orders
+// are born pending, and the confirmation mail is that step's letter.
+
+type statusCopy struct {
+	subject string // %d = order id
+	line    string
+}
+
+var statusMailCopies = map[domain.Locale]map[string]statusCopy{
+	domain.LocaleEN: {
+		domain.OrderConfirmed: {"Order #%d is confirmed", "The hive has taken your order to the packing bench — it ships soon."},
+		domain.OrderShipped:   {"Order #%d is on its way", "Your parcel has left the hive and is with the courier."},
+		domain.OrderDelivered: {"Order #%d has arrived", "Your parcel is delivered. Thank you for buying from the mountain."},
+		domain.OrderCancelled: {"Order #%d is cancelled", "This order has been cancelled and reserved jars went back on the shelf. If money was taken, it returns the way it came."},
+	},
+	domain.LocaleHY: {
+		domain.OrderConfirmed: {"Պատվեր #%d — հաստատված է", "Փեթակը ձեր պատվերն արդեն փաթեթավորում է — շուտով կուղարկվի։"},
+		domain.OrderShipped:   {"Պատվեր #%d — ճանապարհին է", "Ձեր ծանրոցը դուրս է եկել փեթակից և առաքիչի մոտ է։"},
+		domain.OrderDelivered: {"Պատվեր #%d — հասել է", "Ձեր ծանրոցն առաքված է։ Շնորհակալություն լեռից գնումներ անելու համար։"},
+		domain.OrderCancelled: {"Պատվեր #%d — չեղարկված է", "Այս պատվերը չեղարկվել է, և պահուստավորված բանկաները վերադարձել են դարակ։ Եթե գումար է գանձվել, այն կվերադարձվի նույն ճանապարհով։"},
+	},
+	domain.LocaleRU: {
+		domain.OrderConfirmed: {"Заказ #%d подтверждён", "Улей уже собирает ваш заказ — скоро отправим."},
+		domain.OrderShipped:   {"Заказ #%d в пути", "Ваша посылка покинула улей и передана курьеру."},
+		domain.OrderDelivered: {"Заказ #%d доставлен", "Ваша посылка доставлена. Спасибо, что покупаете с гор."},
+		domain.OrderCancelled: {"Заказ #%d отменён", "Этот заказ отменён, отложенные банки вернулись на полку. Если деньги были списаны, они вернутся тем же путём."},
+	},
+}
+
+var statusMailLinks = map[domain.Locale]string{
+	domain.LocaleEN: "The order's page, with its full history:\n%s",
+	domain.LocaleHY: "Պատվերի էջը՝ ամբողջական պատմությամբ․\n%s",
+	domain.LocaleRU: "Страница заказа с полной историей:\n%s",
+}
+
+// OrderStatusUpdate builds the note for one transition, in the order's own
+// language. The second return is false when the status has no copy —
+// unreachable for legal transitions, but "send nothing" beats a panic if
+// the machine ever grows a state before this map does.
+func OrderStatusUpdate(to string, o domain.Order, orderURL string) (Message, bool) {
+	copies, ok := statusMailCopies[o.Locale]
+	if !ok {
+		copies = statusMailCopies[domain.LocaleEN]
+	}
+	c, ok := copies[o.Status]
+	if !ok {
+		return Message{}, false
+	}
+	link, ok := statusMailLinks[o.Locale]
+	if !ok {
+		link = statusMailLinks[domain.LocaleEN]
+	}
+	return Message{
+		To:      to,
+		Subject: fmt.Sprintf(c.subject, o.ID),
+		Text:    c.line + "\n\n" + fmt.Sprintf(link, orderURL) + "\n",
+	}, true
+}
+
 // OrderConfirmation builds the receipt mail from an order's SNAPSHOTS — the
 // same rule as the order page: names and prices as charged, one currency,
 // no re-resolution against today's catalog.

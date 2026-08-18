@@ -2365,7 +2365,7 @@
                 "status"
               ]
             },
-            "description": "Drives the state machine: pending → confirmed → shipped → delivered; cancelled reachable from pending/confirmed (and restores stock). Illegal transition → 409 invalid_transition."
+            "description": "Drives the state machine: pending → confirmed → shipped → delivered; cancelled reachable from pending/confirmed (and restores stock). Illegal transition → 409 invalid_transition. F2: a successful transition also emails the customer — in the ORDER's locale (snapshotted at checkout, migration 000024), only if their notify_order_updates toggle is on, and non-fatally (a mail problem never fails the request)."
           },
           "event": [
             {

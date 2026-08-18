@@ -17,6 +17,46 @@ Template for an entry:
 
 ---
 
+## 2026-08-18 — Phase F2, part two: status-change emails (and the order learns its language)
+
+**Worked on:** the second F2 item — confirmed/shipped/delivered/cancelled
+now mail the customer through the existing Mailer. The prerequisite nothing
+had recorded: WHOSE language? The trigger is the admin's request, so the
+admin's negotiated locale is wrong by design. Migration 000024 snapshots
+the checkout's locale onto the order (default `'en'` doubles as backfill);
+`CreateOrder` widened from a bare `Currency` to `domain.View`; new
+`GetUserByID` feeds the handler the email plus the `notify_order_updates`
+toggle A5 shipped with exactly this sender promised (decision #87, honored;
+decision #92 records the rest). Trilingual copy ×4 statuses, flagged for
+F3's native review. No mail for `pending` (the confirmation letter is that
+step) and none for payment flips.
+
+**Learned:**
+- *"In the order's locale" is a schema requirement, not a template
+  argument* — a mail sent later than its trigger's request must read
+  language from a recorded fact, and the only honest record is a snapshot
+  at checkout, exactly like prices. Deferred sending changes where data
+  must live.
+- *The Parameter Object pays out on schedule* — View's comment promised
+  "add a field without editing every signature again"; widening
+  Currency→View cost one signature and a mechanical sed, not a redesign.
+  The C++ analogue held: `const Options&` over growing positional args.
+- *Preferences gate effects, not actions* — the toggle-off test pins that
+  the status still changes and only the MAIL is suppressed; a preference
+  that silently blocked the state change would be a bug wearing a
+  setting's clothes.
+- *Non-fatal side effects sit AFTER the commit and log instead of erroring*
+  — same pattern as the confirmation mail, now stated twice, which makes
+  it a rule: the transition happened; the letter about it is best-effort.
+- *A fake graduates when there is something to observe* — UpdateOrderStatus
+  was a bare ErrNotFound stub until a 200 had an observable consequence
+  (the mail); then it started borrowing the domain's real transition table.
+
+**Questions / to revisit:**
+- The mail's link uses the legacy `/orders/{id}` path (A1's redirect covers
+  it) — switch the mail builders to `/account/orders/{id}` someday, or keep
+  legacy paths in emails that outlive URL schemes?
+
 ## 2026-08-18 — Phase F2 begins: the payment-status write path (Era III §1's top gap)
 
 **Worked on:** the first Era III cut, exactly the one §4 nominated: E6
