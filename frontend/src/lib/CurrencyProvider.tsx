@@ -2,15 +2,22 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { setApiCurrency } from '../api/client'
 import type { Currency } from './currencies'
 import {
+  CURRENCY_DISPLAY_STORAGE_KEY,
   CURRENCY_STORAGE_KEY,
   CurrencyContext,
   readStoredCurrency,
+  readStoredDisplay,
   writeCurrencyCookie,
+  type CurrencyDisplay,
 } from './useCurrency'
 
 /** Mounted once at the app root; see useCurrency.ts for where the choice lives. */
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [currency, setCurrencyState] = useState<Currency>(readStoredCurrency)
+  // A5 (log #89): dual/single price display — localStorage only, no cookie:
+  // unlike the currency, the SERVER never needs to know how many lines a
+  // price draws.
+  const [display, setDisplayState] = useState<CurrencyDisplay>(readStoredDisplay)
 
   // Told to the API client SYNCHRONOUSLY during render, for exactly the
   // reason useLocale spells out: TanStack Query fires its request during this
@@ -34,6 +41,18 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     setCurrencyState(next)
   }, [])
 
-  const value = useMemo(() => ({ currency, setCurrency }), [currency, setCurrency])
+  const setDisplay = useCallback((next: CurrencyDisplay) => {
+    try {
+      localStorage.setItem(CURRENCY_DISPLAY_STORAGE_KEY, next)
+    } catch {
+      // storage unavailable — the session keeps the choice
+    }
+    setDisplayState(next)
+  }, [])
+
+  const value = useMemo(
+    () => ({ currency, setCurrency, display, setDisplay }),
+    [currency, setCurrency, display, setDisplay],
+  )
   return <CurrencyContext value={value}>{children}</CurrencyContext>
 }

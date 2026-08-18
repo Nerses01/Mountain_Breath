@@ -17,6 +17,55 @@ Template for an entry:
 
 ---
 
+## 2026-08-18 — Phase A5: settings (canvas 10) — and the account plan closes
+
+**Worked on:** migration 000023 (`full_name`, `phone`,
+`notify_order_updates`), PATCH /account/profile (echoing the fresh
+user), POST /account/password (current verified, other sessions
+revoked), the notifications endpoints incl. the tokenless newsletter
+unsubscribe, the canvas-10 screen (profile/password panels, language
+links + currency display segments per #89, real+stub toggles via a new
+`Switch`, the F2 delete stub), `lib/displayName` unifying identity in
+the rail and header pill, strings ×3, tests at every layer. **PLAN_ACCOUNT
+A1–A5 complete.**
+
+**Learned:**
+
+- **Two revocation policies, one sentence apart:** reset revokes ALL
+  sessions (the password was suspect — the thief's cookie must die,
+  even at the cost of the owner's); change-password revokes all EXCEPT
+  the caller's (the owner is at the keyboard; logging them out punishes
+  the right behaviour). The policy difference is the threat-model
+  difference, recorded at the interface so neither gets "unified" later.
+- **Wrong password ≠ unauthorized:** the failed bcrypt compare returns
+  a FIELD error on current_password, not a 401 — the session
+  authenticated fine; one input is wrong. HTTP status speaks about the
+  request's standing, the body about the form.
+- **Double opt-in forces a three-state toggle.** A boolean switch lies
+  about the newsletter: between flip and inbox click the truthful state
+  is "pending", so the API says none|pending|subscribed and the UI
+  shows the middle state instead of pretending. Consent flows make
+  binary UI dishonest.
+- **A capability can have two keys.** Unsubscribe-by-token exists for
+  the anonymous emailed link; unsubscribe-by-session exists because
+  being signed in to the account IS proof of owning the email. Same
+  row, two doors, each keyed to who is knocking.
+- **`role="switch"` vs checkbox:** a switch takes effect immediately,
+  a checkbox implies a form submitted later — the ARIA role encodes the
+  timing contract, not the shape. Fourth popup/control pattern named in
+  this project (combobox, disclosure, menu, switch), each chosen by JOB.
+- **Echo the fresh resource from a PATCH** and the client can
+  `setQueryData` instead of refetching — one round-trip saved, and the
+  cache can never disagree with what the server just confirmed.
+
+**Questions / to revisit:**
+- F2: wire the delete button, and the status-change mailer must read
+  BOTH `notify_order_updates` and the order's locale.
+- The currency display preference is localStorage-only (#89) — promote
+  to a users column only on a real two-devices complaint.
+
+---
+
 ## 2026-08-18 — Phase A4: the addresses screen (canvas 09)
 
 **Worked on:** migration 000022 (`addresses.leave_with_neighbour`,

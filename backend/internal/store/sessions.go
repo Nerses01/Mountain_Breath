@@ -38,12 +38,14 @@ func (s *Store) CreateSession(ctx context.Context, token string, userID int64, e
 func (s *Store) GetUserBySession(ctx context.Context, token string) (domain.User, error) {
 	var u domain.User
 	err := s.pool.QueryRow(ctx, `
-		SELECT u.id, u.email, u.password_hash, u.role, u.created_at
+		SELECT u.id, u.email, u.password_hash, u.role, u.created_at,
+		       u.full_name, u.phone, u.notify_order_updates
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
 		WHERE s.token_hash = $1 AND s.expires_at > now()`,
 		hashToken(token),
-	).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.CreatedAt)
+	).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.CreatedAt,
+		&u.FullName, &u.Phone, &u.NotifyOrderUpdates)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.User{}, domain.ErrNotFound

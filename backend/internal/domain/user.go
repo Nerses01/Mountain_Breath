@@ -12,12 +12,30 @@ const (
 	RoleAdmin    = "admin"
 )
 
+// A5: the harvest-notes toggle's three states, as the settings screen sees
+// them. "none" covers never-subscribed AND unsubscribed — both restart the
+// same way (a fresh double-opt-in).
+const (
+	NewsletterNone       = "none"
+	NewsletterPending    = "pending"
+	NewsletterSubscribed = "subscribed"
+)
+
 type User struct {
 	ID           int64
 	Email        string
 	PasswordHash string
 	Role         string
 	CreatedAt    time.Time
+
+	// A5 (canvas 10): the profile the settings screen edits. Empty strings,
+	// not pointers — one kind of absence, and the UI falls back to the
+	// email without a nil branch.
+	FullName string
+	Phone    string
+	// The one notification preference with a sender to honour it (decision
+	// log #87): F2's status-change mailer checks this before sending.
+	NotifyOrderUpdates bool
 }
 
 func (u User) IsAdmin() bool { return u.Role == RoleAdmin }
@@ -42,6 +60,20 @@ func ValidateRegistration(email, password string) map[string]string {
 	}
 	if len(password) < PasswordMinLength {
 		fields["password"] = ValidationPasswordTooShort
+	}
+	return fields
+}
+
+// ValidateProfile checks the settings form's two fields (A5). Both are
+// OPTIONAL — an account works without them — so only excess is refused;
+// emptiness is a valid answer, not an error.
+func ValidateProfile(fullName, phone string) map[string]string {
+	fields := make(map[string]string)
+	if len(fullName) > 120 {
+		fields["full_name"] = ValidationTooLong
+	}
+	if len(phone) > 40 {
+		fields["phone"] = ValidationTooLong
 	}
 	return fields
 }

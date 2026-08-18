@@ -2,7 +2,10 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
 )
@@ -84,3 +87,44 @@ func (s *Store) UnsubscribeNewsletter(ctx context.Context, token string) error {
 	return nil
 }
 
+// NewsletterStatusByEmail answers the settings screen's harvest-notes
+// toggle (A5, decision log #87): what state is THIS email's subscription
+// in? "none" covers both never-subscribed and unsubscribed — from the
+// toggle's point of view they are the same restartable state.
+func (s *Store) NewsletterStatusByEmail(ctx context.Context, email string) (string, error) {
+	var confirmed, unsubscribed bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT confirmed_at IS NOT NULL, unsubscribed_at IS NOT NULL
+		FROM newsletter_subscribers
+		WHERE email = $1`,
+		email).Scan(&confirmed, &unsubscribed)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.NewsletterNone, nil
+		}
+		return "", fmt.Errorf("querying newsletter status: %w", err)
+	}
+	switch {
+	case unsubscribed:
+		return domain.NewsletterNone, nil
+	case confirmed:
+		return domain.NewsletterSubscribed, nil
+	default:
+		return domain.NewsletterPending, nil
+	}
+}
+
+// UnsubscribeNewsletterByEmail is the settings toggle's OFF (A5). No token:
+// the caller proved they own the email by being signed in to its account —
+// the emailed token exists for the anonymous unsubscribe link, not as the
+// only key to the row. Idempotent like its token twin.
+func (s *Store) UnsubscribeNewsletterByEmail(ctx context.Context, email string) error {
+	if _, err := s.pool.Exec(ctx, `
+		UPDATE newsletter_subscribers
+		SET unsubscribed_at = COALESCE(unsubscribed_at, now())
+		WHERE email = $1`,
+		email); err != nil {
+		return fmt.Errorf("unsubscribing by email: %w", err)
+	}
+	return nil
+}

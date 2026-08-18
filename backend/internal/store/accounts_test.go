@@ -439,3 +439,107 @@ func TestAddressNeighbourFlag(t *testing.T) {
 		}
 	})
 }
+
+// A5: the settings screen's store contracts — the profile round-trips,
+// the password change revokes every session EXCEPT the caller's own, and
+// the newsletter status reads the toggle's three states.
+func TestSettingsStore(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test (needs Docker)")
+	}
+	resetDB(t)
+	s := store.New(testPool)
+	ctx := context.Background()
+
+	t.Run("profile round-trips through the session read", func(t *testing.T) {
+		userID := seedUser(t, "profile@test.local")
+		if err := s.UpdateProfile(ctx, userID, "Anahit Sargsyan", "+374 91 000000"); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.CreateSession(ctx, "prof-token", userID, time.Now().Add(time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+		u, err := s.GetUserBySession(ctx, "prof-token")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if u.FullName != "Anahit Sargsyan" || u.Phone != "+374 91 000000" {
+			t.Errorf("profile = %q / %q", u.FullName, u.Phone)
+		}
+		if !u.NotifyOrderUpdates {
+			t.Error("notify_order_updates should default TRUE")
+		}
+		if err := s.SetNotifyOrderUpdates(ctx, userID, false); err != nil {
+			t.Fatal(err)
+		}
+		u, _ = s.GetUserBySession(ctx, "prof-token")
+		if u.NotifyOrderUpdates {
+			t.Error("toggle did not stick")
+		}
+	})
+
+	t.Run("password change keeps mine, kills theirs", func(t *testing.T) {
+		userID := seedUser(t, "rotate@test.local")
+		for _, tok := range []string{"mine", "theirs"} {
+			if err := s.CreateSession(ctx, tok, userID, time.Now().Add(time.Hour)); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		if err := s.ChangePassword(ctx, userID, "new-hash", "mine"); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := s.GetUserBySession(ctx, "mine"); err != nil {
+			t.Errorf("my own session died: %v", err)
+		}
+		if _, err := s.GetUserBySession(ctx, "theirs"); !errors.Is(err, domain.ErrNotFound) {
+			t.Errorf("the other session survived: %v", err)
+		}
+		var hash string
+		if err := testPool.QueryRow(ctx,
+			`SELECT password_hash FROM users WHERE id = $1`, userID).Scan(&hash); err != nil {
+			t.Fatal(err)
+		}
+		if hash != "new-hash" {
+			t.Errorf("hash = %q", hash)
+		}
+	})
+
+	t.Run("newsletter status walks none → pending → subscribed → none", func(t *testing.T) {
+		email := "letters@test.local"
+		userID := seedUser(t, email)
+		_ = userID
+
+		status := func() string {
+			t.Helper()
+			st, err := s.NewsletterStatusByEmail(ctx, email)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return st
+		}
+
+		if got := status(); got != domain.NewsletterNone {
+			t.Errorf("fresh = %q", got)
+		}
+		if _, err := s.SubscribeNewsletter(ctx, email, "nl-token"); err != nil {
+			t.Fatal(err)
+		}
+		if got := status(); got != domain.NewsletterPending {
+			t.Errorf("after subscribe = %q", got)
+		}
+		if err := s.ConfirmNewsletter(ctx, "nl-token"); err != nil {
+			t.Fatal(err)
+		}
+		if got := status(); got != domain.NewsletterSubscribed {
+			t.Errorf("after confirm = %q", got)
+		}
+		if err := s.UnsubscribeNewsletterByEmail(ctx, email); err != nil {
+			t.Fatal(err)
+		}
+		if got := status(); got != domain.NewsletterNone {
+			t.Errorf("after unsubscribe = %q", got)
+		}
+	})
+}

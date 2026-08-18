@@ -75,12 +75,15 @@ export function Price({
   format,
   className,
 }: PriceProps) {
-  const { currency } = useCurrency()
+  const { currency, display } = useCurrency()
 
   const primary = primaryMinor ?? prices?.[currency]
   if (primary === undefined) return null
 
-  const secondary = secondaryCurrency(currency, prices)
+  // A5 (log #89): "show prices in USD only / AMD only" simply drops the
+  // muted line — the primary amount and everything money-bearing is
+  // untouched, which is what makes this safe as a pure display preference.
+  const secondary = display === 'dual' ? secondaryCurrency(currency, prices) : undefined
   const secondaryMinor = secondary ? prices?.[secondary] : undefined
 
   return (

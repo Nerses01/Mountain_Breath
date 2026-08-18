@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useCart, useProduct, useProducts } from './hooks'
 import { CurrencyProvider } from '../lib/CurrencyProvider'
-import { CurrencySwitcher } from '../components/ui/CurrencySwitcher'
+import { useCurrency } from '../lib/useCurrency'
 
 /**
  * The E5 twin of locale.test.tsx, and it exists for the same reason: the
@@ -60,6 +60,18 @@ function Probe({ useHook }: { useHook: () => unknown }) {
   return null
 }
 
+// The switch UI lives on the settings screen since decision #90 (its
+// segments are covered by SettingsPage.test); what THIS file guards is the
+// context+cache machinery, so a minimal probe stands in for the buttons.
+function SwitchToAMD() {
+  const { setCurrency } = useCurrency()
+  return (
+    <button type="button" onClick={() => setCurrency('AMD')}>
+      to-amd
+    </button>
+  )
+}
+
 describe('catalog requests carry the active currency', () => {
   it('defaults to dollars with nothing stored', async () => {
     renderWithCurrency(<Probe useHook={() => useProducts({ page: 1 })} />)
@@ -101,7 +113,7 @@ describe('switching currency', () => {
   it('refetches instead of serving the cached other-market prices', async () => {
     renderWithCurrency(
       <>
-        <CurrencySwitcher />
+        <SwitchToAMD />
         <Probe useHook={() => useProducts({ page: 1 })} />
       </>,
     )
@@ -109,7 +121,7 @@ describe('switching currency', () => {
     await waitFor(() => expect(urls.length).toBe(1))
     expect(urls[0]).toContain('currency=USD')
 
-    fireEvent.click(screen.getByRole('radio', { name: /AMD/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'to-amd' }))
 
     // THE CACHE BUG THIS GUARDS: if the currency were not part of the query
     // key, the URL would change and TanStack Query would still hand back the
@@ -120,21 +132,12 @@ describe('switching currency', () => {
   })
 
   it('remembers the choice for the next visit', async () => {
-    renderWithCurrency(<CurrencySwitcher />)
+    renderWithCurrency(<SwitchToAMD />)
 
-    fireEvent.click(screen.getByRole('radio', { name: /AMD/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'to-amd' }))
 
     expect(localStorage.getItem('mb_currency')).toBe('AMD')
     // ...and tells the SERVER, which is what decides the checkout currency.
     await waitFor(() => expect(document.cookie).toContain('mb_currency=AMD'))
-  })
-
-  it('announces exactly one selected option', () => {
-    renderWithCurrency(<CurrencySwitcher />)
-
-    const group = screen.getByRole('radiogroup', { name: 'Currency' })
-    expect(group).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: /USD/ })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('radio', { name: /AMD/ })).toHaveAttribute('aria-checked', 'false')
   })
 })

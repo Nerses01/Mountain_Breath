@@ -77,6 +77,15 @@ type fakeStore struct {
 	reorderUser   int64
 	reorderOrder  int64
 
+	// A5 settings: recording fields for the handler contracts.
+	profileName        string
+	profilePhone       string
+	newHash            string
+	keptToken          string
+	notifyOrderUpdates *bool
+	newsletterStatus   string
+	unsubscribedEmail  string
+
 	// E7 promotions. promos is the fake's promo_codes table (keyed by
 	// NORMALIZED code); cartPromo the applied one; priorOrders the hive-club
 	// fact; orderErr lets a test drive handleCreateOrder's promo_invalid
@@ -472,6 +481,36 @@ func (f *fakeStore) ListWishlist(_ context.Context, _ int64, view domain.View) (
 // logic is the store suite's job.
 func (f *fakeStore) AddWishlistToCart(_ context.Context, _ int64) (domain.ReorderResult, error) {
 	return f.reorderResult, nil
+}
+
+// --- A5 settings — recording fakes: handler tests prove requests become
+// the right calls; the store's behaviour has the Docker-backed suite.
+
+func (f *fakeStore) UpdateProfile(_ context.Context, _ int64, fullName, phone string) error {
+	f.profileName, f.profilePhone = fullName, phone
+	return nil
+}
+
+func (f *fakeStore) ChangePassword(_ context.Context, _ int64, newHash, keepToken string) error {
+	f.newHash, f.keptToken = newHash, keepToken
+	return nil
+}
+
+func (f *fakeStore) SetNotifyOrderUpdates(_ context.Context, _ int64, on bool) error {
+	f.notifyOrderUpdates = &on
+	return nil
+}
+
+func (f *fakeStore) NewsletterStatusByEmail(_ context.Context, _ string) (string, error) {
+	if f.newsletterStatus == "" {
+		return domain.NewsletterNone, nil
+	}
+	return f.newsletterStatus, nil
+}
+
+func (f *fakeStore) UnsubscribeNewsletterByEmail(_ context.Context, email string) error {
+	f.unsubscribedEmail = email
+	return nil
 }
 
 func (f *fakeStore) AddWishlistItem(_ context.Context, _ int64, productID int64) error {

@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useLogout } from '../../api/hooks'
 import type { User } from '../../api/types'
+import { displayName, initials } from '../../lib/displayName'
 import { useLocale } from '../../i18n/useLocale'
 import { ChevronDownIcon } from '../ui/icons'
 
@@ -40,9 +41,10 @@ export function AccountMenu({ user }: { user: User }) {
   // One ref holding all item nodes (4 links + sign-out) for roving focus.
   const itemsRef = useRef<(HTMLElement | null)[]>([])
 
-  // Until A5 adds users.full_name, the pill shows the email's local part —
-  // same rule as the rail, one identity everywhere.
-  const displayName = user.email.split('@')[0]
+  // One identity rule everywhere (lib/displayName): the profile's name,
+  // or the email's local part until one is set. The pill shows the FIRST
+  // word — the canvas's "Anahit ▾".
+  const name = displayName(user).split(/\s+/)[0]
 
   const close = (refocus: boolean) => {
     setOpen(false)
@@ -126,10 +128,10 @@ export function AccountMenu({ user }: { user: User }) {
           aria-hidden
           className="flex size-7.5 items-center justify-center rounded-full bg-honey font-display text-xs font-extrabold text-ink"
         >
-          {displayName[0]?.toUpperCase()}
+          {initials(user)}
         </span>
         <span className="max-w-28 truncate font-display text-sm font-semibold">
-          {displayName}
+          {name}
         </span>
         <ChevronDownIcon size={14} className={open ? 'rotate-180' : undefined} />
       </button>

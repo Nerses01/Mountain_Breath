@@ -21,10 +21,13 @@ import type {
   Order,
   OrderStatus,
   Paginated,
+  ChangePasswordInput,
+  NotificationSettings,
   Preview,
   Product,
   ProductDetail,
   ProductSort,
+  ProfileInput,
   ReorderResult,
   UpdateProduct,
   User,
@@ -283,6 +286,24 @@ export const api = {
     request<void>('/api/v1/newsletter/confirm', { method: 'POST', body: { token } }),
   unsubscribeNewsletter: (token: string) =>
     request<void>('/api/v1/newsletter/unsubscribe', { method: 'POST', body: { token } }),
+
+  // A5: the settings screen. Profile echoes the fresh user (the ['me']
+  // cache is set from the response); the password change answers 204 and
+  // signs every OTHER device out server-side.
+  updateProfile: (input: ProfileInput) =>
+    request<User>('/api/v1/account/profile', { method: 'PATCH', body: input }),
+  changePassword: (input: ChangePasswordInput) =>
+    request<void>('/api/v1/account/password', { method: 'POST', body: input }),
+  getNotifications: () => request<NotificationSettings>('/api/v1/account/notifications'),
+  setOrderUpdates: (on: boolean) =>
+    request<void>('/api/v1/account/notifications', {
+      method: 'PATCH',
+      body: { order_updates: on },
+    }),
+  // The harvest toggle's OFF; ON goes through subscribeNewsletter's
+  // double opt-in above.
+  accountUnsubscribeNewsletter: () =>
+    request<void>('/api/v1/account/newsletter', { method: 'DELETE' }),
 
   // E8: the address book behind the checkout's prefill.
   listAddresses: () => request<AddressEntry[]>('/api/v1/account/addresses'),

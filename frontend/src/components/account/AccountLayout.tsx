@@ -3,6 +3,7 @@ import { Trans, useTranslation } from 'react-i18next'
 import { useAddresses, useLogout, useMe, useMyOrders, useReorder, useWishlist } from '../../api/hooks'
 import type { User } from '../../api/types'
 import { cx } from '../../lib/cx'
+import { displayName, initials } from '../../lib/displayName'
 import { formatMoney } from '../../lib/format'
 import { useLocale } from '../../i18n/useLocale'
 import {
@@ -92,12 +93,6 @@ function AccountRail({ user }: { user: User }) {
   const wishlist = useWishlist(true)
   const addresses = useAddresses(true)
 
-  // Until A5 adds users.full_name, the email is the identity we have. The
-  // local part serves as the display name (the canvas shows "Anahit"), the
-  // avatar takes its first letter, and the full address sits underneath —
-  // truthful without pretending we know a name we do not.
-  const displayName = user.email.split('@')[0]
-
   return (
     <div className="flex flex-col gap-4">
       {/* ── Profile card (canvas: dark, avatar, name, standing, tiles) ── */}
@@ -107,11 +102,11 @@ function AccountRail({ user }: { user: User }) {
             aria-hidden
             className="flex size-12 shrink-0 items-center justify-center rounded-full bg-honey font-display text-lg font-extrabold text-ink"
           >
-            {displayName[0]?.toUpperCase()}
+            {initials(user)}
           </span>
           <div className="min-w-0">
             <p className="truncate font-display text-base font-bold text-ink-on-dark" title={user.email}>
-              {displayName}
+              {displayName(user)}
             </p>
             <p className="truncate text-xs text-ink-on-dark-soft">{user.email}</p>
           </div>

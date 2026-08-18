@@ -21,6 +21,8 @@ const user = {
   id: 1,
   email: 'anahit@example.com',
   role: 'customer',
+  full_name: '',
+  phone: '',
   hive: { prior_orders: 7, member: true, member_discount_percent: 8, first_delivery_free: false },
 }
 

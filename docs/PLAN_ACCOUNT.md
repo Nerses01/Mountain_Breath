@@ -1,5 +1,12 @@
 # Mountain Breath — Plan: the account section redesign (canvas 07–10)
 
+> ✅ **Complete 2026-08-18** — all five phases (A1 shell, A2 orders,
+> A3 wishlist, A4 addresses, A5 settings) shipped in one day, decisions
+> #84–#89 recorded, four features parked in Phase 11. What this plan
+> deliberately left open: F2 wires the delete-account button, F5's
+> address picker reuses A4's cards, and the A2 status history plus the
+> A5 `notify_order_updates` column are waiting for F2's mailer.
+>
 > A second design canvas arrived on 2026-08-18:
 > [docs/design/Mountain Breath Account.dc.html](design/Mountain%20Breath%20Account.dc.html)
 > — four logged-in screens (**07 Orders, 08 Wishlist, 09 Addresses,
@@ -319,35 +326,51 @@ landing on the right inputs, and checkout's prefill honours the flag.
 **Goal:** the one screen with no predecessor, and the only real schema
 work: who you are, how the site speaks to you, and the exit door.
 
-- [ ] Migration: `users.full_name`, `users.phone` (nullable — every
-      existing user lacks them; the profile card and checkout prefill
-      cope with absence). Down migration drops them.
-- [ ] `PATCH /account/profile` (name, phone) + `useUpdateProfile`;
-      `/auth/me` and the `User` type carry the new fields; the rail's
-      profile card and header pill prefer the name over the email.
-- [ ] `POST /account/password` — current password verified, then the
-      same hash-and-rotate the reset flow uses, **all other sessions
-      revoked** (the reset flow's rule; changing a password while a
-      stolen session stays alive would be theatre).
-- [ ] Profile panel per canvas: read-only fields + Edit mode, password
-      row opening the change form (three fields; the canvas draws none
-      of it — ours, reusing the reset page's strength rules).
-- [ ] Language & currency panel: language segments (en/hy/ru, §1.3)
-      driving the existing locale mechanism; currency display segments
-      per decision #8.
-- [ ] Notifications panel per decision #5: real toggles persisted, dead
-      channels in the stub style with the truth stated.
-- [ ] Delete-account row: renders against **F2's** endpoint when it
-      exists; until then the row is the honest stub linking the privacy
-      page. The confirm flow (type-to-confirm or password re-entry) is
-      designed here since the canvas only draws the button.
-- [ ] Tests: password-change handler (wrong current, session
-      revocation), profile validation, store round-trips; fakeStore
-      grows the methods; Postman gains all new routes.
+- [x] Migration 000023 (cycle-tested): `users.full_name`, `users.phone`
+      as `'' NOT NULL` — one kind of absence, the codebase's badge rule —
+      plus `notify_order_updates` (default TRUE), the ONE notification
+      column with a sender to honour it (#87).
+- [x] `PATCH /account/profile` (name, phone; email deliberately not — a
+      verification-shaped problem, not a form field) + `useUpdateProfile`
+      setting the `['me']` cache from the echoed user; the rail card and
+      header pill prefer the name via one `lib/displayName` rule.
+- [x] `POST /account/password` — current password verified first (field
+      error `current_password: incorrect_password`, not a 401 — the
+      session is fine, one input is not), then hash-and-rotate with
+      **every session except the caller's own revoked**. The deliberate
+      difference from reset's revoke-ALL is recorded at the interface:
+      reset means the password was suspect; a signed-in change is the
+      owner at the keyboard. OAuth accounts (empty hash) fail closed and
+      set a first password through the reset flow's inbox check.
+- [x] Profile panel per canvas: read-only boxes + Edit mode, the
+      password row opening the two-field change form, the sign-out
+      promise announced on success.
+- [x] Language & currency panel: language segments are LINKS (the URL is
+      the locale's source of truth, decision #17) in all three
+      languages; currency segments per #89 — "USD + AMD" keeps the dual
+      display, "USD"/"AMD" set the market AND drop the muted line
+      (`CurrencyDisplay` in the existing context, localStorage only).
+- [x] Notifications panel per #87: order updates persisted
+      (GET/PATCH /account/notifications); harvest notes drives the REAL
+      newsletter — ON re-runs the double opt-in (pending shown as its
+      own state, the inbox has the last word), OFF is the new tokenless
+      DELETE /account/newsletter (the session proves email ownership);
+      wishlist alerts + SMS render as disabled switches with the truth
+      stated. New `Switch` component (`role="switch"`, aria-checked).
+- [x] Delete-account row: F2's honest stub — policy stated (orders stay
+      in the books), privacy-page link, disabled button. The confirm
+      flow design moves to F2 with the endpoint.
+- [x] Tests: handler suite (wrong current = field error before the store
+      is touched, short new password never reaches bcrypt, success keeps
+      the caller's own token, OAuth fails closed, notifications read/
+      write, tokenless unsubscribe); store suite (profile round-trip,
+      keep-mine-kill-theirs, newsletter none→pending→subscribed→none);
+      page tests (password post, toggle PATCH, stubs disabled).
+      Postman: "Account settings (A5)" folder, five requests.
 
 **Done when:** name/phone/password change end-to-end with sessions
 revoked on password change, preferences persist, and no toggle on the
-screen lies about what it does.
+screen lies about what it does. ✅ **Complete 2026-08-18.**
 
 ---
 

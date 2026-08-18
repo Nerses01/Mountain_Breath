@@ -43,6 +43,12 @@ type userResponse struct {
 	Email string `json:"email"`
 	Role  string `json:"role"`
 
+	// A5: the profile fields the settings screen edits and the header/rail
+	// render. "" until the customer fills them in — the client falls back
+	// to the email, no null branch.
+	FullName string `json:"full_name"`
+	Phone    string `json:"phone"`
+
 	// E7: the hive-club standing — the design's membership, which is not a
 	// stored tier but a reading of the customer's order history (decision
 	// #36). The SERVER derives the booleans: the client renders a badge and
@@ -66,7 +72,11 @@ func toUserResponse(u domain.User, priorOrders int) userResponse {
 		hive.Member = true
 		hive.MemberDiscountPercent = domain.MemberDiscountPercent
 	}
-	return userResponse{ID: u.ID, Email: u.Email, Role: u.Role, Hive: hive}
+	return userResponse{
+		ID: u.ID, Email: u.Email, Role: u.Role,
+		FullName: u.FullName, Phone: u.Phone,
+		Hive: hive,
+	}
 }
 
 // newSessionToken returns 32 cryptographically random bytes as hex.

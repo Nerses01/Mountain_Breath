@@ -19,6 +19,10 @@ const (
 	ValidationSlugFormat       = "slug_format"
 	ValidationEmailFormat      = "email_format"
 	ValidationPasswordTooShort = "password_too_short"
+	// A5: the change-password form's "current password is wrong" — a FIELD
+	// error on current_password, not a 401: the session is fine, one input
+	// is not.
+	ValidationIncorrectPassword = "incorrect_password"
 	ValidationPositive         = "positive"
 	ValidationNotNegative      = "not_negative"
 	ValidationVariantsRequired = "variants_required"

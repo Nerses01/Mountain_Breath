@@ -27,10 +27,22 @@ import { DEFAULT_CURRENCY, isCurrency, type Currency } from './currencies'
  */
 export const CURRENCY_STORAGE_KEY = 'mb_currency'
 export const CURRENCY_COOKIE_NAME = 'mb_currency'
+export const CURRENCY_DISPLAY_STORAGE_KEY = 'mb_currency_display'
+
+/**
+ * A5 (decision log #89): whether prices draw the muted second-market line.
+ * 'dual' is the design's default; 'single' is the settings screen's
+ * "USD only" / "AMD only". Client-side ONLY — localStorage like the
+ * currency itself, no users column until a two-devices complaint exists.
+ * Pure display: orders always show their one charged currency regardless.
+ */
+export type CurrencyDisplay = 'dual' | 'single'
 
 export interface CurrencyContextValue {
   currency: Currency
   setCurrency: (next: Currency) => void
+  display: CurrencyDisplay
+  setDisplay: (next: CurrencyDisplay) => void
 }
 
 export const CurrencyContext = createContext<CurrencyContextValue | null>(null)
@@ -45,6 +57,15 @@ export function readStoredCurrency(): Currency {
     // storage unavailable — fall through to the default
   }
   return DEFAULT_CURRENCY
+}
+
+export function readStoredDisplay(): CurrencyDisplay {
+  try {
+    if (localStorage.getItem(CURRENCY_DISPLAY_STORAGE_KEY) === 'single') return 'single'
+  } catch {
+    // storage unavailable — the default it is
+  }
+  return 'dual'
 }
 
 export function writeCurrencyCookie(currency: Currency) {
@@ -65,5 +86,10 @@ export function writeCurrencyCookie(currency: Currency) {
 export function useCurrency(): CurrencyContextValue {
   const ctx = useContext(CurrencyContext)
   if (ctx) return ctx
-  return { currency: DEFAULT_CURRENCY, setCurrency: () => {} }
+  return {
+    currency: DEFAULT_CURRENCY,
+    setCurrency: () => {},
+    display: 'dual',
+    setDisplay: () => {},
+  }
 }

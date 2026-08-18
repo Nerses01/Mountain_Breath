@@ -183,6 +183,10 @@ export interface User {
   id: number
   email: string
   role: 'customer' | 'admin'
+  /** A5: '' until the customer fills them in — the UI falls back to the
+   *  email, one kind of absence. */
+  full_name: string
+  phone: string
   /**
    * E7: hive-club standing, derived by the SERVER from order history — the
    * client renders these booleans, it never re-implements "after the first
@@ -391,6 +395,26 @@ export interface ReorderResult {
 /** A3: a saved product is a full card plus WHEN the heart was set. */
 export interface WishlistEntry extends Product {
   saved_at: string
+}
+
+// --- Settings (A5) ------------------------------------------------------
+
+export interface ProfileInput {
+  full_name: string
+  phone: string
+}
+
+export interface ChangePasswordInput {
+  current_password: string
+  new_password: string
+}
+
+/** The notifications panel's two REAL channels (decision #87). The
+ *  newsletter state is three-valued because double opt-in has a middle:
+ *  the toggle was flipped but the inbox has not confirmed yet. */
+export interface NotificationSettings {
+  order_updates: boolean
+  newsletter: 'none' | 'pending' | 'subscribed'
 }
 
 export interface Order {

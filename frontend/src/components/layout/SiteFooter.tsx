@@ -6,8 +6,6 @@ import { useFieldErrors } from '../../i18n/useFieldErrors'
 import { useLocale } from '../../i18n/useLocale'
 import { scrollToTopState } from '../../lib/scrollToTopState'
 import { Button } from '../ui/Button'
-import { CurrencySwitcher } from '../ui/CurrencySwitcher'
-import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 
 /**
  * The design's four-column footer on bark, plus the bottom bar.
@@ -17,10 +15,13 @@ import { LanguageSwitcher } from '../ui/LanguageSwitcher'
  * measures 4.2:1 against the bark background and fails AA (token block in
  * src/index.css has the table).
  *
- * The language and currency switchers sit in the bottom bar, where the mock
- * puts "USD / AMD" — following the design's own habit of keeping
- * locale-shaped controls there rather than inventing a header position it
- * gives no guidance for.
+ * DEPARTURE from the store canvas's bottom bar (decision log #90): the
+ * language and currency switchers were removed from here — the account
+ * settings screen (canvas 10) is now their one home. The store mock's
+ * "USD / AMD" predates the settings screen that owns the choice; two
+ * controls for one preference invite them to disagree. The cost, accepted
+ * deliberately: a signed-out visitor switches language only by URL prefix
+ * (/hy, /ru — which every shared link and hreflang tag already carries).
  */
 export function SiteFooter() {
   const { t } = useTranslation()
@@ -124,8 +125,6 @@ export function SiteFooter() {
             >
               {t('footer:legal.privacy')}
             </Link>
-            <CurrencySwitcher />
-            <LanguageSwitcher />
           </div>
         </div>
       </div>

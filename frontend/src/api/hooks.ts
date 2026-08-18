@@ -369,6 +369,55 @@ export function useReorder() {
   })
 }
 
+// --- Settings (A5) ------------------------------------------------------
+
+/** The profile PATCH echoes the fresh user, so the ['me'] cache is SET
+ *  from the response — no refetch round-trip for data we just received. */
+export function useUpdateProfile() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.updateProfile,
+    onSuccess: (user) => qc.setQueryData(['me'], user),
+  })
+}
+
+export function useChangePassword() {
+  return useMutation({ mutationFn: api.changePassword })
+}
+
+export function useNotifications(enabled: boolean) {
+  return useQuery({
+    queryKey: ['notifications'],
+    queryFn: api.getNotifications,
+    enabled,
+  })
+}
+
+export function useSetOrderUpdates() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.setOrderUpdates,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+  })
+}
+
+/** The harvest-notes toggle: ON re-runs the newsletter's own double
+ *  opt-in (consent stays verified), OFF unsubscribes by the session's
+ *  email. Both leave the panel's query stale. */
+export function useNewsletterToggle() {
+  const qc = useQueryClient()
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['notifications'] })
+  const subscribe = useMutation({
+    mutationFn: api.subscribeNewsletter,
+    onSuccess: invalidate,
+  })
+  const unsubscribe = useMutation({
+    mutationFn: api.accountUnsubscribeNewsletter,
+    onSuccess: invalidate,
+  })
+  return { subscribe, unsubscribe }
+}
+
 /** A3: the wishlist's "Add all to cart" — same contract as useReorder. */
 export function useAddWishlistToCart() {
   const qc = useQueryClient()

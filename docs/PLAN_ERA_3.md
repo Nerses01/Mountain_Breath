@@ -43,11 +43,13 @@ surfaced them:
       Real contact details and the family's real per-market prices are
       launch gates (F3) — the shop currently promises to answer an email
       address that does not exist.
-- [ ] **Two small promised-and-forgotten reviews:** E1.5 said "revisit the
-      footer placement of the LanguageSwitcher in E10 if it proves too
-      buried" (E10 never did); Era I's Phase 4 left admin promotion as
-      "via SQL for now" and no UI ever arrived (folded into F2's admin
-      batch).
+- [x] ~~**Two small promised-and-forgotten reviews:**~~ E1.5's "revisit the
+      footer placement of the LanguageSwitcher" — **closed 2026-08-18
+      (decision log #90):** the footer switchers were REMOVED; the account
+      settings screen (PLAN_ACCOUNT A5) is the one home for both
+      language and currency, with the anonymous-visitor cost recorded.
+      Era I's admin promotion via SQL remains open (folded into F2's
+      admin batch).
 
 ---
 
@@ -202,8 +204,10 @@ traffic should confirm the reason wrong before it is built.
 - [ ] **Smarter upsell** in the free-shipping banner (benefit-overlap
       ranking, E7's one-query note) and the `stackable` promo flag — each
       only when the current behaviour demonstrably misses.
-- [ ] The LanguageSwitcher placement review (§1's forgotten promise) with
-      real users' behaviour as the evidence.
+- [x] ~~The LanguageSwitcher placement review~~ — settled 2026-08-18 the
+      other way (decision #90): removed from the footer entirely, the
+      account settings screen is the one home. Re-open only if anonymous
+      traffic demonstrably suffers.
 
 ---
 

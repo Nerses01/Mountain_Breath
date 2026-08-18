@@ -166,6 +166,18 @@ type AccountStore interface {
 	// Provider identity → shop account: known subject wins, verified email
 	// links, otherwise a fresh passwordless customer.
 	FindOrCreateOAuthUser(ctx context.Context, provider, subject, email string) (domain.User, error)
+
+	// A5 (canvas 10): the settings screen. ChangePassword revokes every
+	// session EXCEPT keepToken's — the owner stays signed in, a thief's
+	// cookie dies (contrast the reset flow's revoke-all: there the password
+	// itself was suspect).
+	UpdateProfile(ctx context.Context, userID int64, fullName, phone string) error
+	ChangePassword(ctx context.Context, userID int64, newHash, keepToken string) error
+	SetNotifyOrderUpdates(ctx context.Context, userID int64, on bool) error
+	// The harvest-notes toggle's read and OFF; ON goes through the
+	// newsletter's own double-opt-in subscribe.
+	NewsletterStatusByEmail(ctx context.Context, email string) (string, error)
+	UnsubscribeNewsletterByEmail(ctx context.Context, email string) error
 }
 
 // NewsletterStore is E9's slice: double opt-in, and the token as the
@@ -355,6 +367,12 @@ func (s *Server) Routes() chi.Router {
 			r.Post("/wishlist/save-for-later", s.handleSaveForLater)
 			// A3: "Add all to cart" — the reorder endpoint's sibling.
 			r.Post("/wishlist/add-all", s.handleWishlistAddAll)
+			// A5 (canvas 10): the settings screen's write paths.
+			r.Patch("/account/profile", s.handleUpdateProfile)
+			r.Post("/account/password", s.handleChangePassword)
+			r.Get("/account/notifications", s.handleGetNotifications)
+			r.Patch("/account/notifications", s.handleSetNotifications)
+			r.Delete("/account/newsletter", s.handleAccountNewsletterUnsubscribe)
 			r.Get("/account/addresses", s.handleListAddresses)
 			r.Post("/account/addresses", s.handleCreateAddress)
 			r.Put("/account/addresses/{id}", s.handleUpdateAddress)

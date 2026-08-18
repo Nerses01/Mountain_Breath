@@ -3956,6 +3956,219 @@
       ]
     },
     {
+      "name": "Account settings (A5)",
+      "description": "Canvas 10's write paths: profile (name + phone, echoed back as the fresh user), the signed-in password change (verifies the CURRENT password, then revokes every session except the caller's own — contrast the reset flow's revoke-all), and the notifications panel's two real channels (decision log #87): the order-updates flag on users, and the harvest-notes toggle read from the newsletter table (ON goes through the newsletter's own double-opt-in POST /newsletter/subscribe; OFF is DELETE /account/newsletter, tokenless because the session proves email ownership).\n\nRun signed in.",
+      "item": [
+        {
+          "name": "Update profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/account/profile",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "account",
+                "profile"
+              ]
+            },
+            "description": "Both fields, whole-value semantics; both optional (empty is an answer, only excess is refused). Email is deliberately NOT here — changing the account's identity is a verification-shaped problem, not a form field. Responds with the fresh user (same shape as /auth/me) so the client sets its cache from the response.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"full_name\": \"Anahit Sargsyan\",\n    \"phone\": \"+374 91 000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test(\"echoes the fresh user\", () => {",
+                  "    pm.expect(pm.response.json().full_name).to.eql(\"Anahit Sargsyan\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/account/password",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "account",
+                "password"
+              ]
+            },
+            "description": "204 on success; every session except THIS one is revoked. A wrong current password is a FIELD error (`current_password: incorrect_password`), not a 401 — the session is fine, one input is not. An OAuth-born account (empty hash) fails the same way and sets its first password through the reset flow, which verifies the inbox instead.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"current_password\": \"password-123\",\n    \"new_password\": \"password-456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204, or 400 with a field error when the current password is wrong\", () => {",
+                  "    pm.expect([204, 400]).to.include(pm.response.code);",
+                  "    if (pm.response.code === 400) {",
+                  "        pm.expect(pm.response.json().error.fields).to.have.property(\"current_password\");",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Notification preferences",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/account/notifications",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "account",
+                "notifications"
+              ]
+            },
+            "description": "The two REAL channels in one read: `order_updates` (the users column F2's mailer will honour) and `newsletter` (none | pending | subscribed, derived from the newsletter table by the account's email). The canvas's other toggles have no machinery and no endpoint — deliberately."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test(\"both channels present\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.order_updates).to.be.a(\"boolean\");",
+                  "    pm.expect([\"none\", \"pending\", \"subscribed\"]).to.include(body.newsletter);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Toggle order-update emails",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/account/notifications",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "account",
+                "notifications"
+              ]
+            },
+            "description": "The one persisted toggle. Defaults TRUE for every account.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"order_updates\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unsubscribe newsletter (by account)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/account/newsletter",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "account",
+                "newsletter"
+              ]
+            },
+            "description": "The harvest-notes toggle's OFF. Tokenless: the session proves email ownership; the emailed token remains the anonymous path. Idempotent — 204 even with nothing to unsubscribe."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Accounts (E8)",
       "description": "Wishlist, password reset, the address book and Google sign-in.\n\nThe reset flow reuses the sessions pattern a third time: the email carries a raw 256-bit token, the table stores its SHA-256, single use is enforced under a row lock, and consuming a token revokes every session. The wishlist is set-semantics like the cart. The address book is the account page's CRUD behind the checkout's prefill.\n\nRun the wishlist/address requests signed in (Register/Login first).",
       "item": [
