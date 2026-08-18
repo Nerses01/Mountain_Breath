@@ -90,10 +90,10 @@ Recorded here so nobody "fixes" them back toward the mock:
 
 ---
 
-## 2. Decisions to make before A1
+## 2. Decisions — all settled 2026-08-18
 
-The user's calls (each gets an ARCHITECTURE.md decisions-log row when
-made). Numbers stay stable once referenced.
+The user's calls, each confirmed explicitly (log rows #84–#89 in
+ARCHITECTURE.md). Numbers stay stable once referenced.
 
 - [x] **1. Routes: nest under `/account/*`.** The canvas's shell
       implies `/account/orders`, `/account/wishlist`,
@@ -105,57 +105,48 @@ made). Numbers stay stable once referenced.
       `/orders/:id`, `/wishlist`) become client redirects in every
       locale prefix — emailed links and bookmarks must keep working.
       *(Decided 2026-08-18, decision log #84.)*
-- [ ] **2. Tracker steps ↔ status machine mapping.** Backend states:
-      `pending → confirmed → shipped → delivered` (+`cancelled`). Canvas
-      steps: Packed → With courier → Out for delivery → Delivered — four
-      steps, and "out for delivery" does not exist in the machine.
-      *Recommendation:* map honestly to the machine we have — Placed
-      (pending) → Confirmed → Shipped → Delivered — rather than invent
-      courier states nobody records; rename steps in copy, not in the
-      state machine. Cancelled orders show a flat cancelled band, a state
-      the canvas never draws (ours to design).
-- [ ] **3. Per-step dates need status history.** The canvas dates each
-      tracker step. Options: (a) an `order_status_events` table written
-      on every transition (an audit log — useful forever, one migration +
-      one insert in the existing transition path); (b) show dates only
-      for `created_at` and "now". *Recommendation:* (a) — it is the only
-      item in this plan that gets more expensive the longer it waits,
-      because history not recorded now is unrecoverable later.
-- [ ] **4. Reorder: endpoint or client loop?** (a) `POST
-      /orders/{id}/reorder` — one transaction, server decides what is
-      still purchasable, returns the refreshed cart plus a note of what
-      was skipped (discontinued/out-of-stock lines); (b) the client loops
-      `PUT /cart/items`. *Recommendation:* (a) — partial failure is the
-      whole problem ("2 of 3 added, royal jelly is sold out"), and a
-      client loop can't answer it atomically or translate it once.
-- [ ] **5. Notification preferences: real table or honest stubs?** Of the
-      canvas's four toggles only two have a sender today: order-update
-      emails are **Era III F2's** item, harvest notes ≈ the newsletter
-      (E9, already double-opt-in). Wishlist alerts and SMS have no
-      machinery at all. *Recommendation:* a `notification_prefs` JSONB or
-      columns-on-users now for the two real channels, and the E6/E8
-      stub pattern for the rest (rendered disabled with the truth stated
-      underneath) — the project already refuses decorative toggles that
-      silently do nothing.
-- [ ] **6. Explicitly deferred:** back-in-stock "Notify me" and the
-      apiary-pickup delivery method. Both are real features with real
-      backends (subscriptions + a delivery-method enum touching checkout
-      pricing). They go to **Phase 11's parking lot** with this canvas as
-      their design reference; the cards render in the E6 stub style or
-      not at all (user's call at A3/A4 time).
-- [ ] **7. `leave_with_neighbour` per address?** Today it is a per-order
-      checkout flag snapshotted onto the order. The canvas draws it on
-      the address card. *Recommendation:* add the flag to `addresses` as
-      the checkout **prefill** source; the order keeps its own snapshot
-      (what was true for THIS delivery), exactly like the address
-      snapshot pattern.
-- [ ] **8. Currency display preference — client or server?** "Show
-      prices in USD+AMD / USD / AMD" is pure display (orders are
-      unaffected, §1.3). *Recommendation:* localStorage + context first
-      (like the locale mechanism, zero backend); promote to a `users`
-      column only if a signed-in-on-two-devices complaint ever arrives.
-      Persisting display whims server-side is schema for a problem
-      nobody has yet.
+- [x] **2. Tracker maps to the machine we have** — Placed (pending) →
+      Confirmed → Shipped → Delivered; steps renamed in copy only, no
+      invented courier states ("out for delivery" exists nowhere in the
+      system). Cancelled orders show a flat cancelled band, a state the
+      canvas never draws (ours to design).
+      *(Decided by user 2026-08-18, log #85.)*
+- [x] **3. Status history: the `order_status_events` table** — one row
+      per transition, inserted inside the existing domain-validated
+      transition path; existing orders backfill one synthetic `pending`
+      event from `created_at`. Chosen over "dates only where known"
+      because history not recorded now is unrecoverable later — the one
+      item in this plan that gets more expensive by the day.
+      *(Decided by user 2026-08-18, log #85.)*
+- [x] **4. Reorder is a server endpoint** — `POST /orders/{id}/reorder`:
+      one transaction, the server decides what is still purchasable,
+      returns the refreshed cart plus what was skipped ("2 of 3 added,
+      royal jelly sold out"). A3's "Add all to cart" reuses the same
+      partial-success contract.
+      *(Decided by user 2026-08-18, log #86.)*
+- [x] **5. Notification preferences: real toggles + honest stubs.**
+      Persist only channels with a sender: order-update emails (columns
+      on `users`, read by F2's status-change mailer when it lands) and
+      harvest notes wired to the existing newsletter subscription.
+      Wishlist alerts and SMS render as E6/E8-style stubs — disabled,
+      truth stated — until their machinery exists; their columns arrive
+      with their senders. *(Decided by user 2026-08-18, log #87.)*
+- [x] **6. Deferred to Phase 11's parking lot** (lines added there, this
+      canvas as design reference): back-in-stock "Notify me", apiary
+      pickup as a delivery method, SMS delivery-day notices, the
+      wishlist price-drop sender. Whether their cards render in the E6
+      stub style or not at all is settled per screen at A3/A4 time.
+      *(Decided by user 2026-08-18.)*
+- [x] **7. `leave_with_neighbour` becomes a per-address flag** (A4
+      migration) that PREFILLS checkout; the order keeps its own
+      snapshot — prefill is a suggestion, the order is a record, exactly
+      the E6 address-snapshot pattern.
+      *(Decided by user 2026-08-18, log #88.)*
+- [x] **8. Currency display preference is client-side** — localStorage +
+      context like the locale mechanism, zero backend; promoted to a
+      `users` column only if a signed-in-on-two-devices complaint ever
+      actually arrives. Orders are unaffected either way (§1.3).
+      *(Decided by user 2026-08-18, log #89.)*
 
 ---
 

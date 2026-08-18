@@ -308,6 +308,10 @@ that closed them; every open line now also lives in a structured phase of
 - [ ] Anonymous carts (buy without registering first) → **Era III F5**
 - [x] ~~Product image galleries~~ — done in E3; server-side thumbnails/resizing still open, behind photography → **Era III F3**
 - [ ] Customer-facing order cancellation (while pending) → **Era III F2**
+- [ ] Back-in-stock "Notify me" subscriptions — design drawn on the wishlist canvas (08); deferred per PLAN_ACCOUNT.md §2 #6
+- [ ] Apiary pickup as a delivery method (canvas 09; touches checkout pricing) — PLAN_ACCOUNT.md §2 #6
+- [ ] SMS delivery-day notices (+374; canvas 10's fourth toggle) — PLAN_ACCOUNT.md §2 #6
+- [ ] Wishlist price-drop / member-offer emails, the sender half (canvas 08's rail card) — PLAN_ACCOUNT.md §2 #6
 
 **Engineering:**
 - [x] ~~Login rate limiting~~ — done in E8 (per IP+email, also guards forgot-password and newsletter); auth hardening batch (security headers, session cleanup job) still open → **Era III F6**
