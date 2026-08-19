@@ -130,6 +130,14 @@ export function ProductPage() {
     p.variants.find((v) => v.id === variantId) ?? p.variants[0]
   const inCartQty = cart.data?.items.find((it) => it.variant_id === selected?.id)?.qty ?? 0
   const soldOut = !selected || selected.stock_qty === 0
+  // What the visitor can still ADD: stock minus what the cart already
+  // holds. The stepper capping at raw stock was the bug this fixes — with 3
+  // in the cart and 5 in stock it happily offered 5 more, and the PUT (an
+  // absolute "set to inCartQty + qty") accepted 8. Advisory like every
+  // client-side stock check (checkout's locked transaction is the real
+  // gate), but an honest UI should not sell what it can see it lacks.
+  const remaining = Math.max(0, (selected?.stock_qty ?? 0) - inCartQty)
+  const atLimit = !soldOut && remaining === 0
 
   const tabs: Tab[] = []
   if (p.usage_cards.length > 0) {
@@ -288,10 +296,12 @@ export function ProductPage() {
 
           <div className="flex flex-wrap items-center gap-3.5">
             <QtyStepper
-              value={qty}
+              value={Math.min(qty, Math.max(remaining, 1))}
               onChange={setQty}
               min={1}
-              max={Math.max(selected?.stock_qty ?? 1, 1)}
+              // Capped by what can still be ADDED, not by raw stock — the
+              // cart's holdings count against the ceiling.
+              max={Math.max(remaining, 1)}
               decreaseLabel={t('cart:decrease')}
               increaseLabel={t('cart:increase')}
             />
@@ -299,21 +309,35 @@ export function ProductPage() {
             {me.data ? (
               <Button
                 size="lg"
-                disabled={soldOut || addToCart.isPending}
+                disabled={soldOut || atLimit || addToCart.isPending}
                 onClick={() =>
-                  selected && addToCart.mutate({ variantId: selected.id, qty: inCartQty + qty })
+                  selected &&
+                  remaining > 0 &&
+                  addToCart.mutate({
+                    variantId: selected.id,
+                    // Clamp the SET quantity too: qty is component state and
+                    // can momentarily exceed a remaining that shrank under it.
+                    qty: inCartQty + Math.min(qty, remaining),
+                  })
                 }
                 className="flex-1"
               >
                 {soldOut
                   ? t('catalog:outOfStock')
-                  : addToCart.isPending
-                    ? t('catalog:adding')
-                    : // The price in the button label, as the mock draws it:
-                      // it is the last thing read before committing.
-                      t('product:addToCartWithPrice', {
-                        price: formatMoney((selected?.price_minor ?? 0) * qty, p.currency),
-                      })}
+                  : atLimit
+                    ? // The whole shelf is already in the cart — the button
+                      // says so instead of pretending one more would work.
+                      t('catalog:inCart', { count: inCartQty })
+                    : addToCart.isPending
+                      ? t('catalog:adding')
+                      : // The price in the button label, as the mock draws it:
+                        // it is the last thing read before committing.
+                        t('product:addToCartWithPrice', {
+                          price: formatMoney(
+                            (selected?.price_minor ?? 0) * Math.min(qty, remaining),
+                            p.currency,
+                          ),
+                        })}
               </Button>
             ) : (
               <Button size="lg" className="flex-1" disabled>
@@ -379,14 +403,26 @@ export function ProductPage() {
       {me.data && selected && !soldOut && (
         <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-line bg-card px-5 py-3 md:hidden">
           <span className="font-display text-lg font-extrabold text-brand-ink">
-            {formatMoney(selected.price_minor * qty, p.currency)}
+            {formatMoney(selected.price_minor * Math.min(qty, Math.max(remaining, 1)), p.currency)}
           </span>
+          {/* Same action as the buy box, so the SAME ceiling — a second
+              rendering that forgot the limit would be the very bug again. */}
           <Button
-            disabled={addToCart.isPending}
-            onClick={() => addToCart.mutate({ variantId: selected.id, qty: inCartQty + qty })}
+            disabled={atLimit || addToCart.isPending}
+            onClick={() =>
+              remaining > 0 &&
+              addToCart.mutate({
+                variantId: selected.id,
+                qty: inCartQty + Math.min(qty, remaining),
+              })
+            }
             className="flex-1"
           >
-            {addToCart.isPending ? t('catalog:adding') : t('catalog:addToCart')}
+            {atLimit
+              ? t('catalog:inCart', { count: inCartQty })
+              : addToCart.isPending
+                ? t('catalog:adding')
+                : t('catalog:addToCart')}
           </Button>
         </div>
       )}

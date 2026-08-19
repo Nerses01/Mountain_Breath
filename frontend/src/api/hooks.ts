@@ -322,6 +322,11 @@ export function useQuickAdd(): ((product: Product) => Promise<number>) | undefin
     const variant = product.variants.find((v) => v.stock_qty > 0)
     if (!variant) return 0
     const inCart = cart.data?.items.find((it) => it.variant_id === variant.id)?.qty ?? 0
+    // At the ceiling: no request — the cart already holds every unit the
+    // shop has. Returning the held count still flashes "In cart: N", which
+    // is the honest answer to the click ("you have them all"), instead of
+    // silently re-setting the same quantity — the dead-button bug's shape.
+    if (inCart >= variant.stock_qty) return inCart
     const updated = await setCartItem.mutateAsync({ variantId: variant.id, qty: inCart + 1 })
     return updated.items.find((it) => it.variant_id === variant.id)?.qty ?? inCart + 1
   }
