@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WishlistCard } from './WishlistCard'
@@ -56,7 +56,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function renderCard(e: WishlistEntry, onAdd?: () => void) {
+function renderCard(e: WishlistEntry, onAdd?: React.ComponentProps<typeof WishlistCard>['onAdd']) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <MemoryRouter>
@@ -68,6 +68,14 @@ function renderCard(e: WishlistEntry, onAdd?: () => void) {
 }
 
 describe('WishlistCard', () => {
+  it('flashes the confirmed cart count after an add — same contract as the shop card', async () => {
+    renderCard(entry(), () => Promise.resolve(2))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }))
+
+    expect(await screen.findByRole('button', { name: 'In cart: 2' })).toBeInTheDocument()
+  })
+
   it('shows size and the saved-ago line in words', () => {
     renderCard(entry(), vi.fn())
     // 14 days → "2 weeks ago" via Intl.RelativeTimeFormat.

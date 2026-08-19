@@ -4,7 +4,9 @@ import { useAddWishlistToCart, useQuickAdd, useWishlist } from '../api/hooks'
 import { ReorderReport } from '../components/account/ReorderReport'
 import { WishlistCard } from '../components/account/WishlistCard'
 import { HeartIcon } from '../components/ui/icons'
+import { cx } from '../lib/cx'
 import { formatMoney } from '../lib/format'
+import { useAddToCartFlash } from '../lib/useAddToCartFlash'
 import { useCurrency } from '../lib/useCurrency'
 import { useLocale } from '../i18n/useLocale'
 
@@ -23,6 +25,9 @@ export function WishlistPage() {
   const wishlist = useWishlist(true)
   const quickAdd = useQuickAdd()
   const addAll = useAddWishlistToCart()
+  // The button's own confirmation — the count comes from the server's merge
+  // REPORT, not from how many cards are on screen (sold-out lines add 0).
+  const { addedQty, flash } = useAddToCartFlash()
 
   if (wishlist.isPending) {
     return <p className="text-ink-body">{t('common:state.loading')}</p>
@@ -56,11 +61,30 @@ export function WishlistPage() {
         {entries.length > 0 && (
           <button
             type="button"
-            onClick={() => addAll.mutate()}
+            onClick={() =>
+              addAll.mutate(undefined, {
+                onSuccess: (report) => {
+                  const added = report.lines.reduce((sum, l) => sum + l.qty, 0)
+                  if (added > 0) flash(added)
+                },
+              })
+            }
             disabled={!anyInStock || addAll.isPending}
             className="rounded-full bg-bark px-5.5 py-3 font-display text-sm font-semibold text-ink-on-dark transition hover:opacity-90 disabled:opacity-50"
           >
-            {t('account:wishlist.addAll')}
+            {/* The flash says the TOTAL the server added; the report below
+                stays the detailed, per-line feedback. */}
+            <span
+              key={addedQty ?? 'resting'}
+              className={cx(
+                'inline-block',
+                addedQty !== null && 'animate-pop motion-reduce:animate-none',
+              )}
+            >
+              {addedQty !== null
+                ? t('account:ordersScreen.reorderAdded', { count: addedQty })
+                : t('account:wishlist.addAll')}
+            </span>
           </button>
         )}
       </div>

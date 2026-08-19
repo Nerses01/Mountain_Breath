@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import type { Product } from '../api/types'
+import { useAddToCartFlash } from '../lib/useAddToCartFlash'
 import { useLocale } from '../i18n/useLocale'
 import { Price } from './ui/Price'
 import { cx } from '../lib/cx'
@@ -51,28 +51,9 @@ export function ProductCard({
   const { t } = useTranslation()
   const { localePath } = useLocale()
 
-  // The transient "In cart: N" flash. null is the resting label. The timer
-  // lives in a ref so a second click RESTARTS the window instead of letting
-  // the first click's timeout cut the second flash short.
-  const [addedQty, setAddedQty] = useState<number | null>(null)
-  const flashTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  useEffect(() => () => clearTimeout(flashTimer.current), [])
-
-  const handleAdd = async () => {
-    if (!onAdd) return
-    try {
-      const count = await onAdd(product)
-      // A void handler (tests, future callers) gets no flash — feedback is
-      // only ever shown for a count the server confirmed.
-      if (typeof count !== 'number' || count <= 0) return
-      setAddedQty(count)
-      clearTimeout(flashTimer.current)
-      flashTimer.current = setTimeout(() => setAddedQty(null), 1800)
-    } catch {
-      // A failed add (rare: a stock race the disabled state didn't catch)
-      // keeps the resting label; the cart cache stays truthful either way.
-    }
-  }
+  // The transient "In cart: N" flash — shared with the wishlist's card via
+  // one hook, so the confirmation behaviour cannot drift between grids.
+  const { addedQty, handleAdd } = useAddToCartFlash(onAdd)
 
   // Variants arrive sorted by price, so the first is the "from" price.
   const cheapest = product.variants[0]
@@ -191,7 +172,7 @@ export function ProductCard({
         <button
           type="button"
           disabled={!inStock || !onAdd}
-          onClick={handleAdd}
+          onClick={() => void handleAdd(product)}
           className={cx(
             'relative z-10 shrink-0 rounded-full font-display text-xs font-semibold transition',
             'disabled:pointer-events-none disabled:opacity-50',

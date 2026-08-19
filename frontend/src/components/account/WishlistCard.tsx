@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import type { Product, WishlistEntry } from '../../api/types'
 import { cx } from '../../lib/cx'
+import { useAddToCartFlash } from '../../lib/useAddToCartFlash'
 import { useLocale } from '../../i18n/useLocale'
 import { Badge } from '../ui'
 import { Price } from '../ui/Price'
@@ -30,6 +31,10 @@ export function WishlistCard({
 }) {
   const { t } = useTranslation()
   const { locale, localePath } = useLocale()
+
+  // The same "In cart: N" confirmation the shop's card shows — one hook,
+  // so the two grids cannot drift.
+  const { addedQty, handleAdd } = useAddToCartFlash(onAdd)
 
   const cheapest = entry.variants[0]
   const hasChoice = entry.variants.length > 1
@@ -88,14 +93,32 @@ export function WishlistCard({
         <button
           type="button"
           disabled={!inStock || !onAdd}
-          onClick={() => void onAdd?.(entry)}
+          onClick={() => void handleAdd(entry)}
           className={cx(
             'relative z-10 shrink-0 rounded-full bg-bark px-4.5 py-2.5 font-display text-xs font-semibold text-ink-on-dark transition hover:opacity-90',
             'disabled:pointer-events-none disabled:opacity-50',
           )}
         >
-          {t('catalog:addToCart')}
+          {/* Keyed by count so the pop replays even when only the number
+              changed — same trick as ProductCard. */}
+          <span
+            key={addedQty ?? 'resting'}
+            className={cx(
+              'inline-block',
+              addedQty !== null && 'animate-pop motion-reduce:animate-none',
+            )}
+          >
+            {addedQty !== null
+              ? t('catalog:inCart', { count: addedQty })
+              : t('catalog:addToCart')}
+          </span>
         </button>
+
+        {/* Screen readers are not told about a button relabeling itself —
+            the live region announces the confirmation. */}
+        <span aria-live="polite" className="sr-only">
+          {addedQty !== null ? t('catalog:inCart', { count: addedQty }) : ''}
+        </span>
       </div>
     </article>
   )
