@@ -184,6 +184,14 @@ export function LogoutIcon(props: IconProps) {
   )
 }
 
+export function ShieldIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M12 3 5 5.6v5.2c0 4.5 3 8.3 7 9.7 4-1.4 7-5.2 7-9.7V5.6z" />
+    </IconBase>
+  )
+}
+
 export function StarIcon({ filled = false, ...props }: IconProps & { filled?: boolean }) {
   // A REGULAR star, not a hand-drawn one: ten vertices alternating between
   // an outer radius of 9.6 and an inner one of 4.56 (the ★ glyph's chunky

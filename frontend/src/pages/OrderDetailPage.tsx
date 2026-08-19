@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { ApiError } from '../api/client'
-import { useCancelOrder, useOrder } from '../api/hooks'
+import { useCancelOrder, useOrder, useReorder } from '../api/hooks'
 import { OrderTracker } from '../components/account/OrderTracker'
+import { ReorderReport } from '../components/account/ReorderReport'
+import { Button } from '../components/ui'
 import { useLocale } from '../i18n/useLocale'
 import { cx } from '../lib/cx'
 import { formatMoney } from '../lib/format'
@@ -181,6 +183,15 @@ export function OrderDetailPage() {
             </p>
           </section>
 
+          {/* Reorder lives HERE, not on the history rows (Aug 2026):
+              repeating a basket is a decision about its contents, and this
+              page is the one place that lists every line. Settled orders
+              only — a delivered order is a known-good basket, a cancelled
+              one may be; live orders' jars are already on the way. */}
+          {(o.status === 'delivered' || o.status === 'cancelled') && (
+            <ReorderCard orderId={o.id} />
+          )}
+
           {/* F2: self-service cancel, pending only — past that window the
               arrow belongs to the shop, and the 409 branch below says so.
               The canvas draws no cancel control anywhere, so the design is
@@ -197,6 +208,32 @@ export function OrderDetailPage() {
         </div>
       </div>
     </Shell>
+  )
+}
+
+/** The whole basket back into the cart, with the merge report rendered
+ *  right under the button — additions and every skip, reason named. */
+function ReorderCard({ orderId }: { orderId: number }) {
+  const { t } = useTranslation()
+  const reorder = useReorder()
+
+  return (
+    <section className="rounded-2xl bg-card p-6">
+      <Button
+        variant="outline"
+        fullWidth
+        disabled={reorder.isPending}
+        onClick={() => reorder.mutate(orderId)}
+      >
+        {t('account:ordersScreen.reorder')}
+      </Button>
+      {reorder.data && <ReorderReport report={reorder.data} />}
+      {reorder.isError && (
+        <p role="alert" className="mt-2 text-xs text-danger">
+          {t('common:state.loadFailed')}
+        </p>
+      )}
+    </section>
   )
 }
 

@@ -354,6 +354,7 @@ export const hy = {
       wishlist: 'Ցանկությունների ցուցակ',
       addresses: 'Հասցեներ',
       settings: 'Կարգավորումներ',
+      adminPanel: 'Ադմին վահանակ',
     },
     rail: {
       member: 'Փեթակի ակումբի անդամ',
@@ -374,9 +375,6 @@ export const hy = {
       chilled: 'սառը առաքում',
       details: 'Մանրամասներ',
       reorder: 'Կրկնել պատվերը',
-      showOlder_one: 'Ցույց տալ ևս {{count}} պատվեր ▾',
-      showOlder_other: 'Ցույց տալ ևս {{count}} պատվեր ▾',
-      showFewer: 'Ցույց տալ ավելի քիչ ▴',
       reorderAdded_one: 'Զամբյուղում ավելացվեց {{count}} ապրանք։',
       reorderAdded_other: 'Զամբյուղում ավելացվեց {{count}} ապրանք։',
       reorderNothing: 'Ոչինչ չհաջողվեց ավելացնել․',

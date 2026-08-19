@@ -6,10 +6,10 @@ export type ButtonSize = 'sm' | 'md' | 'lg'
 // Every variant the design uses, in one place. `primary` deliberately paints
 // itself in --color-brand-ink rather than the mock's brighter --color-brand:
 // cream text on the bright orange measures 2.9:1, under the 4.5:1 floor.
-// The glow shadow still uses the bright orange, which is fine — a shadow
-// carries no text (see the token block in src/index.css).
+// The mock's orange glow under primary buttons (--shadow-cta) was dropped by
+// request in Aug 2026 — it read as a smear under the dark checkout card.
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-ink text-ink-on-dark shadow-cta hover:opacity-90',
+  primary: 'bg-brand-ink text-ink-on-dark hover:opacity-90',
   dark: 'bg-bark text-ink-on-dark hover:opacity-90',
   honey: 'bg-honey text-ink hover:opacity-90',
   outline:

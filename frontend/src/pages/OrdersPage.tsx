@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
-import { useMyOrders, useReorder } from '../api/hooks'
+import { useMyOrders } from '../api/hooks'
 import type { Order, OrderStatus } from '../api/types'
 import { OrderTracker } from '../components/account/OrderTracker'
-import { ReorderReport } from '../components/account/ReorderReport'
+import { Pagination } from '../components/ui'
 import { cx } from '../lib/cx'
 import { formatMoney } from '../lib/format'
 import { useLocale } from '../i18n/useLocale'
@@ -12,8 +12,14 @@ import { useLocale } from '../i18n/useLocale'
 /**
  * /account/orders — canvas 07. The screen splits the history in two: the
  * newest still-moving order gets the big bordered card with the tracker,
- * everything else is a compact row. The three filter pills work on the
- * already-fetched list — seven orders is a filter() away, not an endpoint.
+ * everything else is a compact row. The three filter pills and the pager
+ * work on the already-fetched list — a dozen orders is a filter() and a
+ * slice() away, not an endpoint.
+ *
+ * Rows carry no Reorder button (the canvas draws one, Aug 2026 decision):
+ * repeating a basket is a decision about its CONTENTS, and the row shows a
+ * truncated summary — the detail page, which shows every line, owns the
+ * action.
  */
 
 // "On the way" is the canvas's word for the machine's three live states.
@@ -22,16 +28,24 @@ const isActive = (o: Order) => ACTIVE.includes(o.status)
 
 type Filter = 'all' | 'active' | 'delivered'
 
-// How many history rows show before "Show N older orders" (the canvas
-// draws three).
-const VISIBLE_ROWS = 3
+// History rows per page. The canvas draws three rows and a "Show 5 older
+// orders" disclosure; numbered pages replaced it (Aug 2026) so a long
+// history stays walkable instead of growing one ever-taller column.
+const ROWS_PER_PAGE = 3
 
 export function OrdersPage() {
   const { t } = useTranslation()
   const orders = useMyOrders()
-  const reorder = useReorder()
   const [filter, setFilter] = useState<Filter>('all')
-  const [expanded, setExpanded] = useState(false)
+  const [page, setPage] = useState(1)
+
+  // One mover for both states: switching filters re-slices the list, so the
+  // page number must restart — page 3 of "all" means nothing under
+  // "delivered".
+  const pickFilter = (f: Filter) => {
+    setFilter(f)
+    setPage(1)
+  }
 
   if (orders.isPending) {
     return <p className="text-ink-body">{t('common:state.loading')}</p>
@@ -52,8 +66,8 @@ export function OrdersPage() {
 
   const showFeatured = featured !== undefined && passesFilter(featured)
   const rows = all.filter((o) => passesFilter(o) && o !== featured)
-  const visibleRows = expanded ? rows : rows.slice(0, VISIBLE_ROWS)
-  const hiddenCount = rows.length - VISIBLE_ROWS
+  const pageCount = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE))
+  const visibleRows = rows.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE)
 
   return (
     <>
@@ -69,7 +83,7 @@ export function OrdersPage() {
             <FilterPill
               label={`${t('account:ordersScreen.filterAll')} · ${all.length}`}
               selected={filter === 'all'}
-              onClick={() => setFilter('all')}
+              onClick={() => pickFilter('all')}
             />
             {/* A pill that would filter to nothing does not render — an
                 empty state behind a button is a dead end we can prevent. */}
@@ -77,21 +91,19 @@ export function OrdersPage() {
               <FilterPill
                 label={`${t('account:ordersScreen.filterActive')} · ${activeCount}`}
                 selected={filter === 'active'}
-                onClick={() => setFilter('active')}
+                onClick={() => pickFilter('active')}
               />
             )}
             {deliveredCount > 0 && (
               <FilterPill
                 label={`${t('account:ordersScreen.filterDelivered')} · ${deliveredCount}`}
                 selected={filter === 'delivered'}
-                onClick={() => setFilter('delivered')}
+                onClick={() => pickFilter('delivered')}
               />
             )}
           </div>
         )}
       </div>
-
-      {reorder.data && <ReorderReport report={reorder.data} />}
 
       <div className="mt-6 flex flex-col gap-5">
         {all.length === 0 && <p className="text-ink-body">{t('account:noOrders')}</p>}
@@ -104,24 +116,13 @@ export function OrdersPage() {
           <div className="rounded-3xl bg-card px-6 py-2 sm:px-7">
             <ul className="divide-y divide-line-soft">
               {visibleRows.map((o) => (
-                <HistoryRow
-                  key={o.id}
-                  order={o}
-                  onReorder={() => reorder.mutate(o.id)}
-                  reordering={reorder.isPending}
-                />
+                <HistoryRow key={o.id} order={o} />
               ))}
             </ul>
-            {(hiddenCount > 0 || expanded) && (
-              <button
-                type="button"
-                onClick={() => setExpanded((v) => !v)}
-                className="w-full py-4 text-center font-display text-sm font-semibold text-brand-ink hover:underline"
-              >
-                {expanded
-                  ? t('account:ordersScreen.showFewer')
-                  : t('account:ordersScreen.showOlder', { count: hiddenCount })}
-              </button>
+            {pageCount > 1 && (
+              <div className="border-t border-line-soft py-4">
+                <Pagination page={page} pageCount={pageCount} onSelect={setPage} />
+              </div>
             )}
           </div>
         )}
@@ -212,16 +213,8 @@ function FeaturedOrder({ order }: { order: Order }) {
   )
 }
 
-/** One compact history row: id + date, summary, total, status, reorder. */
-function HistoryRow({
-  order,
-  onReorder,
-  reordering,
-}: {
-  order: Order
-  onReorder: () => void
-  reordering: boolean
-}) {
+/** One compact history row: id + date, summary, total, status. */
+function HistoryRow({ order }: { order: Order }) {
   const { t } = useTranslation()
   const { locale, localePath } = useLocale()
 
@@ -232,7 +225,11 @@ function HistoryRow({
   })
 
   return (
-    <li className="flex flex-col gap-3 py-5 sm:grid sm:grid-cols-[1.2fr_1fr_auto] sm:items-center sm:gap-5">
+    // A FIXED first column, not a fr share: every <li> is its own grid, and
+    // fr units hand the id block ~45% of the row, floating the summary
+    // toward the middle. A fixed track starts the summary at the same x in
+    // every row — the tabular look the eye expects from a list of records.
+    <li className="flex flex-col gap-3 py-5 sm:grid sm:grid-cols-[11.5rem_1fr_auto] sm:items-center sm:gap-5">
       <div className="flex flex-col gap-0.5">
         <Link
           to={localePath(`/account/orders/${order.id}`)}
@@ -249,34 +246,26 @@ function HistoryRow({
       <p className="truncate text-sm text-ink-soft">
         {order.items.map((it) => it.name).join(' · ')}
       </p>
+      {/* Min-widths + right/center alignment make the money and status read
+          as COLUMNS across rows, while still growing for longer figures and
+          the other languages' chip labels. tabular-nums: digits share one
+          width, so totals align digit-for-digit. */}
       <div className="flex items-center gap-3 sm:justify-end">
-        <span className="font-display text-[0.9375rem] font-extrabold text-ink">
+        <span className="min-w-22 text-right font-display text-[0.9375rem] font-extrabold tabular-nums text-ink">
           {formatMoney(order.total_minor, order.currency)}
         </span>
-        <StatusChip status={order.status} />
-        {/* Reorder only where it makes sense: a delivered order is a known
-            good basket; a cancelled one may be too. Live orders don't offer
-            it — their jars are already on the way. */}
-        {(order.status === 'delivered' || order.status === 'cancelled') && (
-          <button
-            type="button"
-            onClick={onReorder}
-            disabled={reordering}
-            className="rounded-full border-[1.5px] border-line px-4 py-2 font-display text-[0.8125rem] font-semibold text-ink transition hover:border-line-strong disabled:opacity-50"
-          >
-            {t('account:ordersScreen.reorder')}
-          </button>
-        )}
+        <StatusChip status={order.status} className="min-w-23 text-center" />
       </div>
     </li>
   )
 }
 
-function StatusChip({ status }: { status: OrderStatus }) {
+function StatusChip({ status, className }: { status: OrderStatus; className?: string }) {
   const { t } = useTranslation()
   return (
     <span
       className={cx(
+        className,
         'rounded-full px-3 py-1 font-display text-xs font-bold',
         // The canvas's chip colors: honey for a moving order, the soft
         // green for delivered; quiet for the rest. The green pair is the

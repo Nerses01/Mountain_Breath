@@ -3,7 +3,15 @@ import { useTranslation } from 'react-i18next'
 import { useCatalogFacets, useProducts, useQuickAdd } from '../api/hooks'
 import type { ProductSort } from '../api/types'
 import { ProductCard } from '../components/ProductCard'
-import { Breadcrumbs, Button, Card, IconButton, PillSelect, XIcon } from '../components/ui'
+import {
+  Breadcrumbs,
+  Button,
+  Card,
+  IconButton,
+  Pagination,
+  PillSelect,
+  XIcon,
+} from '../components/ui'
 import { PriceRange } from '../components/ui/PriceRange'
 import { useLocale } from '../i18n/useLocale'
 import { cx } from '../lib/cx'
@@ -386,45 +394,4 @@ function FacetRow({
   )
 }
 
-function Pagination({
-  page,
-  pageCount,
-  onSelect,
-}: {
-  page: number
-  pageCount: number
-  onSelect: (page: number) => void
-}) {
-  const { t } = useTranslation()
-  const pages = Array.from({ length: pageCount }, (_, i) => i + 1)
-
-  return (
-    <nav aria-label={t('catalog:pagination')} className="flex justify-center gap-2.5 pt-2">
-      {pages.map((n) => (
-        <button
-          key={n}
-          type="button"
-          aria-current={n === page ? 'page' : undefined}
-          onClick={() => onSelect(n)}
-          className={cx(
-            'inline-flex size-9.5 items-center justify-center rounded-full font-display text-sm transition',
-            n === page
-              ? 'bg-brand-ink font-bold text-ink-on-dark'
-              : 'border-[1.5px] border-line font-semibold text-ink-body hover:border-line-strong',
-          )}
-        >
-          {n}
-        </button>
-      ))}
-      <button
-        type="button"
-        aria-label={t('catalog:nextPage')}
-        disabled={page >= pageCount}
-        onClick={() => onSelect(page + 1)}
-        className="inline-flex size-9.5 items-center justify-center rounded-full border-[1.5px] border-line text-sm text-ink-body transition hover:border-line-strong disabled:opacity-40"
-      >
-        →
-      </button>
-    </nav>
-  )
-}
+// Pagination moved to components/ui — the order history pages with it too.

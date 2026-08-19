@@ -359,6 +359,7 @@ export const ru = {
       wishlist: 'Список желаний',
       addresses: 'Адреса',
       settings: 'Настройки',
+      adminPanel: 'Админ-панель',
     },
     rail: {
       member: 'Участник клуба улья',
@@ -380,10 +381,6 @@ export const ru = {
       chilled: 'охлаждённая посылка',
       details: 'Подробнее',
       reorder: 'Повторить',
-      showOlder_one: 'Показать ещё {{count}} заказ ▾',
-      showOlder_few: 'Показать ещё {{count}} заказа ▾',
-      showOlder_many: 'Показать ещё {{count}} заказов ▾',
-      showFewer: 'Показать меньше ▴',
       reorderAdded_one: 'В корзину добавлен {{count}} товар.',
       reorderAdded_few: 'В корзину добавлено {{count}} товара.',
       reorderAdded_many: 'В корзину добавлено {{count}} товаров.',

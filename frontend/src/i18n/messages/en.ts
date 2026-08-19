@@ -421,6 +421,7 @@ export const en = {
       wishlist: 'Wishlist',
       addresses: 'Addresses',
       settings: 'Settings',
+      adminPanel: 'Admin panel',
     },
     rail: {
       member: 'Hive club member',
@@ -443,9 +444,6 @@ export const en = {
       chilled: 'chilled parcel',
       details: 'Details',
       reorder: 'Reorder',
-      showOlder_one: 'Show {{count}} older order ▾',
-      showOlder_other: 'Show {{count}} older orders ▾',
-      showFewer: 'Show fewer ▴',
       reorderAdded_one: 'Added {{count}} item to your cart.',
       reorderAdded_other: 'Added {{count}} items to your cart.',
       reorderNothing: 'Nothing could be added:',

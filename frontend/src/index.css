@@ -180,9 +180,11 @@
   --radius-2xl: 1.5rem; /* 24px — panels */
   --radius-3xl: 1.75rem; /* 28px — full screens */
 
-  /* ---- Shadows ------------------------------------------------------ */
+  /* ---- Shadows ------------------------------------------------------
+     The mock also ladders a --shadow-cta orange glow under primary
+     buttons; dropped by request (Aug 2026) — it read as a smear under the
+     dark checkout card. */
   --shadow-screen: 0 30px 70px -40px rgb(70 40 28 / 0.45);
-  --shadow-cta: 0 14px 26px -14px rgb(228 118 31 / 0.9);
 
   /* ---- Motion --------------------------------------------------------
      One confirmation pulse, used by the card's Add button when the cart

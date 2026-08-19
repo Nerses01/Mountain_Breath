@@ -385,27 +385,33 @@ function CheckoutShell({ step, children }: { step: 1 | 3; children: ReactNode })
 
   return (
     <div className="min-h-screen bg-panel">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line-soft bg-panel-soft px-6 py-5 lg:px-14">
-        <Link to={localePath('/')} className="flex items-center gap-3">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-honey font-display font-extrabold text-ink">
-            M
-          </span>
-          <span className="font-display text-[1.0625rem] font-extrabold tracking-wide text-ink">
-            {t('common:brand').toUpperCase()}
-          </span>
-        </Link>
+      {/* The bar paints edge to edge, but its CONTENT sits in the same
+          mx-auto max-w-360 container as <main> below and as SiteHeader on
+          every other page — without it, the logo hugged the viewport edge
+          on wide screens while the page content stayed centered. */}
+      <header className="border-b border-line-soft bg-panel-soft">
+        <div className="mx-auto flex max-w-360 flex-wrap items-center justify-between gap-4 px-6 py-5 lg:px-14">
+          <Link to={localePath('/')} className="flex items-center gap-3">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-honey font-display font-extrabold text-ink">
+              M
+            </span>
+            <span className="font-display text-[1.0625rem] font-extrabold tracking-wide text-ink">
+              {t('common:brand').toUpperCase()}
+            </span>
+          </Link>
 
-        <ol className="flex items-center gap-4 font-display text-sm">
-          <StepDot n={1} label={t('checkout:steps.details')} active={step >= 1} />
-          <StepSeparator />
-          <StepDot n={2} label={t('checkout:steps.payment')} active={step >= 1} />
-          <StepSeparator />
-          <StepDot n={3} label={t('checkout:steps.done')} active={step >= 3} />
-        </ol>
+          <ol className="flex items-center gap-4 font-display text-sm">
+            <StepDot n={1} label={t('checkout:steps.details')} active={step >= 1} />
+            <StepSeparator />
+            <StepDot n={2} label={t('checkout:steps.payment')} active={step >= 1} />
+            <StepSeparator />
+            <StepDot n={3} label={t('checkout:steps.done')} active={step >= 3} />
+          </ol>
 
-        <span className="text-sm text-ink-faint" aria-hidden="true">
-          {t('checkout:secure')}
-        </span>
+          <span className="text-sm text-ink-faint" aria-hidden="true">
+            {t('checkout:secure')}
+          </span>
+        </div>
       </header>
 
       <main className="mx-auto max-w-360 px-6 py-11 lg:px-14">{children}</main>

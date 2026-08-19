@@ -12,6 +12,7 @@ import {
   HomeIcon,
   LogoutIcon,
   OrdersIcon,
+  ShieldIcon,
 } from '../ui/icons'
 
 /**
@@ -147,6 +148,21 @@ function AccountRail({ user }: { user: User }) {
         <RailLink to="/account/addresses" icon={<HomeIcon size={18} />} label={t('account:nav.addresses')} count={addresses.data?.length} />
         <RailLink to="/account/settings" icon={<GearIcon size={18} />} label={t('account:nav.settings')} />
         <div role="presentation" className="mx-2 my-1.5 border-t border-line-soft" />
+        {/* The door to the back office, admins only. A plain Link to the
+            UNPREFIXED path: the admin routes exist outside the locale tree
+            (they are a back office, not a shopfront), so localePath('/admin')
+            would build /hy/admin — a URL no route matches. */}
+        {user.role === 'admin' && (
+          <Link
+            to="/admin"
+            className="flex items-center gap-3 rounded-xl px-4 py-3 font-display text-[0.9375rem] font-semibold text-ink-strong transition hover:bg-panel"
+          >
+            <span aria-hidden className="w-5 text-ink-faint">
+              <ShieldIcon size={18} />
+            </span>
+            {t('account:nav.adminPanel')}
+          </Link>
+        )}
         <button
           type="button"
           onClick={() => logout.mutate()}

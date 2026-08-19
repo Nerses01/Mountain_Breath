@@ -27,6 +27,7 @@ export {
   XIcon,
 } from './icons'
 export { Input } from './Input'
+export { Pagination } from './Pagination'
 export { PillSelect, type PillSelectOption } from './PillSelect'
 export { QtyStepper } from './QtyStepper'
 export { SectionHeading } from './SectionHeading'
