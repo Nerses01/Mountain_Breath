@@ -139,8 +139,14 @@ customer's every screen; the admin got only what each phase needed.
       mirroring migration 000018's CHECKs, whole-value updates, NO delete
       (redemption history hangs off the code — `active` is the off
       switch), admin Promos tab with list + form.*
-- [ ] **Category management**: edit / delete-or-deactivate / reorder
+- [x] **Category management**: edit / delete-or-deactivate / reorder
       (Phase 11 line; the footer and facets already read sort_order).
+      *Done 2026-08-19 (decision #95): settled as delete-when-empty (the
+      schema's RESTRICT, no is_active column), whole-value edit with the
+      editor's own raw-English read, positional reorder endpoint, admin
+      list with move/edit/delete. Also FOUND AND FIXED: the category
+      form's and collection's nested translations shape never matched the
+      backend's flat map — creating a category with a translation 400'd.*
 - [ ] **Admin user management**: promote/demote via UI instead of SQL
       (Era I leftover), guarded so the last admin cannot demote themself.
 - [ ] **Account deletion + data view** (the privacy page's promises, §1):

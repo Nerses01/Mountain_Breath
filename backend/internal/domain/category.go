@@ -31,6 +31,13 @@ type Category struct {
 // details — they only share this value.
 var ErrSlugTaken = errors.New("slug already taken")
 
+// F2 (decision #95): a category holding products cannot be deleted — the
+// rule is the schema's (products.category_id ON DELETE RESTRICT), and this
+// sentinel is its name above SQL. There is deliberately no is_active
+// column: an empty category can simply be deleted, and one with products
+// is not an off-switchable thing — its products are, individually.
+var ErrCategoryInUse = errors.New("category still has products")
+
 // slugRe: lowercase words of letters/digits separated by single dashes,
 // e.g. "herbal-tea", "coffee", "gift-sets-2026".
 var slugRe = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)

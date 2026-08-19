@@ -243,7 +243,21 @@ export interface NewCategory {
   slug: string
   name: string
   sort_order: number
-  translations?: Record<string, { name: string }>
+  /** FLAT map, locale → name ({"hy": "Մեղր"}) — a category's translation
+   *  is one string, unlike a product's {name, description} object. The
+   *  nested shape this field used to declare never matched the backend
+   *  and 400'd on decode (found during F2's category management). */
+  translations?: Record<string, string>
+}
+
+/** F2 (decision #95): the EDITOR's category — name is raw English (never
+ *  locale-resolved) and the non-default translations ride along. */
+export interface AdminCategory {
+  id: number
+  slug: string
+  name: string
+  sort_order: number
+  translations: Record<string, string>
 }
 
 export interface CartItem {

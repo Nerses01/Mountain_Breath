@@ -11,6 +11,7 @@ import type {
   EditorialInput,
   Money,
   ImageInput,
+  NewCategory,
   NewReview,
   OrderStatus,
   PaymentStatus,
@@ -206,13 +207,59 @@ export function useLogout() {
   })
 }
 
-export function useCreateCategory() {
+// Category writes stale BOTH lists: the storefront's locale-resolved
+// ['categories'] and the editor's raw ['admin-categories'].
+function useInvalidateCategories() {
   const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: ['categories'] })
+    qc.invalidateQueries({ queryKey: ['admin-categories'] })
+  }
+}
+
+export function useCreateCategory() {
+  const invalidate = useInvalidateCategories()
   return useMutation({
     mutationFn: api.createCategory,
-    // We changed the categories list on the server — mark every cached
-    // copy stale so visible ones refetch.
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
+    onSuccess: invalidate,
+  })
+}
+
+// --- F2 category management (decision #95) -------------------------------
+
+export function useAdminCategories() {
+  return useQuery({
+    queryKey: ['admin-categories'],
+    queryFn: api.adminCategories,
+  })
+}
+
+export function useUpdateCategory() {
+  const invalidate = useInvalidateCategories()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: NewCategory }) =>
+      api.updateCategory(id, input),
+    // A renamed or re-slugged category also changes product payloads
+    // (their category object) and the catalog facets.
+    onSuccess: () => {
+      invalidate()
+    },
+  })
+}
+
+export function useDeleteCategory() {
+  const invalidate = useInvalidateCategories()
+  return useMutation({
+    mutationFn: api.deleteCategory,
+    onSuccess: invalidate,
+  })
+}
+
+export function useReorderCategories() {
+  const invalidate = useInvalidateCategories()
+  return useMutation({
+    mutationFn: api.reorderCategories,
+    onSuccess: invalidate,
   })
 }
 

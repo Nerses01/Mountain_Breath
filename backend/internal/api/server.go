@@ -21,6 +21,17 @@ import (
 // in Phase 6 a fake in-memory implementation satisfies them too, letting us
 // test handlers without Postgres.
 
+// F2 (decision #95): the admin's category management. AdminCategories is
+// the editor's read (raw English + translations); DeleteCategory refuses a
+// category holding products (the schema's RESTRICT, as ErrCategoryInUse);
+// ReorderCategories rewrites sort_order from one ordered list.
+type CategoryAdminStore interface {
+	AdminCategories(ctx context.Context) ([]domain.Category, error)
+	UpdateCategory(ctx context.Context, c *domain.Category) error
+	DeleteCategory(ctx context.Context, id int64) error
+	ReorderCategories(ctx context.Context, ids []int64) error
+}
+
 type CategoryStore interface {
 	ListCategories(ctx context.Context, locale domain.Locale) ([]domain.Category, error)
 	CreateCategory(ctx context.Context, c *domain.Category) error
@@ -209,6 +220,7 @@ type NewsletterStore interface {
 // Store embeds the per-entity interfaces into the one the Server depends on.
 type Store interface {
 	CategoryStore
+	CategoryAdminStore
 	ProductStore
 	ReviewStore
 	UserStore
@@ -402,6 +414,12 @@ func (s *Server) Routes() chi.Router {
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(s.requireAdmin)
 			r.Post("/categories", s.handleCreateCategory)
+			r.Get("/categories", s.handleAdminListCategories)
+			// The static "order" segment outranks {id} in chi's matching,
+			// so this never collides with the routes below it.
+			r.Put("/categories/order", s.handleReorderCategories)
+			r.Put("/categories/{id}", s.handleUpdateCategory)
+			r.Delete("/categories/{id}", s.handleDeleteCategory)
 			r.Get("/orders", s.handleAdminListOrders)
 			r.Patch("/orders/{id}/status", s.handleUpdateOrderStatus)
 			r.Patch("/orders/{id}/payment", s.handleUpdateOrderPayment)

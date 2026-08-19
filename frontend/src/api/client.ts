@@ -2,6 +2,7 @@ import type { Currency } from '../lib/currencies'
 import type {
   AddressEntry,
   AddressInput,
+  AdminCategory,
   AdminProduct,
   CheckoutInput,
   AdminReview,
@@ -368,6 +369,16 @@ export const api = {
   // admin
   createCategory: (data: NewCategory) =>
     request<Category>('/api/v1/admin/categories', { method: 'POST', body: data }),
+  // F2 (decision #95): category management. Delete is EMPTY categories
+  // only — a category with products answers 409 category_in_use (the
+  // schema's RESTRICT speaking); reorder sends the whole ordered id list.
+  adminCategories: () => request<AdminCategory[]>('/api/v1/admin/categories'),
+  updateCategory: (id: number, data: NewCategory) =>
+    request<Category>(`/api/v1/admin/categories/${id}`, { method: 'PUT', body: data }),
+  deleteCategory: (id: number) =>
+    request<void>(`/api/v1/admin/categories/${id}`, { method: 'DELETE' }),
+  reorderCategories: (ids: number[]) =>
+    request<void>('/api/v1/admin/categories/order', { method: 'PUT', body: { ids } }),
   adminOrders: () => request<Order[]>('/api/v1/admin/orders'),
   adminProducts: () =>
     request<Paginated<AdminProduct>>(withView('/api/v1/admin/products?per_page=100')),

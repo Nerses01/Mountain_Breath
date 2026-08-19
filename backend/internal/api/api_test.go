@@ -156,6 +156,61 @@ func (f *fakeStore) CreateCategory(_ context.Context, c *domain.Category) error 
 	return nil
 }
 
+// --- F2 category admin (decision #95): behaving fakes on the slice the
+// create fake already fills, with the same rules the real store enforces
+// through SQL — slug uniqueness, RESTRICT-style delete, positional reorder.
+
+func (f *fakeStore) AdminCategories(_ context.Context) ([]domain.Category, error) {
+	return f.categories, nil
+}
+
+func (f *fakeStore) UpdateCategory(_ context.Context, c *domain.Category) error {
+	for _, existing := range f.categories {
+		if existing.ID != c.ID && existing.Slug == c.Slug {
+			return domain.ErrSlugTaken
+		}
+	}
+	for i := range f.categories {
+		if f.categories[i].ID == c.ID {
+			c.CreatedAt = f.categories[i].CreatedAt
+			f.categories[i] = *c
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
+func (f *fakeStore) DeleteCategory(_ context.Context, id int64) error {
+	for _, p := range f.products {
+		if p.CategoryID == id {
+			return domain.ErrCategoryInUse
+		}
+	}
+	for i := range f.categories {
+		if f.categories[i].ID == id {
+			f.categories = append(f.categories[:i], f.categories[i+1:]...)
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
+func (f *fakeStore) ReorderCategories(_ context.Context, ids []int64) error {
+	for pos, id := range ids {
+		found := false
+		for i := range f.categories {
+			if f.categories[i].ID == id {
+				f.categories[i].SortOrder = (pos + 1) * 10
+				found = true
+			}
+		}
+		if !found {
+			return domain.ErrNotFound
+		}
+	}
+	return nil
+}
+
 // --- ProductStore ---
 
 func (f *fakeStore) ListProducts(_ context.Context, filter domain.ProductFilter) ([]domain.Product, int, error) {

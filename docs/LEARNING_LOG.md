@@ -17,6 +17,50 @@ Template for an entry:
 
 ---
 
+## 2026-08-19 — Phase F2, part five: categories grow up (and a two-era-old bug surfaces)
+
+**Worked on:** category management (decision #95) — the editor's own
+`GET /admin/categories` (raw English + translations), whole-value
+`PUT /admin/categories/{id}`, `DELETE` for empty categories only, and a
+positional `PUT /admin/categories/order`. The admin page gained move
+arrows, edit-in-form, and delete with the 409 explained. "Delete or
+deactivate" settled as delete-when-empty: no `is_active` column, because
+nothing would read it.
+
+**Found:** the category form and the Postman collection have sent
+product-style NESTED translations (`{"hy": {"name": …}}`) since E1.5 at a
+backend that decodes a FLAT map (`{"hy": …}`) — so creating a category
+WITH a translation has 400'd from the UI this whole time. Nothing caught
+it because handler tests speak to the backend in the backend's own shape,
+frontend tests mock the client, and the seed writes SQL directly — every
+layer was self-consistent, only the seam was wrong. Both senders now
+speak flat.
+
+**Learned:**
+- *The constraint IS the check, deletion edition* — no SELECT-count
+  before DELETE: a pre-check could race a concurrent product creation;
+  the FK's RESTRICT cannot. Same lesson as E7's unique redemption index,
+  third appearance (payment lock, cancel window, now this).
+- *Editors need raw reads* — the storefront's locale-resolved list is
+  exactly wrong for a form: an editor shown the resolved Armenian name
+  would save it back as the English one. Adjacent reads, different
+  questions, two endpoints.
+- *Positional reorder beats client-computed sort keys* — the client sends
+  meaning (an ordered list), the server derives the numbers (10, 20, 30),
+  and all-or-nothing semantics stop a stale list from half-applying.
+- *Cross-layer seams need cross-layer tests* — four self-consistent
+  layers hid a broken handshake for two eras. The fix closes the gap;
+  the OpenAPI/generated-client line in F6 is the systematic answer, and
+  today is evidence for its priority.
+- *Delete-or-deactivate is answered by references, not preference* —
+  promos keep history (no delete), categories don't (delete when empty).
+  The same question got opposite answers one day apart, both derived
+  from what hangs off the row.
+
+**Questions / to revisit:**
+- Bump F6's OpenAPI + generated TS client line? Today's found bug is
+  exactly the class it eliminates.
+
 ## 2026-08-19 — Phase F2, part four: promo codes get their admin
 
 **Worked on:** the promo CRUD (decision #94) — E7's "revisit when three
