@@ -49,6 +49,105 @@ type Promo struct {
 	Values map[Currency]PromoValue
 }
 
+// F2: the admin's write shape for a code — everything promo_codes and
+// promo_code_values hold, minus the live counts (those are facts about
+// usage, not properties an admin sets). Whole-value semantics like every
+// PUT-shaped write here: the form shows every field, so it sends every
+// field, and a currency left out of Values is REMOVED.
+type PromoInput struct {
+	Code    string
+	Kind    string
+	Percent *int // required iff Kind == PromoPercent (the migration's biconditional)
+
+	StartsAt *time.Time
+	EndsAt   *time.Time
+
+	MaxRedemptions *int
+	Active         bool
+
+	Values map[Currency]PromoValue
+}
+
+// ErrPromoCodeTaken is the upper(code) unique index speaking — "honey10"
+// and "HONEY10" are the same code, so the collision is case-insensitive.
+var ErrPromoCodeTaken = errors.New("promo code already exists")
+
+// ValidatePromoInput mirrors the migration's CHECK constraints in the
+// fields vocabulary, so a bad form dies as attachable field errors rather
+// than a driver error the customer-facing envelope cannot explain. The
+// mirroring is deliberate double-bookkeeping: the database stays the last
+// line of defence, this is the first.
+func ValidatePromoInput(in PromoInput) map[string]string {
+	fields := make(map[string]string)
+
+	if NormalizePromoCode(in.Code) == "" {
+		fields["code"] = ValidationRequired
+	} else if len(NormalizePromoCode(in.Code)) > 40 {
+		fields["code"] = ValidationTooLong
+	}
+
+	switch in.Kind {
+	case PromoPercent, PromoFixed, PromoFreeShipping:
+	default:
+		fields["kind"] = ValidationInvalidStatus
+	}
+
+	// The biconditional, both directions — a percent code must carry a
+	// percent, every other kind must not (CHECK ((kind='percent') =
+	// (percent IS NOT NULL))).
+	if in.Kind == PromoPercent {
+		if in.Percent == nil {
+			fields["percent"] = ValidationRequired
+		} else if *in.Percent < 1 || *in.Percent > 100 {
+			fields["percent"] = ValidationPositive
+		}
+	} else if in.Percent != nil {
+		fields["percent"] = ValidationInvalidStatus
+	}
+
+	if in.StartsAt != nil && in.EndsAt != nil && !in.StartsAt.Before(*in.EndsAt) {
+		fields["ends_at"] = ValidationInvalidStatus
+	}
+	if in.MaxRedemptions != nil && *in.MaxRedemptions < 1 {
+		fields["max_redemptions"] = ValidationPositive
+	}
+
+	for currency, v := range in.Values {
+		if _, ok := ParseCurrency(string(currency)); !ok {
+			fields["values."+string(currency)] = ValidationInvalidStatus
+			continue
+		}
+		// An amount is the FIXED kind's money; on any other kind it would
+		// be a number nothing reads, and a stored field nothing reads is a
+		// promise (the A5 rule) — refused rather than quietly kept.
+		if v.AmountMinor != nil && in.Kind != PromoFixed {
+			fields["values."+string(currency)+".amount_minor"] = ValidationInvalidStatus
+		}
+		if v.AmountMinor != nil && *v.AmountMinor < 1 {
+			fields["values."+string(currency)+".amount_minor"] = ValidationPositive
+		}
+		if v.MinSubtotalMinor != nil && *v.MinSubtotalMinor < 1 {
+			fields["values."+string(currency)+".min_subtotal_minor"] = ValidationPositive
+		}
+	}
+
+	// A fixed code with no amount anywhere can never apply in any market —
+	// storing it would only manufacture "unknown code" support emails.
+	if in.Kind == PromoFixed {
+		any := false
+		for _, v := range in.Values {
+			if v.AmountMinor != nil {
+				any = true
+			}
+		}
+		if !any && fields["kind"] == "" {
+			fields["values"] = ValidationRequired
+		}
+	}
+
+	return fields
+}
+
 // NormalizePromoCode is the one canonical form a code has: trimmed,
 // uppercased. Applied at every boundary (apply endpoint, seed, lookup), so
 // "  honey10 " and "HONEY10" are the same code everywhere — matching the

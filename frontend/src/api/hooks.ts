@@ -14,6 +14,7 @@ import type {
   NewReview,
   OrderStatus,
   PaymentStatus,
+  PromoInput,
   Product,
   ReviewStatus,
   UpdateProduct,
@@ -693,6 +694,38 @@ export function useUpdateVariant() {
   return useMutation({
     mutationFn: ({ id, prices, stockQty }: { id: number; prices: Money; stockQty: number }) =>
       api.updateVariant(id, prices, stockQty),
+    onSuccess: invalidate,
+  })
+}
+
+// F2 (decision #94): the admin's promo CRUD. Writes also drop the cart
+// preview cache — an edited code can change what an open cart's applied
+// promo is worth, and the preview re-judges on every read by design.
+export function useAdminPromos() {
+  return useQuery({
+    queryKey: ['admin-promos'],
+    queryFn: api.adminPromos,
+  })
+}
+
+function useInvalidatePromos() {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: ['admin-promos'] })
+    qc.invalidateQueries({ queryKey: ['preview'] })
+  }
+}
+
+export function useCreatePromo() {
+  const invalidate = useInvalidatePromos()
+  return useMutation({ mutationFn: api.createPromo, onSuccess: invalidate })
+}
+
+export function useUpdatePromo() {
+  const invalidate = useInvalidatePromos()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: PromoInput }) =>
+      api.updatePromo(id, input),
     onSuccess: invalidate,
   })
 }

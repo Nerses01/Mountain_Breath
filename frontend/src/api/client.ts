@@ -21,6 +21,8 @@ import type {
   Order,
   OrderStatus,
   PaymentStatus,
+  AdminPromo,
+  PromoInput,
   Paginated,
   ChangePasswordInput,
   NotificationSettings,
@@ -425,4 +427,11 @@ export const api = {
       method: 'PATCH',
       body: { payment_status: paymentStatus },
     }),
+  // F2 (decision #94): promo CRUD. No delete — redemption history hangs
+  // off the code, so retiring one is updatePromo with active: false.
+  adminPromos: () => request<AdminPromo[]>('/api/v1/admin/promos'),
+  createPromo: (p: PromoInput) =>
+    request<AdminPromo>('/api/v1/admin/promos', { method: 'POST', body: p }),
+  updatePromo: (id: number, p: PromoInput) =>
+    request<AdminPromo>(`/api/v1/admin/promos/${id}`, { method: 'PUT', body: p }),
 }

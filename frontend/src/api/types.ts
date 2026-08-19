@@ -529,6 +529,45 @@ export interface EditorialInput {
   usage_cards: ProductUsageCard[]
 }
 
+// ── F2: admin promo CRUD (decision #94) ──────────────────────────────────
+
+export type PromoKind = 'percent' | 'fixed' | 'free_shipping'
+
+/** One market's money for a code — both facts optional, like the backend's
+ *  nullable columns: a percent code has no amount, an uncapped code no floor. */
+export interface PromoValue {
+  amount_minor?: number
+  min_subtotal_minor?: number
+}
+
+export interface AdminPromo {
+  id: number
+  code: string
+  kind: PromoKind
+  /** Present exactly when kind === 'percent' (the backend's biconditional). */
+  percent?: number
+  starts_at?: string
+  ends_at?: string
+  max_redemptions?: number
+  active: boolean
+  /** Read-only usage fact the table shows next to the cap. */
+  redemptions: number
+  values: Partial<Record<Currency, PromoValue>>
+}
+
+/** Whole-value write shape for create AND update: the form shows every
+ *  field so it sends every field; a currency left out of values is removed. */
+export interface PromoInput {
+  code: string
+  kind: PromoKind
+  percent?: number
+  starts_at?: string
+  ends_at?: string
+  max_redemptions?: number
+  active: boolean
+  values: Partial<Record<Currency, PromoValue>>
+}
+
 // Shape of the backend's error envelope (docs/ARCHITECTURE.md).
 export interface ApiErrorBody {
   error: {

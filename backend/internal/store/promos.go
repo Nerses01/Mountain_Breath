@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
 )
@@ -139,6 +140,164 @@ func (s *Store) ClearCartPromo(ctx context.Context, userID int64) error {
 		return fmt.Errorf("clearing cart promo: %w", err)
 	}
 	return nil
+}
+
+// ── F2: the admin's CRUD (decision #94) ───────────────────────────────────
+//
+// No Delete: promo_redemptions hangs off the code (ON DELETE CASCADE), so
+// a hard delete would erase the once-per-customer history and free the
+// text for reuse against a wiped record. `active = false` is the off
+// switch; the update endpoint flips it.
+
+// ListPromos is the admin table's read: every code, newest first. It
+// reuses promoColumns with user id 0 — no real user has id 0, so the
+// used-by-shopper EXISTS is honestly false; the admin table reads the
+// TOTAL count next to it, which is the one it shows.
+func (s *Store) ListPromos(ctx context.Context) ([]domain.Promo, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT `+promoColumns+`
+		FROM promo_codes p
+		ORDER BY p.created_at DESC, p.id DESC`,
+		int64(0))
+	if err != nil {
+		return nil, fmt.Errorf("querying promos: %w", err)
+	}
+	defer rows.Close()
+
+	var promos []domain.Promo
+	for rows.Next() {
+		p, err := scanPromo(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scanning promo: %w", err)
+		}
+		promos = append(promos, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating promos: %w", err)
+	}
+	// One values query per code — an N+1 the admin table can afford: the
+	// family runs a handful of codes, not a catalog. The tripwire is
+	// written here: batch like attachOrderItems the day the list grows.
+	for i := range promos {
+		if err := attachPromoValues(ctx, s.pool, &promos[i]); err != nil {
+			return nil, err
+		}
+	}
+	return promos, nil
+}
+
+// insertPromoValues writes the per-market money rows — the whole-value
+// half of both create and update.
+func insertPromoValues(ctx context.Context, tx pgx.Tx, codeID int64, values map[domain.Currency]domain.PromoValue) error {
+	for currency, v := range values {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO promo_code_values (code_id, currency, amount_minor, min_subtotal_minor)
+			VALUES ($1, $2, $3, $4)`,
+			codeID, currency, v.AmountMinor, v.MinSubtotalMinor); err != nil {
+			return fmt.Errorf("inserting promo value: %w", err)
+		}
+	}
+	return nil
+}
+
+// CreatePromo stores a new code, NORMALIZED — the seed and the apply
+// endpoint already speak trimmed-uppercase, and storing anything else
+// would make the admin table show a form of the code no lookup uses. The
+// upper(code) unique index answers a duplicate in any case with
+// ErrPromoCodeTaken.
+func (s *Store) CreatePromo(ctx context.Context, in domain.PromoInput) (domain.Promo, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return domain.Promo{}, fmt.Errorf("beginning promo tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var id int64
+	err = tx.QueryRow(ctx, `
+		INSERT INTO promo_codes (code, kind, percent, starts_at, ends_at, max_redemptions, active)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id`,
+		domain.NormalizePromoCode(in.Code), in.Kind, in.Percent,
+		in.StartsAt, in.EndsAt, in.MaxRedemptions, in.Active,
+	).Scan(&id)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+			return domain.Promo{}, domain.ErrPromoCodeTaken
+		}
+		return domain.Promo{}, fmt.Errorf("inserting promo: %w", err)
+	}
+	if err := insertPromoValues(ctx, tx, id, in.Values); err != nil {
+		return domain.Promo{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Promo{}, fmt.Errorf("committing promo: %w", err)
+	}
+	return s.promoByID(ctx, id)
+}
+
+// UpdatePromo is whole-value, like the variant editor's prices: the form
+// shows every field so it sends every field, and a currency absent from
+// Values is REMOVED (delete-then-insert inside the transaction). The
+// redemption history is untouched — usage is a fact about the past, not a
+// property being edited.
+func (s *Store) UpdatePromo(ctx context.Context, id int64, in domain.PromoInput) (domain.Promo, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return domain.Promo{}, fmt.Errorf("beginning promo tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(ctx, `
+		UPDATE promo_codes
+		SET code = $2, kind = $3, percent = $4, starts_at = $5, ends_at = $6,
+		    max_redemptions = $7, active = $8
+		WHERE id = $1`,
+		id, domain.NormalizePromoCode(in.Code), in.Kind, in.Percent,
+		in.StartsAt, in.EndsAt, in.MaxRedemptions, in.Active)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+			return domain.Promo{}, domain.ErrPromoCodeTaken
+		}
+		return domain.Promo{}, fmt.Errorf("updating promo: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.Promo{}, domain.ErrNotFound
+	}
+
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM promo_code_values WHERE code_id = $1`, id); err != nil {
+		return domain.Promo{}, fmt.Errorf("clearing promo values: %w", err)
+	}
+	if err := insertPromoValues(ctx, tx, id, in.Values); err != nil {
+		return domain.Promo{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Promo{}, fmt.Errorf("committing promo update: %w", err)
+	}
+	return s.promoByID(ctx, id)
+}
+
+// promoByID is the fresh read both writes answer with, so the admin form
+// re-renders what the DATABASE holds (normalized code included), not what
+// the request hoped.
+func (s *Store) promoByID(ctx context.Context, id int64) (domain.Promo, error) {
+	p, err := scanPromo(s.pool.QueryRow(ctx, `
+		SELECT `+promoColumns+`
+		FROM promo_codes p
+		WHERE p.id = $2`,
+		int64(0), id))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Promo{}, domain.ErrNotFound
+		}
+		return domain.Promo{}, fmt.Errorf("querying promo: %w", err)
+	}
+	if err := attachPromoValues(ctx, s.pool, &p); err != nil {
+		return domain.Promo{}, err
+	}
+	return p, nil
 }
 
 // PriorOrders is the hive-club fact: how many non-cancelled orders this

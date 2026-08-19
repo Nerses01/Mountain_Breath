@@ -145,6 +145,12 @@ type PromoStore interface {
 	PriorOrders(ctx context.Context, userID int64) (int, error)
 	// The free-shipping banner's suggestion; nil when no product closes the gap.
 	UpsellForGap(ctx context.Context, view domain.View, gapMinor int64) (*domain.Upsell, error)
+
+	// F2 (decision #94): the admin's CRUD. No Delete — redemption history
+	// hangs off the code, so `active` is the off switch.
+	ListPromos(ctx context.Context) ([]domain.Promo, error)
+	CreatePromo(ctx context.Context, in domain.PromoInput) (domain.Promo, error)
+	UpdatePromo(ctx context.Context, id int64, in domain.PromoInput) (domain.Promo, error)
 }
 
 // AccountStore is E8's slice: the hearts, the reset tokens, the address
@@ -399,6 +405,9 @@ func (s *Server) Routes() chi.Router {
 			r.Get("/orders", s.handleAdminListOrders)
 			r.Patch("/orders/{id}/status", s.handleUpdateOrderStatus)
 			r.Patch("/orders/{id}/payment", s.handleUpdateOrderPayment)
+			r.Get("/promos", s.handleAdminListPromos)
+			r.Post("/promos", s.handleAdminCreatePromo)
+			r.Put("/promos/{id}", s.handleAdminUpdatePromo)
 			r.Get("/products", s.handleAdminListProducts)
 			r.Post("/products", s.handleCreateProduct)
 			r.Put("/products/{id}", s.handleUpdateProduct)

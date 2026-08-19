@@ -98,6 +98,9 @@ type fakeStore struct {
 	priorOrders int
 	upsell      *domain.Upsell
 	orderErr    error
+	// F2: the admin CRUD's table — a slice, because the admin list is
+	// ordered where the shopper's `promos` lookup map is not.
+	adminPromos []domain.Promo
 
 	// E8 accounts. Mostly recording fields, same philosophy as the E3
 	// editorial fakes: handler tests prove requests become the right calls;
@@ -397,6 +400,55 @@ func (f *fakeStore) CreateOrder(_ context.Context, _ int64, view domain.View, in
 }
 
 // --- PromoStore (E7) ---
+
+// F2 promo CRUD: a behaving fake, like its order siblings — the duplicate
+// rule runs on the domain's own normalization, so handler tests can drive
+// the 409 without duplicating store logic.
+
+func (f *fakeStore) ListPromos(_ context.Context) ([]domain.Promo, error) {
+	return f.adminPromos, nil
+}
+
+func (f *fakeStore) CreatePromo(_ context.Context, in domain.PromoInput) (domain.Promo, error) {
+	code := domain.NormalizePromoCode(in.Code)
+	for _, p := range f.adminPromos {
+		if p.Code == code {
+			return domain.Promo{}, domain.ErrPromoCodeTaken
+		}
+	}
+	promo := promoFromInput(int64(len(f.adminPromos)+1), code, in)
+	f.adminPromos = append(f.adminPromos, promo)
+	return promo, nil
+}
+
+func (f *fakeStore) UpdatePromo(_ context.Context, id int64, in domain.PromoInput) (domain.Promo, error) {
+	code := domain.NormalizePromoCode(in.Code)
+	for _, p := range f.adminPromos {
+		if p.ID != id && p.Code == code {
+			return domain.Promo{}, domain.ErrPromoCodeTaken
+		}
+	}
+	for i, p := range f.adminPromos {
+		if p.ID == id {
+			f.adminPromos[i] = promoFromInput(id, code, in)
+			return f.adminPromos[i], nil
+		}
+	}
+	return domain.Promo{}, domain.ErrNotFound
+}
+
+func promoFromInput(id int64, code string, in domain.PromoInput) domain.Promo {
+	promo := domain.Promo{
+		ID: id, Code: code, Kind: in.Kind,
+		StartsAt: in.StartsAt, EndsAt: in.EndsAt,
+		MaxRedemptions: in.MaxRedemptions, Active: in.Active,
+		Values: in.Values,
+	}
+	if in.Percent != nil {
+		promo.Percent = *in.Percent
+	}
+	return promo
+}
 
 func (f *fakeStore) PromoForUser(_ context.Context, code string, _ int64) (domain.Promo, error) {
 	if p, ok := f.promos[domain.NormalizePromoCode(code)]; ok {

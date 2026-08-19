@@ -2431,6 +2431,137 @@
           "response": []
         },
         {
+          "name": "List promo codes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/admin/promos",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "admin",
+                "promos"
+              ]
+            },
+            "description": "F2 (decision #94): every code, newest first, with the live redemption count next to the cap and the per-market values attached. `percent` appears exactly when kind = 'percent' (the schema's biconditional, kept on the wire)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Create promo code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"code\": \"honey15\",\n    \"kind\": \"percent\",\n    \"percent\": 15,\n    \"active\": true,\n    \"max_redemptions\": 100,\n    \"values\": {\n        \"USD\": { \"min_subtotal_minor\": 2000 },\n        \"AMD\": { \"min_subtotal_minor\": 800000 }\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{apiV1}}/admin/promos",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "admin",
+                "promos"
+              ]
+            },
+            "description": "F2 (decision #94): stores the code NORMALIZED (trimmed, uppercased — the response echoes HONEY15). Kinds: percent (requires `percent` 1–100), fixed (requires an `amount_minor` in at least one market — per-market money, never converted), free_shipping (waives the base rate only). Duplicate in any case → 409 code_taken; constraint mirrors → 400 validation_failed with attachable field keys."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"created (201) or duplicate (409)\", () => {",
+                  "    pm.expect([201, 409]).to.include(pm.response.code);",
+                  "});",
+                  "",
+                  "pm.test(\"a 201 echoes the normalized code\", () => {",
+                  "    if (pm.response.code === 201) {",
+                  "        pm.expect(pm.response.json().code).to.eql(\"HONEY15\");",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Update promo code",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"code\": \"HONEY15\",\n    \"kind\": \"percent\",\n    \"percent\": 20,\n    \"active\": false,\n    \"values\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{apiV1}}/admin/promos/1",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "admin",
+                "promos",
+                "1"
+              ]
+            },
+            "description": "F2 (decision #94): WHOLE-VALUE update — the form shows every field so it sends every field, and a currency left out of `values` is REMOVED. There is deliberately NO DELETE endpoint: redemption history hangs off the code (once-per-customer rows, the global count), so `active: false` is how a code is retired. The redemption history itself is untouched by updates — usage is a fact about the past, not a property being edited."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"updated (200), missing (404) or duplicate (409)\", () => {",
+                  "    pm.expect([200, 404, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
           "name": "List all products (incl. inactive)",
           "request": {
             "method": "GET",

@@ -17,6 +17,44 @@ Template for an entry:
 
 ---
 
+## 2026-08-19 — Phase F2, part four: promo codes get their admin
+
+**Worked on:** the promo CRUD (decision #94) — E7's "revisit when three
+codes stop being enough" line. GET/POST/PUT `/admin/promos`,
+`ValidatePromoInput` in the domain, `ListPromos`/`CreatePromo`/`UpdatePromo`
+in the store (normalized codes, `ErrPromoCodeTaken` from the upper()
+index), and an admin Promos tab: list with kind/window/usage summaries, a
+quick activate/deactivate toggle, and one form for create and edit
+(majors-in-inputs like the variant editor, datetime-local at the edges).
+Deliberately NO delete endpoint.
+
+**Learned:**
+- *Deletability is a schema question, not an endpoint question* —
+  promo_redemptions CASCADEs off the code, so a hard delete erases the
+  once-per-customer history and frees the text for reuse against a wiped
+  record. The `active` flag was always the real off switch; CRUD grew up
+  to mean list/create/update.
+- *Mirror CHECK constraints as domain validation, on purpose* — the same
+  rule lives twice (percent biconditional, window order, positive money),
+  and that is double bookkeeping, not duplication: the DB is the last
+  line of defence, the domain turns a would-be driver exception into
+  field-keyed errors a form can attach.
+- *Refuse the uselessly-storable* — a fixed code with no amount in any
+  market is valid SQL and invalid business; validation rejects what could
+  only ever manufacture "code doesn't work" support email.
+- *Normalization belongs to the write too* — E7 normalized at apply and
+  seed; storing anything but the canonical form from the admin would show
+  a code no lookup uses. Same canon at every boundary, now including this
+  one.
+- *An N+1 with a written tripwire beats a premature batch* — ListPromos
+  loads values per code; the comment names the day it changes (when the
+  list outgrows a family's handful). Deliberate debt, recorded at the site.
+
+**Questions / to revisit:**
+- The quick activate/deactivate toggle round-trips the whole row (whole-
+  value PUT). If a second quick-flip use case appears, is a PATCH-shaped
+  partial update worth its second write path, or does whole-value stay?
+
 ## 2026-08-19 — Phase F2, part three: the customer's cancel button
 
 **Worked on:** `POST /orders/{id}/cancel` — the customer's one

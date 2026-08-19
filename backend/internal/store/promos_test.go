@@ -323,3 +323,94 @@ func TestHiveClubPerksAcrossTwoOrders(t *testing.T) {
 			second.Totals.ShippingMinor, second.Totals.MemberDiscountMinor)
 	}
 }
+
+// F2 (decision #94): the admin's CRUD. What the suite pins: codes are
+// stored NORMALIZED, the upper() index refuses a duplicate in any case,
+// updates are whole-value (an absent currency row is removed), and the
+// missing-id read answers ErrNotFound.
+func TestPromoCRUD(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test (needs Docker)")
+	}
+	resetDB(t)
+	s := store.New(testPool)
+	ctx := context.Background()
+
+	minor := func(n int64) *int64 { return &n }
+	pct := func(n int) *int { return &n }
+
+	created, err := s.CreatePromo(ctx, domain.PromoInput{
+		Code: "  honey15 ", Kind: domain.PromoPercent, Percent: pct(15), Active: true,
+		Values: map[domain.Currency]domain.PromoValue{
+			domain.CurrencyUSD: {MinSubtotalMinor: minor(2000)},
+			domain.CurrencyAMD: {MinSubtotalMinor: minor(800000)},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreatePromo: %v", err)
+	}
+	if created.Code != "HONEY15" {
+		t.Errorf("stored code = %q, want the NORMALIZED form", created.Code)
+	}
+
+	// The shopper's lookup finds it — create and apply share one canon.
+	shopperID := seedUser(t, "shopper@test.local")
+	found, err := s.PromoForUser(ctx, "honey15", shopperID)
+	if err != nil {
+		t.Fatalf("PromoForUser after create: %v", err)
+	}
+	if v, ok := found.Values[domain.CurrencyUSD]; !ok || *v.MinSubtotalMinor != 2000 {
+		t.Errorf("USD floor did not round-trip: %+v", found.Values)
+	}
+
+	// A duplicate differing only in case hits the upper() index.
+	_, err = s.CreatePromo(ctx, domain.PromoInput{
+		Code: "Honey15", Kind: domain.PromoFreeShipping, Active: true,
+	})
+	if !errors.Is(err, domain.ErrPromoCodeTaken) {
+		t.Errorf("case-variant duplicate: err = %v, want ErrPromoCodeTaken", err)
+	}
+
+	// Whole-value update: kind flips to fixed, AMD is left out and must go.
+	updated, err := s.UpdatePromo(ctx, created.ID, domain.PromoInput{
+		Code: "HONEY15", Kind: domain.PromoFixed, Active: false,
+		Values: map[domain.Currency]domain.PromoValue{
+			domain.CurrencyUSD: {AmountMinor: minor(500)},
+		},
+	})
+	if err != nil {
+		t.Fatalf("UpdatePromo: %v", err)
+	}
+	if updated.Kind != domain.PromoFixed || updated.Active {
+		t.Errorf("update not applied: %+v", updated)
+	}
+	if _, ok := updated.Values[domain.CurrencyAMD]; ok {
+		t.Error("AMD row survived a whole-value update that omitted it")
+	}
+	if v, ok := updated.Values[domain.CurrencyUSD]; !ok || v.AmountMinor == nil || *v.AmountMinor != 500 {
+		t.Errorf("USD amount = %+v, want 500", updated.Values)
+	}
+
+	if _, err := s.UpdatePromo(ctx, 99999, domain.PromoInput{
+		Code: "GHOST", Kind: domain.PromoFreeShipping,
+	}); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("unknown id: err = %v, want ErrNotFound", err)
+	}
+
+	// The admin list: newest first, values attached.
+	if _, err := s.CreatePromo(ctx, domain.PromoInput{
+		Code: "SECOND", Kind: domain.PromoFreeShipping, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	promos, err := s.ListPromos(ctx)
+	if err != nil {
+		t.Fatalf("ListPromos: %v", err)
+	}
+	if len(promos) != 2 || promos[0].Code != "SECOND" || promos[1].Code != "HONEY15" {
+		t.Errorf("list = %+v, want SECOND then HONEY15", promos)
+	}
+	if promos[1].Values[domain.CurrencyUSD].AmountMinor == nil {
+		t.Error("list rows arrived without their values")
+	}
+}

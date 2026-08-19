@@ -133,8 +133,12 @@ customer's every screen; the admin got only what each phase needed.
       (`ErrTooLateToCancel` → 409), shared cancel transaction with the
       admin path, cancelled letter sent, armed button on the order page
       ×3 locales.*
-- [ ] **Promo code CRUD** in the admin (E7 shipped seed-only codes;
-      "revisit when three codes stop being enough").
+- [x] **Promo code CRUD** in the admin (E7 shipped seed-only codes;
+      "revisit when three codes stop being enough"). *Done 2026-08-19
+      (decision #94): GET/POST/PUT `/admin/promos`, domain validation
+      mirroring migration 000018's CHECKs, whole-value updates, NO delete
+      (redemption history hangs off the code — `active` is the off
+      switch), admin Promos tab with list + form.*
 - [ ] **Category management**: edit / delete-or-deactivate / reorder
       (Phase 11 line; the footer and facets already read sort_order).
 - [ ] **Admin user management**: promote/demote via UI instead of SQL
