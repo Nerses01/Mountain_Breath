@@ -6,6 +6,8 @@ import { useFieldErrors } from '../../i18n/useFieldErrors'
 import { useLocale } from '../../i18n/useLocale'
 import { scrollToTopState } from '../../lib/scrollToTopState'
 import { Button } from '../ui/Button'
+import { CurrencySwitcher } from '../ui/CurrencySwitcher'
+import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 
 /**
  * The design's four-column footer on bark, plus the bottom bar.
@@ -15,13 +17,14 @@ import { Button } from '../ui/Button'
  * measures 4.2:1 against the bark background and fails AA (token block in
  * src/index.css has the table).
  *
- * DEPARTURE from the store canvas's bottom bar (decision log #90): the
- * language and currency switchers were removed from here — the account
- * settings screen (canvas 10) is now their one home. The store mock's
- * "USD / AMD" predates the settings screen that owns the choice; two
- * controls for one preference invite them to disagree. The cost, accepted
- * deliberately: a signed-out visitor switches language only by URL prefix
- * (/hy, /ru — which every shared link and hreflang tag already carries).
+ * The language and currency switchers are BACK in the bottom bar (decision
+ * #98, reversing #90): the settings screen that replaced them exists only
+ * behind a sign-in, which left an anonymous visitor with no control at all
+ * — no way to switch currency, and language only by hand-editing the URL.
+ * That is #90's own "anonymous traffic suffers" reversal condition, met.
+ * The two-controls-disagree worry #90 named cannot occur: both surfaces
+ * read and write the same single sources (the URL for language, the
+ * useCurrency context for currency).
  */
 export function SiteFooter() {
   const { t } = useTranslation()
@@ -125,6 +128,8 @@ export function SiteFooter() {
             >
               {t('footer:legal.privacy')}
             </Link>
+            <CurrencySwitcher />
+            <LanguageSwitcher />
           </div>
         </div>
       </div>
