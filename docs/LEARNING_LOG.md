@@ -17,6 +17,49 @@ Template for an entry:
 
 ---
 
+## 2026-08-19 — Phase F2, part three: the customer's cancel button
+
+**Worked on:** `POST /orders/{id}/cancel` — the customer's one
+self-service transition, while the order is still `pending` (decision
+#93). The admin's cancel and the customer's now share one transaction body
+(`applyOrderStatusTx`: status write + history event + restock + promo
+release), with different gates in front: the admin gets the machine's
+rules, the customer gets ownership (existence-hiding 404) plus the
+pending-only window (`ErrTooLateToCancel` → 409 `too_late_to_cancel`).
+The cancelled letter goes out for self-cancels too, through the shared
+`sendOrderStatusMail`. On the order page: the address book's armed-button
+pattern (ask again, disarm after 3 s), pending orders only, with the 409
+branch explaining "the hive already confirmed — get in touch" over the
+freshly-refetched tracker. Canvas draws no cancel control, so the design
+is ours (standing exception #2). ×3 locales.
+
+**Learned:**
+- *Permission is not transition* — the machine says confirmed → cancelled
+  exists; policy says only the admin may drive it. Encoding the customer's
+  window as its own domain function (rather than a second transition
+  table) means the admin's arrows can grow without silently widening the
+  customer's.
+- *Check the policy under the same lock as the write* — the pending-only
+  check runs under the cancel's own FOR UPDATE, so a concurrent admin
+  confirmation cannot slip between "still pending?" and "cancel it".
+  TOCTOU closed by construction, not by luck.
+- *Extract the transaction body, keep the gates apart* — two doors, one
+  room: `applyOrderStatusTx` holds the side effects both paths must never
+  disagree on, while each caller keeps its own locking, validation, and
+  error vocabulary.
+- *Distinct sentinels earn distinct client copy* — `ErrTooLateToCancel`
+  exists so the page can say "contact us" instead of a generic failure,
+  while a stranger still sees only 404. Error design is UX design.
+- *On a 409, refetch what refuted you* — the cancel hook invalidates the
+  order caches on conflict: the truest thing to show under "too late" is
+  the confirmed status that made it so.
+
+**Questions / to revisit:**
+- Should a cancelled-by-customer order be distinguishable from
+  cancelled-by-admin in the history (an actor column on
+  order_status_events)? Today both read "cancelled"; F4's webhook will add
+  a third writer and may force the question.
+
 ## 2026-08-18 — Phase F2, part two: status-change emails (and the order learns its language)
 
 **Worked on:** the second F2 item — confirmed/shipped/delivered/cancelled

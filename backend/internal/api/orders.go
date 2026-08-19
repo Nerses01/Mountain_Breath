@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -409,22 +410,68 @@ func (s *Server) handleUpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// F2: tell the customer — in the ORDER's language (its snapshot), not
-	// the admin's, and only if their notify_order_updates toggle says so
-	// (decision #87 promised this check when the toggle shipped). Non-fatal
-	// like the confirmation mail: the transition is committed, and a mail
-	// problem is a logged nuisance, never a 500 telling the admin the
-	// status change failed.
-	if customer, uerr := s.store.GetUserByID(r.Context(), order.UserID); uerr != nil {
-		s.log.Error("loading customer for status mail", "order", order.ID, "error", uerr)
-	} else if customer.NotifyOrderUpdates {
-		orderURL := fmt.Sprintf("%s%s/orders/%d", s.publicURL, localePathPrefix(order.Locale), order.ID)
-		if msg, ok := mail.OrderStatusUpdate(customer.Email, order, orderURL); ok {
-			if err := s.mailer.Send(r.Context(), msg); err != nil {
-				s.log.Error("sending status mail", "order", order.ID, "error", err)
-			}
+	s.sendOrderStatusMail(r.Context(), order)
+
+	s.respondJSON(w, http.StatusOK, toOrderResponse(order))
+}
+
+// sendOrderStatusMail tells the customer about a committed transition — in
+// the ORDER's language (its snapshot), and only if their
+// notify_order_updates toggle says so (decision #87 promised this check
+// when the toggle shipped). Non-fatal like the confirmation mail: the
+// transition is committed, and a mail problem is a logged nuisance, never
+// a 500 telling the caller the status change failed. Shared by the admin's
+// status endpoint and the customer's cancel (F2) — a self-cancelled order
+// still gets its letter, because the mail is the record of the change, not
+// a notification about somebody else's.
+func (s *Server) sendOrderStatusMail(ctx context.Context, order domain.Order) {
+	customer, err := s.store.GetUserByID(ctx, order.UserID)
+	if err != nil {
+		s.log.Error("loading customer for status mail", "order", order.ID, "error", err)
+		return
+	}
+	if !customer.NotifyOrderUpdates {
+		return
+	}
+	orderURL := fmt.Sprintf("%s%s/orders/%d", s.publicURL, localePathPrefix(order.Locale), order.ID)
+	if msg, ok := mail.OrderStatusUpdate(customer.Email, order, orderURL); ok {
+		if err := s.mailer.Send(ctx, msg); err != nil {
+			s.log.Error("sending status mail", "order", order.ID, "error", err)
 		}
 	}
+}
+
+// POST /orders/{id}/cancel — the customer's one self-service transition
+// (F2): out while the order is still pending. Past that window the machine
+// may still allow cancellation, but that arrow is the admin's — the
+// customer gets 409 too_late_to_cancel and the page tells them to get in
+// touch. A stranger's order id is a 404, indistinguishable from a missing
+// one (the handleGetOrder rule; ownership lives in the store because the
+// call writes).
+func (s *Server) handleCancelMyOrder(w http.ResponseWriter, r *http.Request) {
+	user, _ := userFrom(r.Context())
+
+	orderID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_id", "order id must be a number")
+		return
+	}
+
+	order, err := s.store.CancelOrderByCustomer(r.Context(), user.ID, orderID)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrNotFound):
+			s.respondError(w, http.StatusNotFound, "not_found", "no such order")
+		case errors.Is(err, domain.ErrTooLateToCancel):
+			s.respondError(w, http.StatusConflict, "too_late_to_cancel", err.Error())
+		default:
+			s.log.Error("cancelling order", "id", orderID, "error", err)
+			s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		}
+		return
+	}
+
+	s.sendOrderStatusMail(r.Context(), order)
 
 	s.respondJSON(w, http.StatusOK, toOrderResponse(order))
 }

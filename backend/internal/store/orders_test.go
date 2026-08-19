@@ -259,6 +259,80 @@ func TestUpdateOrderStatus_CancelRestoresStock(t *testing.T) {
 	}
 }
 
+// F2: the customer's self-service cancel. Same side effects as the
+// admin's cancel (they share applyOrderStatusTx), so what THIS test pins
+// is the two gates in front of them: ownership answers ErrNotFound
+// (existence-hiding), and the pending-only window answers
+// ErrTooLateToCancel with nothing changed.
+func TestCancelOrderByCustomer(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test (needs Docker)")
+	}
+	resetDB(t)
+	s := store.New(testPool)
+	ctx := context.Background()
+
+	variantID := seedCatalog(t, 10)
+	userID := seedUserWithCart(t, "regretter@test.local", variantID, 4)
+	strangerID := seedUser(t, "stranger@test.local")
+
+	order, err := s.CreateOrder(ctx, userID, domain.View{Currency: domain.CurrencyUSD}, testCheckout())
+	if err != nil {
+		t.Fatalf("CreateOrder: %v", err)
+	}
+
+	// A stranger's attempt does not even learn the order exists.
+	if _, err := s.CancelOrderByCustomer(ctx, strangerID, order.ID); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("stranger: err = %v, want ErrNotFound", err)
+	}
+
+	// The owner, while pending: cancelled, stock back, history recorded.
+	got, err := s.CancelOrderByCustomer(ctx, userID, order.ID)
+	if err != nil {
+		t.Fatalf("cancelling: %v", err)
+	}
+	if got.Status != domain.OrderCancelled {
+		t.Errorf("status = %q, want cancelled", got.Status)
+	}
+	var stock int
+	if err := testPool.QueryRow(ctx,
+		`SELECT stock_qty FROM product_variants WHERE id = $1`, variantID).Scan(&stock); err != nil {
+		t.Fatal(err)
+	}
+	if stock != 10 {
+		t.Errorf("stock after cancel = %d, want 10", stock)
+	}
+	read, err := s.GetOrder(ctx, order.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(read.Events); n != 2 || read.Events[n-1].Status != domain.OrderCancelled {
+		t.Errorf("events = %+v, want pending then cancelled", read.Events)
+	}
+
+	// A CONFIRMED order is past the customer's window — refused with
+	// nothing changed, even though the machine itself allows the admin
+	// that same arrow.
+	userID2 := seedUserWithCart(t, "slowpoke@test.local", variantID, 2)
+	order2, err := s.CreateOrder(ctx, userID2, domain.View{Currency: domain.CurrencyUSD}, testCheckout())
+	if err != nil {
+		t.Fatalf("CreateOrder: %v", err)
+	}
+	if _, err := s.UpdateOrderStatus(ctx, order2.ID, domain.OrderConfirmed); err != nil {
+		t.Fatalf("confirming: %v", err)
+	}
+	if _, err := s.CancelOrderByCustomer(ctx, userID2, order2.ID); !errors.Is(err, domain.ErrTooLateToCancel) {
+		t.Errorf("confirmed: err = %v, want ErrTooLateToCancel", err)
+	}
+	read2, err := s.GetOrder(ctx, order2.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read2.Status != domain.OrderConfirmed {
+		t.Errorf("status = %q — the refused cancel must change nothing", read2.Status)
+	}
+}
+
 // F2: the payment machine's write path. The interesting assertions are the
 // re-reads — GetOrder after each flip proves the change was COMMITTED, not
 // just present on the struct the method handed back.

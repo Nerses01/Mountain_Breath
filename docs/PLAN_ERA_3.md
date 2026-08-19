@@ -125,9 +125,14 @@ customer's every screen; the admin got only what each phase needed.
       `CreateOrder` widened to take `domain.View`, the status handler
       sends non-fatally honoring `notify_order_updates` (#87's promise),
       trilingual copy flagged for the F3 native review.*
-- [ ] **Customer-facing cancellation** while `pending` (Phase 11 line):
+- [x] **Customer-facing cancellation** while `pending` (Phase 11 line):
       one endpoint (the domain state machine already allows it and
       restores stock + promo redemptions), one button on the order page.
+      *Done 2026-08-19 (decision #93): `POST /orders/{id}/cancel`,
+      pending-only window as a domain rule distinct from the machine
+      (`ErrTooLateToCancel` → 409), shared cancel transaction with the
+      admin path, cancelled letter sent, armed button on the order page
+      ×3 locales.*
 - [ ] **Promo code CRUD** in the admin (E7 shipped seed-only codes;
       "revisit when three codes stop being enough").
 - [ ] **Category management**: edit / delete-or-deactivate / reorder

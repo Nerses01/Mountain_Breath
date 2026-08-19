@@ -105,6 +105,74 @@ func TestUpdateOrderPayment(t *testing.T) {
 	})
 }
 
+// F2: POST /orders/{id}/cancel — the customer's self-service cancel. The
+// window and ownership rules live in domain/store (their own tests); what
+// the handler owes is the error VOCABULARY: 404 that hides existence from
+// strangers, 409 too_late_to_cancel the client can translate, and a plain
+// 200 with the cancelled order for the happy path.
+func TestCancelMyOrder(t *testing.T) {
+	newFake := func(status string) *fakeStore {
+		fake := newFakeStore()
+		fake.orders = []domain.Order{{
+			ID: 12, UserID: 7, Status: status,
+			Locale: domain.LocaleEN, Currency: domain.CurrencyAMD,
+			PaymentMethod: domain.PayBankTransfer, PaymentStatus: domain.PaymentUnpaid,
+		}}
+		fake.usersByID[7] = domain.User{ID: 7, Email: "anahit@test.local", NotifyOrderUpdates: true}
+		return fake
+	}
+
+	t.Run("anonymous gets 401", func(t *testing.T) {
+		fake := newFake(domain.OrderPending)
+		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/orders/12/cancel", "", nil)
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("status = %d, want 401", rec.Code)
+		}
+	})
+
+	t.Run("a stranger's attempt is a 404, not a 403", func(t *testing.T) {
+		fake := newFake(domain.OrderPending)
+		cookie := loginAs(fake, domain.User{ID: 5, Role: domain.RoleCustomer})
+		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/orders/12/cancel", "", cookie)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("status = %d, want the existence-hiding 404", rec.Code)
+		}
+		if fake.orders[0].Status != domain.OrderPending {
+			t.Errorf("a stranger changed the order to %q", fake.orders[0].Status)
+		}
+	})
+
+	t.Run("the owner cancels a pending order", func(t *testing.T) {
+		fake := newFake(domain.OrderPending)
+		cookie := loginAs(fake, domain.User{ID: 7, Role: domain.RoleCustomer})
+		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/orders/12/cancel", "", cookie)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d; body %s", rec.Code, rec.Body)
+		}
+		var got struct {
+			Status string `json:"status"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		if got.Status != "cancelled" {
+			t.Errorf("status = %q, want cancelled", got.Status)
+		}
+	})
+
+	t.Run("a confirmed order answers 409 too_late_to_cancel", func(t *testing.T) {
+		fake := newFake(domain.OrderConfirmed)
+		cookie := loginAs(fake, domain.User{ID: 7, Role: domain.RoleCustomer})
+		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/orders/12/cancel", "", cookie)
+		if rec.Code != http.StatusConflict {
+			t.Fatalf("status = %d, want 409; body %s", rec.Code, rec.Body)
+		}
+		if !strings.Contains(rec.Body.String(), "too_late_to_cancel") {
+			t.Errorf("body %s, want the too_late_to_cancel code the client translates", rec.Body)
+		}
+	})
+}
+
 // F2: the status-change mails. The fixture order's locale is ARMENIAN while
 // every request in the test is plain English — which is exactly the point:
 // the mail must follow the order's snapshot, not anyone's Accept-Language.
@@ -168,6 +236,19 @@ func TestUpdateOrderStatus_EmailsCustomer(t *testing.T) {
 		}
 		if len(mailer.sent) != 0 {
 			t.Errorf("%d mails sent for a transition that never happened", len(mailer.sent))
+		}
+	})
+
+	t.Run("customer self-cancel sends the cancelled letter too", func(t *testing.T) {
+		fake, mailer := newFake(true), &fakeMailer{}
+		srv := newTestServerOpts(fake, api.Options{Mailer: mailer, PublicURL: "https://shop.example"})
+		cookie := loginAs(fake, domain.User{ID: 7, Role: domain.RoleCustomer})
+		rec := doRequest(srv, http.MethodPost, "/api/v1/orders/12/cancel", "", cookie)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d; body %s", rec.Code, rec.Body)
+		}
+		if len(mailer.sent) != 1 || !strings.Contains(mailer.sent[0].Subject, "չեղարկված") {
+			t.Errorf("sent = %+v, want one Armenian cancelled letter", mailer.sent)
 		}
 	})
 

@@ -481,6 +481,25 @@ func (f *fakeStore) Reorder(_ context.Context, userID, orderID int64) (domain.Re
 }
 func (f *fakeStore) ListAllOrders(_ context.Context) ([]domain.Order, error) { return nil, nil }
 
+// CancelOrderByCustomer mirrors the real gates with the domain's own
+// functions: ownership first (ErrNotFound hides existence), then the
+// pending-only window.
+func (f *fakeStore) CancelOrderByCustomer(_ context.Context, userID, orderID int64) (domain.Order, error) {
+	for i, o := range f.orders {
+		if o.ID == orderID {
+			if o.UserID != userID {
+				return domain.Order{}, domain.ErrNotFound
+			}
+			if !domain.CustomerMayCancelOrder(o.Status) {
+				return domain.Order{}, domain.ErrTooLateToCancel
+			}
+			f.orders[i].Status = domain.OrderCancelled
+			return f.orders[i], nil
+		}
+	}
+	return domain.Order{}, domain.ErrNotFound
+}
+
 // UpdateOrderStatus graduated from stub to behaving fake when F2's status
 // mailer gave handler tests something to observe after a 200 — same shape
 // as its payment sibling below: the transition brain is the domain's, so

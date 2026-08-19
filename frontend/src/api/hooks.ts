@@ -434,6 +434,29 @@ export function useAddWishlistToCart() {
 // The confirmation page's read. No locale or currency in the key: an order
 // is a frozen record — its snapshots do not change with the viewer's
 // language or market, so one cache entry serves every view of it.
+// F2: cancel a pending order. Invalidation mirrors the admin's status
+// mutation — cancelling restores stock, so the product caches go too. On
+// a 409 (the shop confirmed while the page was open) the ORDER caches are
+// also dropped: the freshest thing to show under the error is the real
+// status that made the cancel too late.
+export function useCancelOrder() {
+  const qc = useQueryClient()
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['orders'] })
+    qc.invalidateQueries({ queryKey: ['products'] })
+    qc.invalidateQueries({ queryKey: ['product'] })
+  }
+  return useMutation({
+    mutationFn: api.cancelOrder,
+    onSuccess: invalidate,
+    onError: (e) => {
+      if (e instanceof ApiError && e.status === 409) {
+        qc.invalidateQueries({ queryKey: ['orders'] })
+      }
+    },
+  })
+}
+
 export function useOrder(id: number) {
   return useQuery({
     queryKey: ['orders', id],

@@ -3075,6 +3075,45 @@
             }
           ],
           "response": []
+        },
+        {
+          "name": "Cancel my order (customer)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/orders/1/cancel",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "orders",
+                "1",
+                "cancel"
+              ]
+            },
+            "description": "F2 (decision log #93): the customer's one self-service transition — cancel while the order is still PENDING. The window is narrower than the state machine (which also allows the ADMIN confirmed → cancelled): past confirmation the answer is 409 too_late_to_cancel, translated client-side. Cancelling restores stock and releases the promo redemption (same shared transaction logic as the admin's cancel), records the history event, and mails the cancelled letter (order's locale, notify_order_updates permitting). A stranger's order id → the existence-hiding 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"cancelled (200) or past the window (409)\", () => {",
+                  "    pm.expect([200, 409]).to.include(pm.response.code);",
+                  "});",
+                  "",
+                  "pm.test(\"a 200 body shows the cancelled order\", () => {",
+                  "    if (pm.response.code === 200) {",
+                  "        pm.expect(pm.response.json().status).to.eql(\"cancelled\");",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
         }
       ]
     },

@@ -341,6 +341,13 @@ export const en = {
       paid: 'Paid',
       refunded: 'Refunded',
     },
+    cancel: {
+      title: 'Changed your mind?',
+      blurb: 'You can cancel while the order is still pending — reserved jars go back on the shelf, and any promo code is yours again.',
+      button: 'Cancel this order',
+      confirm: 'Cancel it — are you sure?',
+      tooLate: 'The hive has already confirmed this order — get in touch and we will sort it out.',
+    },
   },
   cart: {
     title: 'Your cart',

@@ -113,6 +113,10 @@ type OrderStore interface {
 	// store's question here (unlike GetOrder) because the call WRITES to
 	// the caller's cart — a stranger's id returns ErrNotFound.
 	Reorder(ctx context.Context, userID, orderID int64) (domain.ReorderResult, error)
+	// F2: the customer's self-service cancel — pending only (the domain's
+	// window, narrower than the machine), ownership checked in-store like
+	// Reorder's because the call writes.
+	CancelOrderByCustomer(ctx context.Context, userID, orderID int64) (domain.Order, error)
 }
 
 // CheckoutStore is E6's slice: the pieces a checkout screen needs before an
@@ -361,6 +365,7 @@ func (s *Server) Routes() chi.Router {
 			r.Get("/orders/{id}", s.handleGetOrder)
 			// A2: refill the cart from a past order (decision log #86).
 			r.Post("/orders/{id}/reorder", s.handleReorder)
+			r.Post("/orders/{id}/cancel", s.handleCancelMyOrder)
 			// The saved address, for pre-filling the checkout form. Under
 			// /account rather than /addresses because E8's account page is
 			// its natural home and the URL should not have to move.

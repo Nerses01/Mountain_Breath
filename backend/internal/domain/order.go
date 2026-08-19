@@ -122,6 +122,19 @@ type OrderItem struct {
 
 var ErrInvalidTransition = errors.New("invalid order status transition")
 
+// F2: the customer's cancellation window. The MACHINE allows
+// confirmed → cancelled, but that arrow is the ADMIN's: once the hive has
+// confirmed, jars may already be packed, and undoing that is a
+// conversation, not a button. Who may drive a transition is a separate
+// question from whether the transition exists — keeping this rule out of
+// orderTransitions means widening the admin's arrows never silently
+// widens the customer's.
+var ErrTooLateToCancel = errors.New("the order is already confirmed — contact the shop to cancel")
+
+func CustomerMayCancelOrder(status string) bool {
+	return status == OrderPending
+}
+
 // The order lifecycle as data: pending → confirmed → shipped → delivered,
 // with cancellation possible while not yet shipped.
 var orderTransitions = map[string][]string{

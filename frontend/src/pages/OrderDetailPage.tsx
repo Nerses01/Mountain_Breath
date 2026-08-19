@@ -1,8 +1,11 @@
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
-import { useOrder } from '../api/hooks'
+import { ApiError } from '../api/client'
+import { useCancelOrder, useOrder } from '../api/hooks'
 import { OrderTracker } from '../components/account/OrderTracker'
 import { useLocale } from '../i18n/useLocale'
+import { cx } from '../lib/cx'
 import { formatMoney } from '../lib/format'
 
 /**
@@ -178,6 +181,13 @@ export function OrderDetailPage() {
             </p>
           </section>
 
+          {/* F2: self-service cancel, pending only — past that window the
+              arrow belongs to the shop, and the 409 branch below says so.
+              The canvas draws no cancel control anywhere, so the design is
+              ours: the address book's armed-button pattern, one control
+              that asks again and disarms after 3 s. */}
+          {o.status === 'pending' && <CancelOrder orderId={o.id} />}
+
           <Link
             to={localePath('/account/orders')}
             className="text-sm font-semibold text-brand-ink hover:underline"
@@ -187,6 +197,64 @@ export function OrderDetailPage() {
         </div>
       </div>
     </Shell>
+  )
+}
+
+function CancelOrder({ orderId }: { orderId: number }) {
+  const { t } = useTranslation()
+  const cancel = useCancelOrder()
+
+  const [arming, setArming] = useState(false)
+  const disarm = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(disarm.current), [])
+
+  const click = () => {
+    if (arming) {
+      clearTimeout(disarm.current)
+      setArming(false)
+      cancel.mutate(orderId)
+      return
+    }
+    setArming(true)
+    disarm.current = setTimeout(() => setArming(false), 3000)
+  }
+
+  // The 409 means the hive confirmed while this page was open; the hook
+  // already refetched the order, so the tracker above tells the new truth
+  // and this line explains why the button stopped working.
+  const tooLate =
+    cancel.error instanceof ApiError && cancel.error.code === 'too_late_to_cancel'
+
+  return (
+    <section className="rounded-2xl bg-card p-6">
+      <h2 className="font-display text-sm font-bold uppercase tracking-label text-ink">
+        {t('order:cancel.title')}
+      </h2>
+      <p className="mt-2 text-xs leading-relaxed text-ink-soft">
+        {t('order:cancel.blurb')}
+      </p>
+      <button
+        type="button"
+        onClick={click}
+        disabled={cancel.isPending}
+        className={cx(
+          'mt-3 text-sm hover:underline disabled:opacity-50',
+          arming ? 'font-bold text-danger' : 'font-semibold text-ink-faint hover:text-danger',
+        )}
+      >
+        {arming ? t('order:cancel.confirm') : t('order:cancel.button')}
+      </button>
+      {tooLate && (
+        <p role="alert" className="mt-2 text-xs text-danger">
+          {t('order:cancel.tooLate')}
+        </p>
+      )}
+      {cancel.isError && !tooLate && (
+        <p role="alert" className="mt-2 text-xs text-danger">
+          {t('common:state.loadFailed')}
+        </p>
+      )}
+    </section>
   )
 }
 

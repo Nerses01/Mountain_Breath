@@ -353,6 +353,11 @@ export const api = {
   // were skipped — the body reports each line's fate.
   reorder: (id: number) =>
     request<ReorderResult>(`/api/v1/orders/${id}/reorder`, { method: 'POST' }),
+  // F2: the customer's self-service cancel — pending orders only. Past the
+  // window the backend answers 409 too_late_to_cancel; a stranger's id is
+  // an existence-hiding 404.
+  cancelOrder: (id: number) =>
+    request<Order>(`/api/v1/orders/${id}/cancel`, { method: 'POST' }),
   // 404 means "no saved address yet" — a first checkout — and the caller
   // renders an empty form for it rather than an error. A4: the response is
   // the full book entry, so the neighbour checkbox prefills too.

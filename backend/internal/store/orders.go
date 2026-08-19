@@ -522,9 +522,26 @@ func (s *Store) UpdateOrderStatus(ctx context.Context, orderID int64, to string)
 		return domain.Order{}, fmt.Errorf("%w: %s → %s", domain.ErrInvalidTransition, o.Status, to)
 	}
 
+	if err := applyOrderStatusTx(ctx, tx, orderID, to); err != nil {
+		return domain.Order{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Order{}, fmt.Errorf("committing status change: %w", err)
+	}
+	o.Status = to
+	return o, nil
+}
+
+// applyOrderStatusTx is the WRITE half of a status change, shared by the
+// admin's UpdateOrderStatus and the customer's CancelOrderByCustomer (F2)
+// so the two doors can never drift: whoever opened the transaction has
+// already locked the row and decided the transition is allowed; this
+// applies it and its side effects, and the caller commits.
+func applyOrderStatusTx(ctx context.Context, tx pgx.Tx, orderID int64, to string) error {
 	if _, err := tx.Exec(ctx,
 		`UPDATE orders SET status = $1 WHERE id = $2`, to, orderID); err != nil {
-		return domain.Order{}, fmt.Errorf("updating status: %w", err)
+		return fmt.Errorf("updating status: %w", err)
 	}
 
 	// A2 (log #85): the transition becomes a recorded fact, in the same
@@ -533,7 +550,7 @@ func (s *Store) UpdateOrderStatus(ctx context.Context, orderID int64, to string)
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO order_status_events (order_id, status)
 		VALUES ($1, $2)`, orderID, to); err != nil {
-		return domain.Order{}, fmt.Errorf("recording status event: %w", err)
+		return fmt.Errorf("recording status event: %w", err)
 	}
 
 	if to == domain.OrderCancelled {
@@ -544,7 +561,7 @@ func (s *Store) UpdateOrderStatus(ctx context.Context, orderID int64, to string)
 			FROM order_items oi
 			WHERE oi.order_id = $1 AND v.id = oi.variant_id`,
 			orderID); err != nil {
-			return domain.Order{}, fmt.Errorf("restoring stock: %w", err)
+			return fmt.Errorf("restoring stock: %w", err)
 		}
 		// ...and the promo code, the same way: cancelling undoes the order's
 		// side effects, and a redemption is one of them. The order keeps its
@@ -554,14 +571,55 @@ func (s *Store) UpdateOrderStatus(ctx context.Context, orderID int64, to string)
 		if _, err := tx.Exec(ctx, `
 			DELETE FROM promo_redemptions WHERE order_id = $1`,
 			orderID); err != nil {
-			return domain.Order{}, fmt.Errorf("releasing promo redemption: %w", err)
+			return fmt.Errorf("releasing promo redemption: %w", err)
 		}
+	}
+	return nil
+}
+
+// CancelOrderByCustomer is the customer's one self-service transition
+// (F2). Ownership is checked HERE, like Reorder's, because the call
+// WRITES — a stranger's order id answers ErrNotFound, the same
+// existence-hiding as the order page. The window is the DOMAIN's rule
+// (CustomerMayCancelOrder: pending only — narrower than the machine,
+// whose confirmed → cancelled arrow belongs to the admin), and it is
+// checked under the same FOR UPDATE lock that the flip uses: without it,
+// an admin confirming at the same moment could slip a confirmation
+// between the customer's check and their cancel.
+func (s *Store) CancelOrderByCustomer(ctx context.Context, userID, orderID int64) (domain.Order, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return domain.Order{}, fmt.Errorf("beginning cancel tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	o, err := scanOrder(tx.QueryRow(ctx, `
+		SELECT `+orderColumns+`
+		FROM orders WHERE id = $1
+		FOR UPDATE`,
+		orderID))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Order{}, domain.ErrNotFound
+		}
+		return domain.Order{}, fmt.Errorf("locking order: %w", err)
+	}
+	if o.UserID != userID {
+		return domain.Order{}, domain.ErrNotFound
+	}
+
+	if !domain.CustomerMayCancelOrder(o.Status) {
+		return domain.Order{}, domain.ErrTooLateToCancel
+	}
+
+	if err := applyOrderStatusTx(ctx, tx, orderID, domain.OrderCancelled); err != nil {
+		return domain.Order{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return domain.Order{}, fmt.Errorf("committing status change: %w", err)
+		return domain.Order{}, fmt.Errorf("committing cancel: %w", err)
 	}
-	o.Status = to
+	o.Status = domain.OrderCancelled
 	return o, nil
 }
 
