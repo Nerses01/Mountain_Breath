@@ -235,3 +235,42 @@ func (s *Store) ListReviews(ctx context.Context, f domain.ReviewFilter) ([]domai
 	}
 	return reviews, total, nil
 }
+
+// ReviewsByUser is the data view's read (F2, decision #97): everything
+// this person has written, every status included — pending and rejected
+// reviews are still THEIR words, and an export that hid them would be
+// lying by omission. The parallel slug slice is the ListUsers pairing
+// idiom: the export wants a human-readable product reference without
+// teaching domain.Review a field only this caller uses.
+func (s *Store) ReviewsByUser(ctx context.Context, userID int64) ([]domain.Review, []string, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT r.id, r.product_id, r.rating, r.title, r.body, r.status, r.created_at,
+		       p.slug
+		FROM reviews r
+		JOIN products p ON p.id = r.product_id
+		WHERE r.user_id = $1
+		ORDER BY r.created_at DESC`,
+		userID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("querying user reviews: %w", err)
+	}
+	defer rows.Close()
+
+	reviews := make([]domain.Review, 0)
+	slugs := make([]string, 0)
+	for rows.Next() {
+		var r domain.Review
+		var slug string
+		if err := rows.Scan(&r.ID, &r.ProductID, &r.Rating, &r.Title, &r.Body,
+			&r.Status, &r.CreatedAt, &slug); err != nil {
+			return nil, nil, fmt.Errorf("scanning user review: %w", err)
+		}
+		r.UserID = userID
+		reviews = append(reviews, r)
+		slugs = append(slugs, slug)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("iterating user reviews: %w", err)
+	}
+	return reviews, slugs, nil
+}

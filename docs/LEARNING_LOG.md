@@ -17,6 +17,63 @@ Template for an entry:
 
 ---
 
+## 2026-08-19 — Phase F2 closes: the privacy page stops lying
+
+**Worked on:** the last and largest F2 item (decision #97) — account
+deletion and the data view, the privacy page's two promises. The page's
+own sentence was the spec: "Orders we must keep for bookkeeping as the
+law requires; everything else goes." Migration 000025 makes
+`orders.user_id` nullable (FK deliberately stays RESTRICT);
+`DeleteAccount` is one transaction — detach orders, delete reviews,
+remove the newsletter row, let the FK graph cascade sessions / carts /
+wishlist / addresses / tokens / identities / redemptions; the last admin
+is refused (#96's guard — a deleted admin is a demoted admin with extra
+steps). GET `/account/data` composes the screens' own store reads into
+one JSON. The settings screen's honest stub became the real flow:
+password-confirmed (OAuth-only accounts, hash '' by construction, need
+none), armed like the address book's remove, with "Download my data"
+beside it. **Phase F2 is complete** — the family runs the store without
+psql, and the privacy page tells no lies.
+
+**Learned:**
+- *Published copy is a requirement with a deadline* — the audit treated
+  the privacy page as a contract, and its sentence translated directly
+  into transaction steps. Prose and schema can be the same document at
+  different altitudes.
+- *RESTRICT is a question addressed to the future* — both RESTRICT
+  constraints (orders, reviews) existed precisely so that whoever built
+  deletion HAD to answer them. The schema doesn't make the decision; it
+  refuses to let you skip it. Detach one, delete the other — opposite
+  answers, both forced.
+- *An export that reuses the screens' reads cannot drift* — assembling
+  /account/data from special queries would create a second truth; using
+  ListOrdersByUser/ListWishlist/etc. means "what we show you" and "what
+  we export about you" are the same code path.
+- *Nullable-in, zero-out is a boundary decision* — orders.user_id NULL in
+  SQL surfaces as 0 in Go (no valid id is 0), scanned via a pointer at
+  exactly one place (scanOrder). And the INNER→LEFT join on the admin
+  list was the hidden second half of "orders survive": surviving rows an
+  INNER join hides are only half-survived.
+- *Cache clear ≠ cache invalidate* — after deletion the client calls
+  qc.clear(), not invalidateQueries: every cached fact describes an
+  account that no longer exists, and "stale, please refetch" would just
+  collect 401s.
+- *Re-auth scales with irreversibility* — password change asks for the
+  password, deletion asks armed + password; OAuth-only accounts have no
+  password BY CONSTRUCTION (hash ''), so the design must say what their
+  equivalent is (the provider-vouched session) rather than pretend the
+  field exists.
+
+**Questions / to revisit:**
+- The data view returns JSON only; a human-readable HTML rendering was
+  skipped. Enough for the promise, or does F3's content pass want a
+  friendlier export?
+- Detached orders are invisible to their former owner (no account) but
+  visible to admins. If a deleted customer writes in about an old order,
+  the lookup is by order id or ship-to name — is that workable for the
+  family, or does deletion want an anonymized order-lookup token printed
+  in the goodbye screen?
+
 ## 2026-08-19 — Phase F2, part six: the admin seat gets a lock
 
 **Worked on:** user administration (decision #96) — the Era I "promote

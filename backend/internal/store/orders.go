@@ -414,7 +414,11 @@ const orderColumns = `orders.id, orders.user_id, orders.status,
 func scanOrder(row pgx.Row, extra ...any) (domain.Order, error) {
 	var o domain.Order
 	var first, last, phone, street, city, postal, country *string
-	dest := []any{&o.ID, &o.UserID, &o.Status, &o.TotalMinor, &o.CreatedAt,
+	// user_id is nullable since migration 000025: an order outlives its
+	// deleted customer. Zero means "no account behind this any more" —
+	// which no live user id ever is.
+	var userID *int64
+	dest := []any{&o.ID, &userID, &o.Status, &o.TotalMinor, &o.CreatedAt,
 		&o.Currency, &o.FxRateUsed,
 		&o.Totals.SubtotalMinor, &o.Totals.ShippingMinor,
 		&o.Totals.DiscountMinor, &o.Totals.TaxMinor,
@@ -425,6 +429,9 @@ func scanOrder(row pgx.Row, extra ...any) (domain.Order, error) {
 		&o.PromoCode, &o.Locale}
 	if err := row.Scan(append(dest, extra...)...); err != nil {
 		return domain.Order{}, err
+	}
+	if userID != nil {
+		o.UserID = *userID
 	}
 	o.Totals.TotalMinor = o.TotalMinor
 	if street != nil {
@@ -464,10 +471,14 @@ func (s *Store) ListOrdersByUser(ctx context.Context, userID int64) ([]domain.Or
 // ListAllOrders is the admin view: every order, newest first, with the
 // customer's email joined in.
 func (s *Store) ListAllOrders(ctx context.Context) ([]domain.Order, error) {
+	// LEFT JOIN since migration 000025: a deleted customer's orders stay in
+	// the books, and the admin table shows them with a blank email rather
+	// than not at all — an INNER join would silently hide exactly the rows
+	// the detachment existed to keep.
 	rows, err := s.pool.Query(ctx, `
-		SELECT `+orderColumns+`, u.email
+		SELECT `+orderColumns+`, COALESCE(u.email, '')
 		FROM orders
-		JOIN users u ON u.id = orders.user_id
+		LEFT JOIN users u ON u.id = orders.user_id
 		ORDER BY orders.created_at DESC
 		LIMIT 200`)
 	if err != nil {

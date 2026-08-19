@@ -172,6 +172,14 @@ type PromoStore interface {
 // AccountStore is E8's slice: the hearts, the reset tokens, the address
 // book and the OAuth identities — everything the account grows this phase.
 type AccountStore interface {
+	// F2 (decision #97): the privacy page's promises. DeleteAccount keeps
+	// orders (detached) and removes everything else in one transaction;
+	// ErrLastAdmin guards the #96 invariant. The two reads below feed the
+	// data view.
+	DeleteAccount(ctx context.Context, userID int64) error
+	CountSessions(ctx context.Context, userID int64) (int, error)
+	ReviewsByUser(ctx context.Context, userID int64) ([]domain.Review, []string, error)
+
 	// The wishlist answers with full product CARDS (plus saved_at, A3);
 	// the heart's on/off state everywhere derives from this one list
 	// client-side.
@@ -385,6 +393,8 @@ func (s *Server) Routes() chi.Router {
 			r.Post("/checkout/preview", s.handleCheckoutPreview)
 			r.Post("/orders", s.handleCreateOrder)
 			r.Get("/orders", s.handleListMyOrders)
+			r.Get("/account/data", s.handleAccountData)
+			r.Delete("/account", s.handleDeleteAccount)
 			r.Get("/orders/{id}", s.handleGetOrder)
 			// A2: refill the cart from a past order (decision log #86).
 			r.Post("/orders/{id}/reorder", s.handleReorder)

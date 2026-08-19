@@ -128,7 +128,21 @@ describe('SettingsPage', () => {
     renderPage()
     expect(await screen.findByRole('switch', { name: 'Wishlist alerts' })).toBeDisabled()
     expect(screen.getByRole('switch', { name: 'SMS on delivery day' })).toBeDisabled()
-    // The delete row's button is the F2 stub — visible, inert.
-    expect(screen.getByRole('button', { name: 'Delete…' })).toBeDisabled()
+  })
+
+  // F2 (decision #97): the delete row is live — but the first click only
+  // OPENS the confirmation area (password + armed button); nothing is
+  // requested until the armed button is pressed twice.
+  it('delete opens a confirm area instead of deleting', async () => {
+    renderPage()
+    const del = await screen.findByRole('button', { name: 'Delete…' })
+    expect(del).toBeEnabled()
+
+    fireEvent.click(del)
+
+    expect(screen.getByLabelText('Current password')).toBeInTheDocument()
+    expect(
+      requests.find((r) => r.method === 'DELETE' && r.url.includes('/account')),
+    ).toBeUndefined()
   })
 })

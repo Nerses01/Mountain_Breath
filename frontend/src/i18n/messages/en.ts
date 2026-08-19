@@ -538,8 +538,13 @@ export const en = {
       deleteTitle: 'Delete account',
       deleteBlurb: 'Removes your addresses, wishlist and sign-in; order records stay in the books.',
       privacyLink: 'Privacy policy',
-      deleteStub: 'Not available yet — account deletion ships with the go-live work.',
       deleteButton: 'Delete…',
+      downloadData: 'Download my data',
+      deletePasswordHint:
+        'Confirm with your password. Signed up with Google and never set one? Leave it empty.',
+      deleteConfirm: 'Forever — are you sure?',
+      deleteLastAdmin: 'You are the only admin — promote someone else first.',
+      cancel: 'Cancel',
     },
     // ---- A4: the addresses screen (canvas 09) ------------------------
     addressesScreen: {

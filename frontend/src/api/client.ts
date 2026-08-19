@@ -367,6 +367,16 @@ export const api = {
   // renders an empty form for it rather than an error. A4: the response is
   // the full book entry, so the neighbour checkbox prefills too.
   defaultAddress: () => request<AddressEntry>('/api/v1/account/address'),
+  // F2 (decision #97): the privacy page's promises. The data view is
+  // typed loosely on purpose — the client only ever serializes it into a
+  // download, and mirroring the whole export shape here would be a second
+  // contract to drift.
+  accountData: () => request<Record<string, unknown>>('/api/v1/account/data'),
+  deleteAccount: (currentPassword: string) =>
+    request<void>('/api/v1/account', {
+      method: 'DELETE',
+      body: { current_password: currentPassword },
+    }),
 
   // admin
   createCategory: (data: NewCategory) =>

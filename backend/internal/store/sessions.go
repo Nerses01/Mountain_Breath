@@ -62,3 +62,19 @@ func (s *Store) DeleteSession(ctx context.Context, token string) error {
 	}
 	return nil
 }
+
+// CountSessions is the data view's honesty about auth state (F2, decision
+// #97): how many devices currently hold a live key to this account. Only
+// unexpired rows count — an expired session is a dead fact awaiting the
+// cleanup job, not something "we store about you" in any meaningful sense.
+func (s *Store) CountSessions(ctx context.Context, userID int64) (int, error) {
+	var n int
+	err := s.pool.QueryRow(ctx, `
+		SELECT count(*)::int FROM sessions
+		WHERE user_id = $1 AND expires_at > now()`,
+		userID).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("counting sessions: %w", err)
+	}
+	return n, nil
+}

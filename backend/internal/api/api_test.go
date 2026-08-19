@@ -71,7 +71,10 @@ type fakeStore struct {
 	lastCheckout domain.CheckoutInput
 	orders       []domain.Order
 	// F2: who the status mailer finds when it looks up an order's customer.
-	usersByID      map[int64]domain.User
+	usersByID map[int64]domain.User
+	// F2 (decision #97): the data view's canned review export.
+	userReviews     []domain.Review
+	userReviewSlugs []string
 	shippingRates  map[domain.Currency]domain.ShippingRate
 	defaultAddress *domain.AddressEntry
 
@@ -413,6 +416,44 @@ func (f *fakeStore) GetUserByID(_ context.Context, userID int64) (domain.User, e
 	return domain.User{}, domain.ErrNotFound
 }
 
+// F2 (decision #97): account deletion + the data view's reads.
+
+func (f *fakeStore) DeleteAccount(_ context.Context, userID int64) error {
+	u, ok := f.usersByID[userID]
+	if !ok {
+		return domain.ErrNotFound
+	}
+	if u.Role == domain.RoleAdmin {
+		others := 0
+		for id, other := range f.usersByID {
+			if id != userID && other.Role == domain.RoleAdmin {
+				others++
+			}
+		}
+		if others == 0 {
+			return domain.ErrLastAdmin
+		}
+	}
+	delete(f.usersByID, userID)
+	return nil
+}
+
+// CountSessions counts the fake's real session map — the same table
+// loginAs writes — so the export's number is observably true in tests.
+func (f *fakeStore) CountSessions(_ context.Context, userID int64) (int, error) {
+	n := 0
+	for _, u := range f.sessions {
+		if u.ID == userID {
+			n++
+		}
+	}
+	return n, nil
+}
+
+func (f *fakeStore) ReviewsByUser(_ context.Context, _ int64) ([]domain.Review, []string, error) {
+	return f.userReviews, f.userReviewSlugs, nil
+}
+
 // F2 (decision #96): user administration, behaving. The list sorts by id
 // descending (the fake's stand-in for newest-first); the role write runs
 // the same last-admin count the real store locks for.
@@ -602,8 +643,17 @@ func (f *fakeStore) DefaultAddress(_ context.Context, _ int64) (domain.AddressEn
 	}
 	return *f.defaultAddress, nil
 }
-func (f *fakeStore) ListOrdersByUser(_ context.Context, _ int64) ([]domain.Order, error) {
-	return nil, nil
+// ListOrdersByUser graduated from stub when the data view (F2, #97) gave
+// it an observer: it filters the fake's orders table by owner, like the
+// real WHERE clause.
+func (f *fakeStore) ListOrdersByUser(_ context.Context, userID int64) ([]domain.Order, error) {
+	orders := make([]domain.Order, 0)
+	for _, o := range f.orders {
+		if o.UserID == userID {
+			orders = append(orders, o)
+		}
+	}
+	return orders, nil
 }
 
 // Reorder mirrors the real store's contract: ownership answered here, a

@@ -746,6 +746,19 @@ export function useUpdateVariant() {
   })
 }
 
+// F2 (decision #97): the point of no return. On success the WHOLE cache
+// is cleared, not invalidated — every cached fact is about an account
+// that no longer exists, and a refetch would only collect 401s.
+export function useDeleteAccount() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.deleteAccount,
+    onSuccess: () => {
+      qc.clear()
+    },
+  })
+}
+
 // F2 (decision #96): user administration. A role change also invalidates
 // ['me'] — an admin demoting THEMSELF (with another admin left) must see
 // the admin area close, not linger on a cached role.

@@ -1,8 +1,10 @@
-import { useState } from 'react'
-import { Link } from 'react-router'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router'
 import { useTranslation } from 'react-i18next'
+import { api, ApiError } from '../api/client'
 import {
   useChangePassword,
+  useDeleteAccount,
   useMe,
   useNewsletterToggle,
   useNotifications,
@@ -31,8 +33,10 @@ import { useLocale } from '../i18n/useLocale'
  *    opt-in included — which is why it has a THIRD state (pending);
  *  - wishlist alerts and SMS are disabled with the truth stated
  *    (decision #87 — their columns arrive with their senders);
- *  - delete-account is F2's endpoint; until it exists the button is
- *    disabled with the policy stated, not a dead click.
+ *  - delete-account is REAL (F2, decision #97): password-confirmed,
+ *    armed like the address book's remove, orders stay in the books —
+ *    and the data download next to it is the privacy page's "we will
+ *    show you what we store", as one JSON file.
  */
 export function SettingsPage() {
   const { t } = useTranslation()
@@ -452,31 +456,137 @@ function NotificationsPanel({ user }: { user: User }) {
 
 /** Canvas 10's danger row — F2 owns the endpoint; until it exists the
  *  button is disabled with the policy stated, not a dead click. */
+/** F2 (decision #97): the stub grew its endpoint. Collapsed, the row is
+ *  the canvas's "Delete account / Delete…"; expanded, it asks for the
+ *  current password (Google-only accounts have none — the hint says so),
+ *  offers the data download, and the button itself arms for 3 s before
+ *  it fires — the address book's confirm pattern at higher stakes. */
 function DeleteAccountRow() {
   const { t } = useTranslation()
   const { localePath } = useLocale()
+  const navigate = useNavigate()
+  const del = useDeleteAccount()
+
+  const [open, setOpen] = useState(false)
+  const [password, setPassword] = useState('')
+  const [downloading, setDownloading] = useState(false)
+  const [arming, setArming] = useState(false)
+  const disarm = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(disarm.current), [])
+
+  const download = async () => {
+    setDownloading(true)
+    try {
+      const data = await api.accountData()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'mountain-breath-data.json'
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  const deleteClick = () => {
+    if (arming) {
+      clearTimeout(disarm.current)
+      setArming(false)
+      del.mutate(password, {
+        onSuccess: () => navigate(localePath('/')),
+      })
+      return
+    }
+    setArming(true)
+    disarm.current = setTimeout(() => setArming(false), 3000)
+  }
+
+  const { fieldError } = useFieldErrors(del.error)
+  const lastAdmin = del.error instanceof ApiError && del.error.code === 'last_admin'
 
   return (
-    <section className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border-[1.5px] border-line bg-panel px-6 py-5">
-      <div className="flex min-w-0 flex-col gap-1">
-        <h2 className="font-display text-[0.9375rem] font-bold text-ink">
-          {t('account:settingsScreen.deleteTitle')}
-        </h2>
-        <p className="text-[0.8125rem] text-ink-muted">
-          {t('account:settingsScreen.deleteBlurb')}{' '}
-          <Link to={localePath('/privacy')} className="font-semibold text-brand-ink hover:underline">
-            {t('account:settingsScreen.privacyLink')}
-          </Link>
-        </p>
-        <p className="text-[0.8125rem] text-ink-muted">{t('account:settingsScreen.deleteStub')}</p>
+    <section className="rounded-3xl border-[1.5px] border-line bg-panel px-6 py-5">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 className="font-display text-[0.9375rem] font-bold text-ink">
+            {t('account:settingsScreen.deleteTitle')}
+          </h2>
+          <p className="text-[0.8125rem] text-ink-muted">
+            {t('account:settingsScreen.deleteBlurb')}{' '}
+            <Link to={localePath('/privacy')} className="font-semibold text-brand-ink hover:underline">
+              {t('account:settingsScreen.privacyLink')}
+            </Link>
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            disabled={downloading}
+            onClick={download}
+            className="rounded-full border-[1.5px] border-line px-5 py-2.5 font-display text-sm font-semibold text-ink hover:border-ink disabled:opacity-50"
+          >
+            {downloading
+              ? t('account:working')
+              : t('account:settingsScreen.downloadData')}
+          </button>
+          {!open && (
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="rounded-full border-[1.5px] border-danger px-5 py-2.5 font-display text-sm font-semibold text-danger hover:bg-danger hover:text-white"
+            >
+              {t('account:settingsScreen.deleteButton')}
+            </button>
+          )}
+        </div>
       </div>
-      <button
-        type="button"
-        disabled
-        className="rounded-full border-[1.5px] border-danger px-5 py-2.5 font-display text-sm font-semibold text-danger opacity-50"
-      >
-        {t('account:settingsScreen.deleteButton')}
-      </button>
+
+      {open && (
+        <div className="mt-4 flex flex-col gap-3 border-t border-line pt-4 sm:max-w-sm">
+          <Input
+            label={t('account:settingsScreen.currentPassword')}
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            error={fieldError('current_password')}
+          />
+          <p className="text-[0.8125rem] text-ink-muted">
+            {t('account:settingsScreen.deletePasswordHint')}
+          </p>
+          {lastAdmin && (
+            <p role="alert" className="text-[0.8125rem] font-semibold text-danger">
+              {t('account:settingsScreen.deleteLastAdmin')}
+            </p>
+          )}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              disabled={del.isPending}
+              onClick={deleteClick}
+              className={cx(
+                'rounded-full border-[1.5px] border-danger px-5 py-2.5 font-display text-sm font-semibold disabled:opacity-50',
+                arming ? 'bg-danger text-white' : 'text-danger hover:bg-danger hover:text-white',
+              )}
+            >
+              {arming
+                ? t('account:settingsScreen.deleteConfirm')
+                : t('account:settingsScreen.deleteButton')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false)
+                setPassword('')
+              }}
+              className="font-display text-sm font-semibold text-ink-soft hover:underline"
+            >
+              {t('account:settingsScreen.cancel')}
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

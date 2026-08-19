@@ -33,12 +33,13 @@ surfaced them:
       payment state machine in the domain (`unpaid → paid → refunded`, no
       backward arrows), with mark-paid/mark-refunded buttons on the admin
       orders table. F2's first item, done first as §4 suggested.
-- [ ] **The privacy page promises what the API cannot do.** E9's copy says
+- [x] ~~**The privacy page promises what the API cannot do.**~~ E9's copy says
       "delete your account entirely" and "we will show you what we store" —
-      there is no deletion endpoint and no export. A published promise is a
-      requirement; either build it (F2) or soften the page before launch.
-      Deletion is also where `users` FKs get audited: orders must survive
-      (bookkeeping, the page says so), sessions/hearts/addresses must go.
+      there was no deletion endpoint and no export. **Closed 2026-08-19
+      (decision #97):** both promises built rather than softened —
+      GET `/account/data` and DELETE `/account`; the FK audit ran as
+      predicted (orders detached via migration 000025, reviews deleted,
+      everything else cascades).
 - [ ] **Placeholder facts inside real pages.** The E9 content ships
       `hive@mountain-breath.example` and `+374 91 00 00 00` on the Contact
       page, and §1.1's rule that *every price is placeholder* still stands.
@@ -153,13 +154,21 @@ customer's every screen; the admin got only what each phase needed.
       PATCH `/admin/users/{id}/role`; "at least one admin" enforced as a
       count-under-locks invariant (race-tested like the oversell), 409
       `last_admin`; admin Users tab with role badges and (you) marker.*
-- [ ] **Account deletion + data view** (the privacy page's promises, §1):
+- [x] **Account deletion + data view** (the privacy page's promises, §1):
       delete cascades the personal graph, orders are retained and
-      detached per the stated bookkeeping rule.
+      detached per the stated bookkeeping rule. *Done 2026-08-19
+      (decision #97): migration 000025 (orders.user_id nullable, FK stays
+      RESTRICT), DeleteAccount as one transaction honoring the page's
+      sentence, GET /account/data composing the screens' own reads, the
+      settings stub replaced by the real password-confirmed armed flow +
+      data download ×3 locales.*
 
 **Done when:** a full order lifecycle — including getting paid, a status
 email, and a customer cancellation — happens without anyone opening psql,
-and the privacy page tells no lies.
+and the privacy page tells no lies. ✅ **PHASE F2 COMPLETE 2026-08-19**
+(decisions #91–#97, learning log entries of 2026-08-18/19): every item
+shipped; the mark-paid button, status mails, customer cancel, promo CRUD,
+category management, role management, and the privacy promises all exist.
 
 ---
 

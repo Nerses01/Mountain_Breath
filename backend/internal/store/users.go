@@ -69,6 +69,103 @@ func (s *Store) GetUserByID(ctx context.Context, userID int64) (domain.User, err
 	return u, nil
 }
 
+// ── F2: account deletion (decision #97) ───────────────────────────────────
+
+// DeleteAccount executes the privacy page's sentence — "Orders we must
+// keep for bookkeeping as the law requires; everything else goes" — as
+// one transaction. The FK graph decides most of it (sessions, carts,
+// wishlist, addresses, reset tokens, oauth identities, promo redemptions
+// all CASCADE); the two RESTRICT constraints are the schema forcing THIS
+// method to decide, and it decides per the page:
+//
+//   - orders are DETACHED (user_id → NULL, migration 000025): the
+//     financial record survives with every snapshot it already carries.
+//   - reviews are DELETED: a review is a named person's public statement,
+//     and the person is leaving — "everything else goes".
+//
+// The newsletter row goes too, by the account's email: "delete my
+// account" from someone who once double-opted-in reads as "stop knowing
+// me", not "keep mailing me".
+//
+// Deleting the last ADMIN is refused with ErrLastAdmin — the same count
+// invariant as demotion (#96), enforced the same way, because a deleted
+// admin is a demoted admin with extra steps.
+func (s *Store) DeleteAccount(ctx context.Context, userID int64) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("beginning delete-account tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Read (not lock) the account first: locking our own row before the
+	// ordered admin-set lock below would hand two concurrent admin
+	// deletions opposite lock orders — the deadlock the ordering exists
+	// to prevent. The role read here is advisory; the locked set below is
+	// the truth the decision uses.
+	var email, role string
+	err = tx.QueryRow(ctx,
+		`SELECT email, role FROM users WHERE id = $1`, userID).Scan(&email, &role)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrNotFound
+		}
+		return fmt.Errorf("reading account: %w", err)
+	}
+
+	if role == domain.RoleAdmin {
+		adminRows, err := tx.Query(ctx, `
+			SELECT id FROM users WHERE role = 'admin' ORDER BY id FOR UPDATE`)
+		if err != nil {
+			return fmt.Errorf("locking admin rows: %w", err)
+		}
+		admins := make(map[int64]bool)
+		for adminRows.Next() {
+			var id int64
+			if err := adminRows.Scan(&id); err != nil {
+				adminRows.Close()
+				return fmt.Errorf("scanning admin row: %w", err)
+			}
+			admins[id] = true
+		}
+		adminRows.Close()
+		if err := adminRows.Err(); err != nil {
+			return fmt.Errorf("iterating admin rows: %w", err)
+		}
+		if admins[userID] && len(admins) == 1 {
+			return domain.ErrLastAdmin
+		}
+	}
+
+	// The two RESTRICT decisions, made explicitly.
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM reviews WHERE user_id = $1`, userID); err != nil {
+		return fmt.Errorf("deleting reviews: %w", err)
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE orders SET user_id = NULL WHERE user_id = $1`, userID); err != nil {
+		return fmt.Errorf("detaching orders: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM newsletter_subscribers WHERE email = $1`, email); err != nil {
+		return fmt.Errorf("removing newsletter row: %w", err)
+	}
+
+	// Everything else is the FK graph's job.
+	tag, err := tx.Exec(ctx, `DELETE FROM users WHERE id = $1`, userID)
+	if err != nil {
+		return fmt.Errorf("deleting user: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("committing delete-account: %w", err)
+	}
+	return nil
+}
+
 // ── F2: user administration (decision #96) ────────────────────────────────
 
 // ListUsers is the admin table's read: everyone, newest first, with a

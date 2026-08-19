@@ -3372,6 +3372,94 @@
           "response": []
         },
         {
+          "name": "My data (privacy export)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/account/data",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "account",
+                "data"
+              ]
+            },
+            "description": "F2 (decision #97): the privacy page's 'we will show you what we store', as one JSON — account, addresses, orders, wishlist, reviews (every status: pending and rejected are still your words), newsletter state, and the count of devices holding a live session. Composed from the same store reads the screens use, so it cannot drift from what the shop actually acts on. No password material, ever."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"the promised sections are present\", () => {",
+                  "    const body = pm.response.json();",
+                  "    for (const key of [\"account\", \"addresses\", \"orders\", \"wishlist\", \"reviews\", \"newsletter\", \"active_sessions\"]) {",
+                  "        pm.expect(body).to.have.property(key);",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test(\"no password material\", () => {",
+                  "    pm.expect(pm.response.text()).to.not.include(\"password\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Delete my account",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"current_password\": \"your-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{apiV1}}/account",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "account"
+              ]
+            },
+            "description": "F2 (decision #97): 'delete your account entirely. Orders we must keep for bookkeeping; everything else goes.' One transaction: orders are DETACHED (user_id → NULL, migration 000025 — every snapshot stays), reviews deleted, the newsletter row for the email removed, and the user row's deletion cascades sessions, carts, wishlist, addresses, reset tokens, OAuth identities and promo redemptions. Re-authenticates with the current password; OAuth-only accounts (empty hash by construction) delete on their session alone. The last admin is refused with 409 last_admin (#96's invariant — a deleted admin is a demoted admin with extra steps). 204 clears the session cookie. CAREFUL: running this against your dev account actually deletes it."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"deleted (204), wrong password (400) or last admin (409)\", () => {",
+                  "    pm.expect([204, 400, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
           "name": "My orders",
           "request": {
             "method": "GET",
