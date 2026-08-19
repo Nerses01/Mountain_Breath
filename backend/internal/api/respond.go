@@ -6,11 +6,17 @@ import (
 )
 
 // Error envelope shared by every endpoint, per docs/ARCHITECTURE.md:
-// {"error": {"code": "...", "message": "...", "fields": {...}}}
+// {"error": {"code": "...", "message": "...", "fields": {...}, "details": {...}}}
 type errorBody struct {
 	Code    string            `json:"code"`
 	Message string            `json:"message"`
 	Fields  map[string]string `json:"fields,omitempty"`
+
+	// Details is per-code structured data (e.g. insufficient_stock carries
+	// {name, label, available}), so a trilingual client can compose its own
+	// sentence instead of printing the English Message. Optional — most
+	// errors need nothing beyond their code.
+	Details map[string]any `json:"details,omitempty"`
 }
 
 type errorEnvelope struct {
@@ -28,6 +34,10 @@ func (s *Server) respondJSON(w http.ResponseWriter, status int, v any) {
 
 func (s *Server) respondError(w http.ResponseWriter, status int, code, message string) {
 	s.respondJSON(w, status, errorEnvelope{Error: errorBody{Code: code, Message: message}})
+}
+
+func (s *Server) respondErrorDetails(w http.ResponseWriter, status int, code, message string, details map[string]any) {
+	s.respondJSON(w, status, errorEnvelope{Error: errorBody{Code: code, Message: message, Details: details}})
 }
 
 func (s *Server) respondValidationError(w http.ResponseWriter, fields map[string]string) {

@@ -262,6 +262,12 @@ export const en = {
   checkout: {
     title: 'Where should the jars go?',
     signInFirst: 'Sign in to check out.',
+    // The 409 the stock race produces: the server says how many are truly
+    // left (details on the error), the sentence is composed here so it can
+    // exist in all three languages.
+    stockShort: 'Only {{count}} of {{name}} ({{label}}) left in stock — adjust the quantity in your cart and try again.',
+    stockGone: '{{name}} ({{label}}) has just sold out — remove it from your cart and try again.',
+    stockFixCart: 'Open the cart',
     secure: 'Secure · SSL',
     steps: {
       details: 'Details',

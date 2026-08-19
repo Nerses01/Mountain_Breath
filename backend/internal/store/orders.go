@@ -131,7 +131,12 @@ func (s *Store) CreateOrder(ctx context.Context, userID int64, view domain.View,
 				domain.ErrPriceUnavailable, l.name, l.label, currency)
 		}
 		if l.stockQty < l.qty {
-			return domain.Order{}, fmt.Errorf("%w: %s (%s)", domain.ErrInsufficientStock, l.name, l.label)
+			// The typed error carries the count read UNDER THE LOCK — the one
+			// number that is true at this instant, not a stale product-page
+			// snapshot. The customer gets told exactly how many they can have.
+			return domain.Order{}, &domain.StockShortError{
+				Name: l.name, Label: l.label, Available: l.stockQty,
+			}
 		}
 		subtotal += *l.priceMinor * int64(l.qty)
 		hasColdChain = hasColdChain || l.isColdChain

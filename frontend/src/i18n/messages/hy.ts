@@ -208,6 +208,9 @@ export const hy = {
   checkout: {
     title: 'Ո՞ւր հասցնենք բանկաները',
     signInFirst: 'Պատվիրելու համար մուտք գործեք։',
+    stockShort: '{{name}} ({{label}}) ապրանքից մնացել է ընդամենը {{count}} հատ — փոխեք քանակը զամբյուղում և կրկին փորձեք։',
+    stockGone: '{{name}} ({{label}}) նոր սպառվեց — հեռացրեք զամբյուղից և կրկին փորձեք։',
+    stockFixCart: 'Բացել զամբյուղը',
     secure: 'Անվտանգ · SSL',
     steps: {
       details: 'Տվյալներ',

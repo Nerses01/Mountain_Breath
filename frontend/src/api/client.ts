@@ -44,18 +44,22 @@ export class ApiError extends Error {
   readonly status: number
   readonly code: string
   readonly fields?: Record<string, string>
+  /** Per-code structured data (see ApiErrorBody.details). */
+  readonly details?: Record<string, unknown>
 
   constructor(
     status: number,
     code: string,
     message: string,
     fields?: Record<string, string>,
+    details?: Record<string, unknown>,
   ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
     this.fields = fields
+    this.details = details
   }
 }
 
@@ -132,15 +136,17 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     let code = 'unknown_error'
     let message = `HTTP ${res.status}`
     let fields: Record<string, string> | undefined
+    let details: Record<string, unknown> | undefined
     try {
       const body = (await res.json()) as ApiErrorBody
       code = body.error.code
       message = body.error.message
       fields = body.error.fields
+      details = body.error.details
     } catch {
       // response body wasn't our JSON envelope — keep the fallback
     }
-    throw new ApiError(res.status, code, message, fields)
+    throw new ApiError(res.status, code, message, fields, details)
   }
   if (res.status === 204) {
     return undefined as T // no content (e.g. logout)

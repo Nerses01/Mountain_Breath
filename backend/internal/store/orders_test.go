@@ -148,6 +148,15 @@ func TestCreateOrder_InsufficientStock(t *testing.T) {
 	if !errors.Is(err, domain.ErrInsufficientStock) {
 		t.Errorf("err = %v, want ErrInsufficientStock", err)
 	}
+	// The typed error must carry the count read under the lock — it is what
+	// the API forwards so the customer learns how many they CAN buy.
+	var short *domain.StockShortError
+	if !errors.As(err, &short) {
+		t.Fatalf("err = %T, want *domain.StockShortError", err)
+	}
+	if short.Available != 2 {
+		t.Errorf("Available = %d, want 2", short.Available)
+	}
 
 	// Nothing must have changed — the transaction rolled back.
 	var stock int

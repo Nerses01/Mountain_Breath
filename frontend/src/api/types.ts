@@ -602,5 +602,9 @@ export interface ApiErrorBody {
     code: string
     message: string
     fields?: Record<string, string>
+    // Per-code structured data — e.g. insufficient_stock carries
+    // {name, label, available} so the client can compose a localized
+    // sentence instead of printing the English message.
+    details?: Record<string, unknown>
   }
 }

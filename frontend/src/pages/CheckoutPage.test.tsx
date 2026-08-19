@@ -192,6 +192,43 @@ describe('CheckoutPage', () => {
     expect(Object.keys(post!.body as object)).not.toContain('total_minor')
   })
 
+  it('a stock 409 says how many are left, with a link to fix the cart', async () => {
+    // The server refuses under the row lock and answers with structured
+    // details; the page must compose the localized sentence from them, not
+    // echo the English message.
+    const base = fetch
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).includes('/orders') && init?.method === 'POST') {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                error: {
+                  code: 'insufficient_stock',
+                  message: 'insufficient stock: Fresh Royal Jelly (25 g), 3 available',
+                  details: { name: 'Fresh Royal Jelly', label: '25 g', available: 3 },
+                },
+              }),
+              { status: 409, headers: { 'Content-Type': 'application/json' } },
+            ),
+          )
+        }
+        return base(input, init)
+      }),
+    )
+
+    renderCheckout()
+    await settle()
+    fillAddress()
+    fireEvent.click(screen.getByRole('button', { name: 'Place the order' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Only 3 of Fresh Royal Jelly (25 g) left in stock',
+    )
+    expect(screen.getByRole('link', { name: 'Open the cart' })).toBeInTheDocument()
+  })
+
   it('cash on delivery is disabled while shopping in dollars', async () => {
     renderCheckout()
     await settle()

@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // CartItem is a cart line enriched with live product data for display —
 // current price and stock, joined in by the store.
@@ -83,3 +86,26 @@ var (
 	ErrEmptyCart         = errors.New("cart is empty")
 	ErrInsufficientStock = errors.New("insufficient stock")
 )
+
+// StockShortError is ErrInsufficientStock with the DATA attached: which line
+// cannot be fulfilled and how many are actually left. A struct rather than a
+// formatted string because the storefront speaks three languages — the API
+// hands these fields to the client, which composes the sentence; prose baked
+// in here could only ever be English.
+//
+// Unwrap returns the sentinel, so every existing errors.Is(err,
+// ErrInsufficientStock) check — the API's status mapping, the tests — keeps
+// working unchanged. This is Go's version of a derived exception type:
+// callers who only care "was it a stock problem?" match the base, callers
+// who want the numbers errors.As the concrete type.
+type StockShortError struct {
+	Name      string
+	Label     string
+	Available int
+}
+
+func (e *StockShortError) Error() string {
+	return fmt.Sprintf("insufficient stock: %s (%s), %d available", e.Name, e.Label, e.Available)
+}
+
+func (e *StockShortError) Unwrap() error { return ErrInsufficientStock }

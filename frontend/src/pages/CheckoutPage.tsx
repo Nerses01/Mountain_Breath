@@ -90,6 +90,16 @@ export function CheckoutPage() {
   const fieldError = (key: string): string | undefined =>
     localErrors[key] ?? serverErrors.fieldError(key)
 
+  // The stock 409's structured details — name/label/available — so the
+  // banner can say the number in the reader's language rather than printing
+  // the server's English message. Absent on every other error.
+  const stockShort =
+    checkout.error instanceof ApiError && checkout.error.code === 'insufficient_stock'
+      ? (checkout.error.details as
+          | { name?: string; label?: string; available?: number }
+          | undefined)
+      : undefined
+
   function setField(key: keyof Address, value: string) {
     setAddress((a) => ({ ...a, [key]: value }))
     // An error clears the moment its field is edited — feedback tied to the
@@ -129,6 +139,14 @@ export function CheckoutPage() {
           // total; refetching the preview makes the promo box name the
           // reason inline, next to the code it is about.
           if (err instanceof ApiError && err.code === 'promo_invalid') {
+            void qc.invalidateQueries({ queryKey: ['preview'] })
+          }
+          // 409 insufficient_stock: somebody bought the last jars while
+          // this page was open. The cached cart still shows the OLD stock,
+          // so the cart page's qty stepper would cap at a stale number —
+          // refetching makes "fix the quantity" actually work first try.
+          if (err instanceof ApiError && err.code === 'insufficient_stock') {
+            void qc.invalidateQueries({ queryKey: ['cart'] })
             void qc.invalidateQueries({ queryKey: ['preview'] })
           }
         },
@@ -186,10 +204,28 @@ export function CheckoutPage() {
             {t('checkout:title')}
           </h1>
 
-          {serverErrors.formError && (
+          {stockShort ? (
             <p role="alert" className="rounded-xl bg-danger/10 p-4 text-sm text-danger">
-              {serverErrors.formError}
+              {(stockShort.available ?? 0) > 0
+                ? t('checkout:stockShort', {
+                    count: stockShort.available,
+                    name: stockShort.name,
+                    label: stockShort.label,
+                  })
+                : t('checkout:stockGone', {
+                    name: stockShort.name,
+                    label: stockShort.label,
+                  })}{' '}
+              <Link to={localePath('/cart')} className="font-semibold underline">
+                {t('checkout:stockFixCart')}
+              </Link>
             </p>
+          ) : (
+            serverErrors.formError && (
+              <p role="alert" className="rounded-xl bg-danger/10 p-4 text-sm text-danger">
+                {serverErrors.formError}
+              </p>
+            )
           )}
 
           {/* ── Contact ─────────────────────────────────────────────── */}

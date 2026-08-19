@@ -44,6 +44,46 @@ func TestCheckout(t *testing.T) {
 		}
 	})
 
+	t.Run("insufficient stock is a 409 that says how many are left", func(t *testing.T) {
+		fake := newFakeStore()
+		fake.cart = cartWithOneItem()
+		// The typed error the store returns when the locked row can't cover
+		// the cart line — the handler must pass its numbers through as DATA,
+		// so the trilingual client can compose the sentence itself.
+		fake.orderErr = &domain.StockShortError{
+			Name: "Fresh Royal Jelly", Label: "25 g", Available: 3,
+		}
+		cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleCustomer})
+
+		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/orders", validCheckoutBody, cookie)
+		if rec.Code != http.StatusConflict {
+			t.Fatalf("status = %d, want 409 (%s)", rec.Code, rec.Body.String())
+		}
+
+		var envelope struct {
+			Error struct {
+				Code    string         `json:"code"`
+				Details map[string]any `json:"details"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+			t.Fatal(err)
+		}
+		if envelope.Error.Code != "insufficient_stock" {
+			t.Errorf("code = %q, want insufficient_stock", envelope.Error.Code)
+		}
+		// JSON numbers decode as float64 into an any.
+		if got := envelope.Error.Details["available"]; got != float64(3) {
+			t.Errorf("details.available = %v, want 3", got)
+		}
+		if got := envelope.Error.Details["name"]; got != "Fresh Royal Jelly" {
+			t.Errorf("details.name = %v, want the product name", got)
+		}
+		if got := envelope.Error.Details["label"]; got != "25 g" {
+			t.Errorf("details.label = %v, want the variant label", got)
+		}
+	})
+
 	t.Run("missing fields come back as one 400 with JSON paths", func(t *testing.T) {
 		fake := newFakeStore()
 		fake.cart = cartWithOneItem()

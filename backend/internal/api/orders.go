@@ -199,7 +199,18 @@ func (s *Server) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, domain.ErrEmptyCart):
 			s.respondError(w, http.StatusConflict, "empty_cart", "your cart is empty")
 		case errors.Is(err, domain.ErrInsufficientStock):
-			// err carries the product name; safe and useful for the customer
+			// The typed error carries name/label/available as DATA, so the
+			// client can say "only 3 left of X" in the reader's language and
+			// the customer can fix the cart instead of guessing. The English
+			// Message stays for curl and logs.
+			var short *domain.StockShortError
+			if errors.As(err, &short) {
+				s.respondErrorDetails(w, http.StatusConflict, "insufficient_stock", err.Error(),
+					map[string]any{
+						"name": short.Name, "label": short.Label, "available": short.Available,
+					})
+				return
+			}
 			s.respondError(w, http.StatusConflict, "insufficient_stock", err.Error())
 		case errors.Is(err, domain.ErrPriceUnavailable):
 			// 409, not 500: the shop is misconfigured for this market, not
