@@ -17,6 +17,50 @@ Template for an entry:
 
 ---
 
+## 2026-08-19 — Phase F2, part six: the admin seat gets a lock
+
+**Worked on:** user administration (decision #96) — the Era I "promote
+yourself with psql" step retired. GET `/admin/users` (everyone, newest
+first, order counts, no password material on the wire) and
+PATCH `/admin/users/{id}/role`, with the shop's one role invariant: at
+least one admin, always. The demote path locks every admin row in id
+order, counts AFTER the locks, and refuses the demotion that would land
+on zero (409 `last_admin` — self-demotion included, as a special case of
+the general rule, not its own rule). Admin Users tab with role badges,
+a "(you)" marker, and the 409 explained. Scope deliberately narrow: roles
+only — no creation, deletion, or profile edits from the admin surface.
+
+**Learned:**
+- *Count invariants are the third kind* — uniqueness gets an index,
+  referential integrity gets an FK, but "at least N rows like this"
+  can only be counted under locks (stock, promo caps, now admin seats:
+  the same shape three times makes it a category, not a trick).
+- *FOR UPDATE re-evaluates after the wait* — Postgres's EPQ means the
+  second of two racing demotions doesn't act on its stale snapshot: rows
+  that stopped matching `role='admin'` while it waited drop out of its
+  locked set, so the post-wait count is truth. This is WHY
+  lock-then-count works in READ COMMITTED.
+- *Ordered locking, fourth appearance* — `ORDER BY id FOR UPDATE` so two
+  demotions cannot deadlock; the checkout taught it, every multi-row
+  lock since has repeated it. Deadlock avoidance is a property you
+  re-prove at every new lock site, not a global setting.
+- *Guard the general rule, get the special case free* — "the last admin
+  cannot demote themself" needed no self-check: zero-admins is refused
+  whoever asks, and self is just one asker. Guarding specifics one by
+  one is how holes happen.
+- *Race tests are cheap once the shape exists* — the two-goroutine
+  demotion test is the 10-goroutine oversell test on a two-row table;
+  the second concurrency test in a codebase costs a fraction of the
+  first.
+
+**Questions / to revisit:**
+- The admin's own ['me'] cache invalidates on role change, but an admin
+  demoted by ANOTHER admin keeps a live session with a stale role until
+  refresh — requireAdmin re-reads the session's user per request, so the
+  API is safe; only the UI lags. Is that acceptable slack, or should
+  sessions be revoked on demotion (the settings screen's revoke-others
+  machinery is adjacent)?
+
 ## 2026-08-19 — Phase F2, part five: categories grow up (and a two-era-old bug surfaces)
 
 **Worked on:** category management (decision #95) — the editor's own

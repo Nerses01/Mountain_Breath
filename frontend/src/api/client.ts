@@ -4,6 +4,8 @@ import type {
   AddressInput,
   AdminCategory,
   AdminProduct,
+  AdminUser,
+  Role,
   CheckoutInput,
   AdminReview,
   ApiErrorBody,
@@ -437,6 +439,14 @@ export const api = {
     request<Order>(`/api/v1/admin/orders/${orderId}/payment`, {
       method: 'PATCH',
       body: { payment_status: paymentStatus },
+    }),
+  // F2 (decision #96): user administration — roles only. Demoting the
+  // last admin answers 409 last_admin: the shop may never lock itself out.
+  adminUsers: () => request<AdminUser[]>('/api/v1/admin/users'),
+  updateUserRole: (id: number, role: Role) =>
+    request<AdminUser>(`/api/v1/admin/users/${id}/role`, {
+      method: 'PATCH',
+      body: { role },
     }),
   // F2 (decision #94): promo CRUD. No delete — redemption history hangs
   // off the code, so retiring one is updatePromo with active: false.

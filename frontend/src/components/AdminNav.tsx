@@ -6,6 +6,7 @@ const tabs = [
   { to: '/admin/orders', label: 'Orders', end: false },
   { to: '/admin/promos', label: 'Promos', end: false },
   { to: '/admin/reviews', label: 'Reviews', end: false },
+  { to: '/admin/users', label: 'Users', end: false },
 ]
 
 export function AdminNav() {

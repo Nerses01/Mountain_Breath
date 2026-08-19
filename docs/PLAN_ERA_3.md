@@ -147,8 +147,12 @@ customer's every screen; the admin got only what each phase needed.
       list with move/edit/delete. Also FOUND AND FIXED: the category
       form's and collection's nested translations shape never matched the
       backend's flat map — creating a category with a translation 400'd.*
-- [ ] **Admin user management**: promote/demote via UI instead of SQL
+- [x] **Admin user management**: promote/demote via UI instead of SQL
       (Era I leftover), guarded so the last admin cannot demote themself.
+      *Done 2026-08-19 (decision #96): GET `/admin/users` +
+      PATCH `/admin/users/{id}/role`; "at least one admin" enforced as a
+      count-under-locks invariant (race-tested like the oversell), 409
+      `last_admin`; admin Users tab with role badges and (you) marker.*
 - [ ] **Account deletion + data view** (the privacy page's promises, §1):
       delete cascades the personal graph, orders are retained and
       detached per the stated bookkeeping rule.

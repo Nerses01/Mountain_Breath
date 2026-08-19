@@ -543,6 +543,20 @@ export interface EditorialInput {
   usage_cards: ProductUsageCard[]
 }
 
+// ── F2: user administration (decision #96) ───────────────────────────────
+
+export type Role = 'customer' | 'admin'
+
+export interface AdminUser {
+  id: number
+  email: string
+  full_name?: string
+  role: Role
+  created_at: string
+  /** All orders ever, cancelled included — account history, not revenue. */
+  orders: number
+}
+
 // ── F2: admin promo CRUD (decision #94) ──────────────────────────────────
 
 export type PromoKind = 'percent' | 'fixed' | 'free_shipping'

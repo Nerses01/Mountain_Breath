@@ -40,6 +40,18 @@ type User struct {
 
 func (u User) IsAdmin() bool { return u.Role == RoleAdmin }
 
+// F2 (decision #96): the role write path's vocabulary. ValidRole answers
+// the 400-shaped question; ErrLastAdmin is the 409-shaped invariant "the
+// shop always has at least one admin" — a COUNT invariant like the promo
+// cap, so it cannot be a constraint or an index and is enforced under a
+// lock in the store. Losing the last admin would mean psql is the only
+// way back in: the exact dependency F2 exists to remove.
+var ErrLastAdmin = errors.New("cannot demote the only admin")
+
+func ValidRole(s string) bool {
+	return s == RoleCustomer || s == RoleAdmin
+}
+
 var (
 	ErrEmailTaken = errors.New("email already registered")
 	// One error for both wrong email and wrong password: the response must

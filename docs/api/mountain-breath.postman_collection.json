@@ -2192,6 +2192,90 @@
           "response": []
         },
         {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/admin/users",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ]
+            },
+            "description": "F2 (decision #96): everyone, newest first, with role and an order count (all orders, cancelled included — account history, not revenue). Password hashes never appear in the response."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"no password material on the wire\", () => {",
+                  "    pm.expect(pm.response.text()).to.not.include(\"password\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Update user role",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"role\": \"admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{apiV1}}/admin/users/2/role",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "2",
+                "role"
+              ]
+            },
+            "description": "F2 (decision #96): promote or demote — the Era I 'promote yourself with psql' step retired. Roles are customer | admin (anything else → 400 validation_failed). Demoting the LAST admin — self included — answers 409 last_admin: 'at least one admin' is a count invariant enforced under row locks (two racing demotions serialize; the second re-counts a world with one admin and is refused). The shop can never lock itself out."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"changed (200), missing (404) or last admin (409)\", () => {",
+                  "    pm.expect([200, 404, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
           "name": "Create category",
           "request": {
             "method": "POST",

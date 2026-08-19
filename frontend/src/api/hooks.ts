@@ -16,6 +16,7 @@ import type {
   OrderStatus,
   PaymentStatus,
   PromoInput,
+  Role,
   Product,
   ReviewStatus,
   UpdateProduct,
@@ -742,6 +743,28 @@ export function useUpdateVariant() {
     mutationFn: ({ id, prices, stockQty }: { id: number; prices: Money; stockQty: number }) =>
       api.updateVariant(id, prices, stockQty),
     onSuccess: invalidate,
+  })
+}
+
+// F2 (decision #96): user administration. A role change also invalidates
+// ['me'] — an admin demoting THEMSELF (with another admin left) must see
+// the admin area close, not linger on a cached role.
+export function useAdminUsers() {
+  return useQuery({
+    queryKey: ['admin-users'],
+    queryFn: api.adminUsers,
+  })
+}
+
+export function useUpdateUserRole() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, role }: { id: number; role: Role }) =>
+      api.updateUserRole(id, role),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-users'] })
+      qc.invalidateQueries({ queryKey: ['me'] })
+    },
   })
 }
 

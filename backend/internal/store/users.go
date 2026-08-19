@@ -69,6 +69,99 @@ func (s *Store) GetUserByID(ctx context.Context, userID int64) (domain.User, err
 	return u, nil
 }
 
+// ── F2: user administration (decision #96) ────────────────────────────────
+
+// ListUsers is the admin table's read: everyone, newest first, with a
+// per-user order count for context (all orders, cancelled included — the
+// column answers "how much history does this account have", not revenue).
+func (s *Store) ListUsers(ctx context.Context) ([]domain.User, []int, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT u.id, u.email, u.role, u.created_at, u.full_name,
+		       (SELECT count(*) FROM orders o WHERE o.user_id = u.id)::int
+		FROM users u
+		ORDER BY u.created_at DESC, u.id DESC`)
+	if err != nil {
+		return nil, nil, fmt.Errorf("querying users: %w", err)
+	}
+	defer rows.Close()
+
+	users := make([]domain.User, 0)
+	counts := make([]int, 0)
+	for rows.Next() {
+		var u domain.User
+		var n int
+		if err := rows.Scan(&u.ID, &u.Email, &u.Role, &u.CreatedAt, &u.FullName, &n); err != nil {
+			return nil, nil, fmt.Errorf("scanning user: %w", err)
+		}
+		users = append(users, u)
+		counts = append(counts, n)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("iterating users: %w", err)
+	}
+	return users, counts, nil
+}
+
+// UpdateUserRole promotes or demotes — with the shop's one role invariant
+// enforced where it can actually hold: "at least one admin" is a COUNT,
+// so like the promo cap it cannot be an index or a CHECK; it is counted
+// under locks. The transaction locks every current admin row (ordered, so
+// two concurrent demotions cannot deadlock) and only then counts: the
+// second of two racing demotions waits, re-reads a world with one admin
+// left, and is refused. Promotion never locks more than the target — the
+// count only ever grows on that path.
+func (s *Store) UpdateUserRole(ctx context.Context, userID int64, role string) (domain.User, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return domain.User{}, fmt.Errorf("beginning role tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if role == domain.RoleCustomer {
+		// The demote path: lock the admin set, then count it. FOR UPDATE
+		// re-evaluates each row after a lock wait (Postgres's EPQ), so a
+		// row another transaction just demoted no longer matches and drops
+		// out of OUR set — the count below is post-wait truth, not a
+		// snapshot from before the race.
+		adminRows, err := tx.Query(ctx, `
+			SELECT id FROM users WHERE role = 'admin' ORDER BY id FOR UPDATE`)
+		if err != nil {
+			return domain.User{}, fmt.Errorf("locking admin rows: %w", err)
+		}
+		admins := make(map[int64]bool)
+		for adminRows.Next() {
+			var id int64
+			if err := adminRows.Scan(&id); err != nil {
+				adminRows.Close()
+				return domain.User{}, fmt.Errorf("scanning admin row: %w", err)
+			}
+			admins[id] = true
+		}
+		adminRows.Close()
+		if err := adminRows.Err(); err != nil {
+			return domain.User{}, fmt.Errorf("iterating admin rows: %w", err)
+		}
+
+		if admins[userID] && len(admins) == 1 {
+			return domain.User{}, domain.ErrLastAdmin
+		}
+	}
+
+	tag, err := tx.Exec(ctx,
+		`UPDATE users SET role = $2 WHERE id = $1`, userID, role)
+	if err != nil {
+		return domain.User{}, fmt.Errorf("updating role: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.User{}, domain.ErrNotFound
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.User{}, fmt.Errorf("committing role change: %w", err)
+	}
+	return s.GetUserByID(ctx, userID)
+}
+
 // UpdateProfile writes the settings form's two fields (A5). Whole-value
 // semantics like every PUT-shaped write here: the form shows both fields,
 // so it sends both.

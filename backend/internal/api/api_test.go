@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -410,6 +411,39 @@ func (f *fakeStore) GetUserByID(_ context.Context, userID int64) (domain.User, e
 		return u, nil
 	}
 	return domain.User{}, domain.ErrNotFound
+}
+
+// F2 (decision #96): user administration, behaving. The list sorts by id
+// descending (the fake's stand-in for newest-first); the role write runs
+// the same last-admin count the real store locks for.
+func (f *fakeStore) ListUsers(_ context.Context) ([]domain.User, []int, error) {
+	users := make([]domain.User, 0, len(f.usersByID))
+	for _, u := range f.usersByID {
+		users = append(users, u)
+	}
+	sort.Slice(users, func(i, j int) bool { return users[i].ID > users[j].ID })
+	return users, make([]int, len(users)), nil
+}
+
+func (f *fakeStore) UpdateUserRole(_ context.Context, userID int64, role string) (domain.User, error) {
+	u, ok := f.usersByID[userID]
+	if !ok {
+		return domain.User{}, domain.ErrNotFound
+	}
+	if role == domain.RoleCustomer && u.Role == domain.RoleAdmin {
+		others := 0
+		for id, other := range f.usersByID {
+			if id != userID && other.Role == domain.RoleAdmin {
+				others++
+			}
+		}
+		if others == 0 {
+			return domain.User{}, domain.ErrLastAdmin
+		}
+	}
+	u.Role = role
+	f.usersByID[userID] = u
+	return u, nil
 }
 
 func (f *fakeStore) CreateSession(_ context.Context, token string, userID int64, _ time.Time) error {

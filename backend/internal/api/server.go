@@ -87,6 +87,11 @@ type UserStore interface {
 	// F2: the status mailer's read — an order knows its customer only as
 	// user_id, and the mail needs the email plus the toggle that gates it.
 	GetUserByID(ctx context.Context, userID int64) (domain.User, error)
+	// F2 (decision #96): user administration. ListUsers pairs each user
+	// with an order count; UpdateUserRole enforces "at least one admin"
+	// under locks and answers ErrLastAdmin when a demotion would break it.
+	ListUsers(ctx context.Context) ([]domain.User, []int, error)
+	UpdateUserRole(ctx context.Context, userID int64, role string) (domain.User, error)
 }
 
 type SessionStore interface {
@@ -423,6 +428,8 @@ func (s *Server) Routes() chi.Router {
 			r.Get("/orders", s.handleAdminListOrders)
 			r.Patch("/orders/{id}/status", s.handleUpdateOrderStatus)
 			r.Patch("/orders/{id}/payment", s.handleUpdateOrderPayment)
+			r.Get("/users", s.handleAdminListUsers)
+			r.Patch("/users/{id}/role", s.handleUpdateUserRole)
 			r.Get("/promos", s.handleAdminListPromos)
 			r.Post("/promos", s.handleAdminCreatePromo)
 			r.Put("/promos/{id}", s.handleAdminUpdatePromo)

@@ -6,6 +6,7 @@ import { PREFIXED_LOCALES } from './i18n/locales'
 import { AddressesPage } from './pages/AddressesPage'
 import { AdminOrdersPage } from './pages/AdminOrdersPage'
 import { AdminPromosPage } from './pages/AdminPromosPage'
+import { AdminUsersPage } from './pages/AdminUsersPage'
 import { AdminPage } from './pages/AdminPage'
 import { AdminProductsPage } from './pages/AdminProductsPage'
 import { AdminReviewsPage } from './pages/AdminReviewsPage'
@@ -125,6 +126,7 @@ function App() {
       <Route path="/admin/orders" element={<AdminOrdersPage />} />
       <Route path="/admin/promos" element={<AdminPromosPage />} />
       <Route path="/admin/reviews" element={<AdminReviewsPage />} />
+      <Route path="/admin/users" element={<AdminUsersPage />} />
     </Routes>
   )
 }
