@@ -1,4 +1,10 @@
 import { useTranslation } from 'react-i18next'
+// Importing the image (instead of dropping it in public/) hands it to Vite's
+// build: the emitted file gets a content hash in its name, so browsers can
+// cache it forever and a future re-shoot busts that cache by itself. The
+// import evaluates to the final URL string. (C++ lens: this is a build-time
+// resource embed resolved by the bundler, not a runtime file read.)
+import heroJar from '../assets/hero-honey-jar.jpg'
 import { useProducts, useQuickAdd } from '../api/hooks'
 import { ProductCard } from '../components/ProductCard'
 import {
@@ -92,36 +98,42 @@ export function HomePage() {
           </div>
         </div>
 
-        {/* The hero image slot. The mock draws a cut-out honey jar over a
-            radial glow; with no photography yet, the glow and the frame keep
-            the composition and the label says what belongs here. */}
-        <div
-          aria-hidden
-          className="relative flex min-h-100 items-center justify-center lg:min-h-120"
-        >
-          <span className="absolute size-90 rounded-full bg-radial-[at_35%_30%] from-honey to-brand opacity-90" />
-          {/* The mock cuts a photographed jar out over this glow. With no
-              photography yet the slot has to read as a placeholder ON the
-              glow, not vanish into it — hence the diagonal hatch (the mock's
-              own placeholder texture) and a boxed label rather than a
-              translucent panel, which the orange swallowed whole. */}
+        {/* The hero image. One departure from the mock, stated: the mock cuts
+            the jar OUT of its photo and floats it over the radial glow; this
+            shot brings its own meadow bokeh, so it fills the slot's rounded
+            frame instead and the glow survives as a halo past the corners.
+            The div is no longer aria-hidden wholesale — the photo carries
+            information ("this is what you are buying"), so it gets a real,
+            translated alt; only the glow and the stamp stay decorative. */}
+        <div className="relative flex min-h-100 items-center justify-center lg:min-h-120">
+          <span
+            aria-hidden
+            className="absolute size-90 rounded-full bg-radial-[at_35%_30%] from-honey to-brand opacity-90"
+          />
           {/* aspect-ratio, not h-full: a percentage height resolves against
               the parent's HEIGHT, and this parent only has a min-height, so
               h-full collapsed the frame to a thin band across the glow. An
               aspect ratio derives the height from the width instead — and
-              the ratio is the mock's own 470×440 slot. */}
+              the ratio is the mock's own 470×440 slot; object-cover lets the
+              browser crop the square file into it. */}
+          {/* width/height are the file's intrinsic pixels — the browser
+              reserves the box before a single byte of image arrives, so the
+              text never reflows around a late photo (the layout-shift half of
+              F3's "explicit dimensions" rule, paid early). fetchPriority
+              tells the preloader this IS the largest paint of the page, not
+              just another asset in the queue. */}
+          <img
+            src={heroJar}
+            alt={t('home:hero.imageAlt')}
+            width={1024}
+            height={1024}
+            fetchPriority="high"
+            className="relative aspect-47/44 w-full max-w-118 rounded-2xl object-cover"
+          />
           <span
-            className="relative flex aspect-47/44 w-full max-w-118 items-center justify-center rounded-2xl"
-            style={{
-              backgroundImage:
-                'repeating-linear-gradient(135deg, rgb(255 255 255 / 0.55) 0 12px, rgb(255 255 255 / 0.25) 12px 24px)',
-            }}
+            aria-hidden
+            className="absolute right-1.5 top-8 flex size-29 flex-col items-center justify-center gap-0.5 rounded-full border-[1.5px] border-dashed border-brand bg-card"
           >
-            <span className="rounded-md bg-card/85 px-4 py-2 text-center font-mono text-xs uppercase tracking-label text-ink-muted">
-              {t('home:hero.imageSlot')}
-            </span>
-          </span>
-          <span className="absolute right-1.5 top-8 flex size-29 flex-col items-center justify-center gap-0.5 rounded-full border-[1.5px] border-dashed border-brand bg-card">
             <span className="font-display text-sm font-bold text-ink">
               {t('home:hero.stamp.raw')}
             </span>

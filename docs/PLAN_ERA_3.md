@@ -179,7 +179,12 @@ category management, role management, and the privacy promises all exist.
 - [ ] **Photography.** The single biggest visible gap: every image slot on
       every screen is a designed placeholder. A jar, a comb, the meadow,
       the family — the mock's own shot list. *(Business task; everything
-      below waits on it.)*
+      below waits on it.)* *Progress 2026-08-19: the home hero carries its
+      first real image (`src/assets/hero-honey-jar.jpg`, resized 1536→1024
+      / 424→140 KB, translated alt ×3) — honestly noted as AI-generated,
+      a stand-in with the placeholder look gone; the item stays open for
+      the family's real shot list, and swapping the file re-fingerprints
+      itself through the Vite import.*
 - [ ] **The E10-deferred image pipeline**, built against real files:
       server-side thumbnails/resizing on upload (Phase 11 line), `srcset`
       + AVIF/WebP, explicit dimensions everywhere an `<img>` renders.

@@ -218,7 +218,8 @@ export const en = {
         'Honey, beeswax, propolis, royal jelly, pollen and venom — harvested by our family on the high meadows, and nothing else added on the way to you.',
       primaryCta: 'Shop the hive',
       secondaryCta: 'Meet the beekeepers',
-      imageSlot: 'hero image — honey jar + comb',
+      imageAlt:
+        'A glass jar of raw honey with a piece of honeycomb inside, wildflowers and bees behind it',
       stamp: { raw: 'Raw', unfiltered: 'unfiltered' },
     },
     stats: {

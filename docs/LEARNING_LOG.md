@@ -17,6 +17,41 @@ Template for an entry:
 
 ---
 
+## 2026-08-19 — Phase F3 opens: the hero's first real image
+
+**Worked on:** the home hero's placeholder (hatch texture + label) replaced
+by an actual photo of a honey jar — F3's first visible dent. The file was
+resized 1536²→1024² and recompressed (424→140 KB) before entering the
+repo, imported from `src/assets` (not `public/`) so Vite fingerprints it
+(`hero-honey-jar-BmWpERmH.jpg` in the build), rendered with a translated
+alt ×3 locales, explicit `width`/`height`, and `fetchPriority="high"`.
+The hero container lost its blanket `aria-hidden`: a real product photo is
+information, only the glow and the stamp stay decorative. Honesty note in
+the plan: the image is AI-generated — the placeholder *look* is gone, but
+F3's photography line stays open for the family's real shots.
+
+**Learned:**
+- *`src/assets` vs `public/`* — an imported asset joins the build and gets
+  a content-hashed name (cache forever, self-busting on change); `public/`
+  files keep stable URLs but the cache must be managed by hand. Import
+  unless something external needs the URL fixed.
+- *Explicit `width`/`height` on `<img>`* — the browser reserves the box
+  before any byte arrives, so text doesn't reflow when the photo lands;
+  CSS still wins for the displayed size (the attributes set intrinsic
+  ratio, not layout).
+- *`fetchPriority="high"`* — a hint to the preloader that this image is
+  the page's largest contentful paint; React 19 forwards the camelCase
+  prop (React 18 dropped it).
+- *Hand-optimizing one image is fine; a pipeline is for many* — one
+  System.Drawing resize replaced 424 KB with 140 KB; the F3 image
+  pipeline item exists for when uploads do this automatically.
+
+**Questions / to revisit:**
+- AVIF/WebP with `<picture>`/`srcset` for the hero — deliberately left to
+  the F3 pipeline item rather than hand-building one-offs.
+
+---
+
 ## 2026-08-19 — Phase F2 closes: the privacy page stops lying
 
 **Worked on:** the last and largest F2 item (decision #97) — account
