@@ -55,6 +55,17 @@ export interface Benefit {
   name: string
 }
 
+/**
+ * A photo as a CARD sees it: url and alt, hero first. The full-fat gallery
+ * entry (id, is_primary) exists only on the detail — see ProductImage. The
+ * card slice powers the hover slideshow, so every product now ships up to
+ * three of these; [0] is what a static render shows.
+ */
+export interface CardImage {
+  url: string
+  alt: string
+}
+
 export interface Product {
   id: number
   category_id: number
@@ -69,7 +80,9 @@ export interface Product {
   slug: string
   name: string
   description: string
-  image_url: string
+  /** Hero first, photos only — the video never rides on a card (decision
+   *  #99, replacing the dropped products.image_url column). */
+  images: CardImage[]
   created_at: string
   variants: ProductVariant[]
   // '' when the product has no badge — the backend sends an empty string
@@ -124,6 +137,14 @@ export interface ProductImage {
   is_primary: boolean
 }
 
+/** The single video slot. No is_primary — the hero is always a photo (a DB
+ *  CHECK enforces it); alt is the clip's accessible label. */
+export interface ProductVideo {
+  id: number
+  url: string
+  alt: string
+}
+
 export interface ProductHighlight {
   text: string
 }
@@ -136,6 +157,8 @@ export interface ProductUsageCard {
 
 export interface ProductDetail extends Product {
   images: ProductImage[]
+  /** null when the product has no clip — one kind of absence, like ship_to. */
+  video: ProductVideo | null
   highlights: ProductHighlight[]
   usage_cards: ProductUsageCard[]
 
@@ -499,12 +522,14 @@ export interface NewVariantInput {
   stock_qty: number
 }
 
+// Neither write shape carries image_url anymore (decision #99): media enters
+// exclusively through the upload endpoints, and the backend now 400s on
+// unknown fields — so sending it would be an error, not a no-op.
 export interface NewProduct {
   category_id: number
   slug: string
   name: string
   description: string
-  image_url: string
   variants: NewVariantInput[]
   translations?: Record<string, ProductText>
 }
@@ -513,7 +538,6 @@ export interface UpdateProduct {
   category_id: number
   name: string
   description: string
-  image_url: string
   is_active: boolean
   translations?: Record<string, ProductText>
 

@@ -14,15 +14,19 @@ import (
 // is work nobody sees. The split is the whole reason `GET /products` and
 // `GET /products/{slug}` return different shapes.
 
-// attachImages loads the gallery, hero first.
+// attachImages loads the gallery (photos hero first) and the video slot.
 //
 // ORDER BY is_primary DESC first, then sort_order: the partial unique index
 // in 000011 guarantees at most one primary, so this puts the hero at index 0
-// without the caller having to search for it — while PrimaryImage() still
-// exists for the case where none is flagged.
+// without the caller having to search for it.
+//
+// One query for both kinds, split here in Go: the video is a product_images
+// row (migration 000026), but the two answer different rendering questions —
+// Images feeds <img> slots, Video a <video> tab — so the domain model keeps
+// them apart even though storage does not.
 func (s *Store) attachImages(ctx context.Context, p *domain.Product, locale domain.Locale) error {
 	rows, err := s.pool.Query(ctx, `
-		SELECT i.id, i.url, i.sort_order, i.is_primary,
+		SELECT i.id, i.url, i.sort_order, i.is_primary, i.kind,
 		       COALESCE(t.alt, en.alt, '')
 		FROM product_images i
 		LEFT JOIN product_image_translations t  ON t.image_id  = i.id AND t.locale  = $2
@@ -38,8 +42,14 @@ func (s *Store) attachImages(ctx context.Context, p *domain.Product, locale doma
 	p.Images = make([]domain.ProductImage, 0)
 	for rows.Next() {
 		var img domain.ProductImage
-		if err := rows.Scan(&img.ID, &img.URL, &img.SortOrder, &img.IsPrimary, &img.Alt); err != nil {
+		var kind string
+		if err := rows.Scan(&img.ID, &img.URL, &img.SortOrder, &img.IsPrimary, &kind, &img.Alt); err != nil {
 			return fmt.Errorf("scanning product image: %w", err)
+		}
+		if kind == "video" {
+			video := img
+			p.Video = &video
+			continue
 		}
 		p.Images = append(p.Images, img)
 	}
@@ -211,7 +221,7 @@ func (s *Store) productCards(ctx context.Context, view domain.View, tail string,
 		SELECT p.id, p.category_id, p.slug,
 		       ` + sqlProductName + `,
 		       ` + sqlProductDesc + `,
-		       p.image_url, p.is_active, p.created_at,
+		       p.is_active, p.created_at,
 		       COALESCE(p.badge, ''), p.badge_tone, p.sales_count,
 		       c.slug, ` + sqlCategoryName + `,
 		       p.rating_avg::float8, p.rating_count
@@ -234,7 +244,7 @@ func (s *Store) productCards(ctx context.Context, view domain.View, tail string,
 	for rows.Next() {
 		var p domain.Product
 		if err := rows.Scan(&p.ID, &p.CategoryID, &p.Slug, &p.Name, &p.Description,
-			&p.ImageURL, &p.IsActive, &p.CreatedAt,
+			&p.IsActive, &p.CreatedAt,
 			&p.Badge, &p.BadgeTone, &p.SalesCount,
 			&p.CategorySlug, &p.CategoryName,
 			&p.Rating.Average, &p.Rating.Count); err != nil {
@@ -246,11 +256,16 @@ func (s *Store) productCards(ctx context.Context, view domain.View, tail string,
 		return nil, fmt.Errorf("iterating product cards: %w", err)
 	}
 
-	// The card needs a price and a benefit line, exactly like the shop grid.
+	// The card needs a price, a benefit line and its photos, exactly like
+	// the shop grid — this shared tail is what keeps the wishlist's and the
+	// related panel's cards from drifting from it.
 	if err := s.attachVariants(ctx, products, view); err != nil {
 		return nil, err
 	}
 	if err := s.attachBenefits(ctx, products, locale); err != nil {
+		return nil, err
+	}
+	if err := s.attachCardImages(ctx, products, locale); err != nil {
 		return nil, err
 	}
 	return products, nil

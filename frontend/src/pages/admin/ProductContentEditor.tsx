@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   useAdminProducts,
   useDeleteProductImage,
@@ -8,7 +8,9 @@ import {
   useSaveProductImages,
   useSaveProductRelated,
   useUpdateProduct,
+  useUploadProductVideo,
 } from '../../api/hooks'
+import { useFieldErrors } from '../../i18n/useFieldErrors'
 import type {
   AdminProduct,
   EditorialInput,
@@ -64,6 +66,7 @@ export function ProductContentEditor({ product }: { product: AdminProduct }) {
 
       <MetadataEditor product={product} />
       <GalleryEditor product={product} />
+      <VideoEditor product={product} />
       <EditorialEditor product={product} />
       <RelatedEditor product={product} />
     </div>
@@ -157,7 +160,6 @@ function MetadataEditor({ product }: { product: AdminProduct }) {
               category_id: product.category_id,
               name: product.name,
               description: product.description,
-              image_url: product.image_url,
               is_active: product.is_active,
               ...current,
             },
@@ -256,6 +258,92 @@ function GalleryEditor({ product }: { product: AdminProduct }) {
         ))}
       </ul>
       {save.isError && <p className="text-sm text-red-600">Could not save the gallery.</p>}
+    </section>
+  )
+}
+
+// --- Video -------------------------------------------------------------
+
+/**
+ * The single video slot (decision #99). One slot means the two states are
+ * "empty → upload" and "filled → preview + delete"; there is no reorder, no
+ * hero flag, no per-slot list. Replacing is delete-then-upload through the
+ * SAME delete mutation the photos use, because the video is a gallery row
+ * with kind='video' — one less endpoint, one less cache to invalidate.
+ *
+ * Exported for its test: the parent editor only renders behind useProduct,
+ * and the section's two states are worth asserting in isolation.
+ */
+export function VideoEditor({ product }: { product: AdminProduct }) {
+  const detail = useProduct(product.slug)
+  const upload = useUploadProductVideo()
+  const remove = useDeleteProductImage()
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Upload failures (too large, wrong type, slot taken) are whole-request
+  // errors — same shape as the photo slot's.
+  const { formError } = useFieldErrors(upload.error)
+
+  if (!detail.data) return null
+  const video = detail.data.video
+
+  return (
+    <section className="space-y-2">
+      <h5 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Video</h5>
+
+      {video ? (
+        <div className="flex items-center gap-3 rounded-lg bg-white p-2">
+          {/* preload="metadata": the admin sees the first frame and the
+              duration without the browser pulling the whole clip into a
+              list that may show six of these. */}
+          <video
+            src={video.url}
+            preload="metadata"
+            muted
+            controls
+            className="h-24 rounded"
+            aria-label={video.alt || 'Product video'}
+          />
+          <p className="text-xs text-stone-400">
+            Shown as the last gallery tab on the product page. To replace it,
+            delete it and upload another.
+          </p>
+          <button
+            type="button"
+            disabled={remove.isPending}
+            onClick={() => remove.mutate({ productId: product.id, imageId: video.id })}
+            className="ml-auto text-sm text-red-600 hover:underline disabled:opacity-50"
+          >
+            delete video
+          </button>
+        </div>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={upload.isPending}
+            className="rounded-lg border border-dashed border-stone-300 px-4 py-2 text-sm text-stone-500 hover:border-emerald-600 disabled:opacity-50"
+          >
+            {upload.isPending ? 'Uploading…' : '+ 🎬 upload video (MP4/WebM, max 50 MB)'}
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="video/mp4,video/webm"
+            className="hidden"
+            data-testid="video-file-input"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) upload.mutate({ id: product.id, file })
+              e.target.value = '' // same file can be re-picked later
+            }}
+          />
+        </>
+      )}
+
+      {formError && <p className="text-sm text-red-600">{formError}</p>}
+      {remove.isError && <p className="text-sm text-red-600">Could not delete the video.</p>}
     </section>
   )
 }

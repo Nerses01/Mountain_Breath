@@ -22,7 +22,7 @@ function entry(over: Partial<WishlistEntry> = {}): WishlistEntry {
     slug: 'royal-jelly',
     name: 'Fresh Royal Jelly',
     description: '',
-    image_url: '',
+    images: [],
     created_at: '2026-08-01T00:00:00Z',
     variants: [
       { id: 9, sku: 'RJ-50', label: '50 g jar', stock_qty: 4, price_minor: 5800, prices: { USD: 5800 } },

@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -123,6 +124,150 @@ func TestProductImages_OnePrimaryPerProduct(t *testing.T) {
 	imgs := imageState(t, honey)
 	if len(imgs) != 2 || imgs[0].ID != second.ID || !imgs[0].IsPrimary || imgs[1].IsPrimary {
 		t.Errorf("after reorder: %+v", imgs)
+	}
+}
+
+// The photo cap is a count the database cannot express declaratively, so it
+// lives in AddProductImage's transaction — and gets tested like a constraint
+// would be: by pushing past it.
+func TestProductImages_CapAtThree(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test (needs Docker)")
+	}
+	resetDB(t)
+	seedHive(t)
+	s := store.New(testPool)
+	ctx := context.Background()
+
+	honey := productIDBySlug(t, "honey")
+
+	for i := 0; i < domain.MaxGalleryImages; i++ {
+		if _, err := s.AddProductImage(ctx, honey, "/uploads/a.jpg", nil); err != nil {
+			t.Fatalf("image %d within the cap: %v", i+1, err)
+		}
+	}
+	if _, err := s.AddProductImage(ctx, honey, "/uploads/d.jpg", nil); !errors.Is(err, domain.ErrGalleryFull) {
+		t.Errorf("4th image: got %v, want ErrGalleryFull", err)
+	}
+
+	// The video occupies its own slot — it must not eat a photo's place.
+	wax := productIDBySlug(t, "wax")
+	if _, err := s.AddProductVideo(ctx, wax, "/uploads/w.mp4"); err != nil {
+		t.Fatalf("AddProductVideo: %v", err)
+	}
+	for i := 0; i < domain.MaxGalleryImages; i++ {
+		if _, err := s.AddProductImage(ctx, wax, "/uploads/b.jpg", nil); err != nil {
+			t.Fatalf("image %d beside a video: %v", i+1, err)
+		}
+	}
+
+	// Deleting a photo reopens the slot — the cap counts rows, not history.
+	imgs := imageState(t, honey)
+	if err := s.DeleteProductImage(ctx, honey, imgs[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddProductImage(ctx, honey, "/uploads/e.jpg", nil); err != nil {
+		t.Errorf("re-adding after a delete: %v", err)
+	}
+}
+
+func TestProductVideo_SinglePerProduct(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test (needs Docker)")
+	}
+	resetDB(t)
+	seedHive(t)
+	s := store.New(testPool)
+	ctx := context.Background()
+
+	honey := productIDBySlug(t, "honey")
+
+	video, err := s.AddProductVideo(ctx, honey, "/uploads/v.mp4")
+	if err != nil {
+		t.Fatalf("AddProductVideo: %v", err)
+	}
+	if _, err := s.AddProductVideo(ctx, honey, "/uploads/v2.mp4"); !errors.Is(err, domain.ErrVideoExists) {
+		t.Errorf("second video: got %v, want ErrVideoExists", err)
+	}
+	// Replacing means delete-then-upload, through the same DELETE route
+	// photos use — the video is an image row on purpose.
+	if err := s.DeleteProductImage(ctx, honey, video.ID); err != nil {
+		t.Fatalf("deleting the video: %v", err)
+	}
+	if _, err := s.AddProductVideo(ctx, honey, "/uploads/v3.mp4"); err != nil {
+		t.Errorf("re-adding after delete: %v", err)
+	}
+
+	// A missing product is a 404, not a 500.
+	if _, err := s.AddProductVideo(ctx, 99999, "/uploads/v.mp4"); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("unknown product: got %v, want ErrNotFound", err)
+	}
+
+	// The detail read hands the video to its own field: Images feeds <img>
+	// slots, Video a <video> tab, and mixing them would put an .mp4 in an
+	// <img> on every consumer that renders the array blindly.
+	if _, err := s.AddProductImage(ctx, honey, "/uploads/a.jpg", nil); err != nil {
+		t.Fatal(err)
+	}
+	detail, err := s.GetProductBySlug(ctx, "honey", domain.View{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.Video == nil || detail.Video.URL != "/uploads/v3.mp4" {
+		t.Errorf("Video = %+v, want the uploaded clip", detail.Video)
+	}
+	if len(detail.Images) != 1 || detail.Images[0].URL != "/uploads/a.jpg" {
+		t.Errorf("Images = %+v — the video must not appear among the photos", detail.Images)
+	}
+}
+
+// The video must never become the hero: not on upload (constraint), not by
+// promotion when the last photo-hero is deleted (the store's WHERE), and a
+// product whose first PHOTO arrives after the video still auto-heroes it.
+func TestProductVideo_NeverPromotedToHero(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test (needs Docker)")
+	}
+	resetDB(t)
+	seedHive(t)
+	s := store.New(testPool)
+	ctx := context.Background()
+
+	honey := productIDBySlug(t, "honey")
+
+	if _, err := s.AddProductVideo(ctx, honey, "/uploads/v.mp4"); err != nil {
+		t.Fatal(err)
+	}
+	// The video is already there; the first photo must still become primary
+	// (the auto-hero count filters on kind).
+	photo, err := s.AddProductImage(ctx, honey, "/uploads/a.jpg", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !photo.IsPrimary {
+		t.Error("first photo beside an existing video should still auto-hero")
+	}
+
+	// Deleting the only photo: the promotion must SKIP the video and leave
+	// the product hero-less rather than 500 on the video-not-primary CHECK.
+	if err := s.DeleteProductImage(ctx, honey, photo.ID); err != nil {
+		t.Fatalf("deleting the hero beside a video: %v", err)
+	}
+	var primaries int
+	if err := testPool.QueryRow(ctx,
+		`SELECT count(*) FROM product_images WHERE product_id = $1 AND is_primary`,
+		honey).Scan(&primaries); err != nil {
+		t.Fatal(err)
+	}
+	if primaries != 0 {
+		t.Errorf("got %d primary rows, want 0 — the video must not be promoted", primaries)
+	}
+
+	// Belt and braces: the CHECK itself rejects a direct flag write.
+	if _, err := testPool.Exec(ctx, `
+		UPDATE product_images SET is_primary = TRUE
+		WHERE product_id = $1 AND kind = 'video'`, honey); err == nil {
+		t.Error("the database accepted a primary video; the CHECK is not doing its job")
 	}
 }
 
@@ -354,7 +499,9 @@ func TestSaveProductRelated_DropsSelfReferences(t *testing.T) {
 }
 
 // The listing must NOT pay for editorial content — the split is the reason
-// the two endpoints exist.
+// the two endpoints exist. Photos are the exception since decision #99: the
+// card's hover slideshow renders every photo, so the list attaches them
+// (thin: url+alt), while bullets and usage cards stay detail-only.
 func TestListProducts_LeavesEditorialEmpty(t *testing.T) {
 	if testing.Short() {
 		t.Skip("integration test (needs Docker)")
@@ -383,8 +530,14 @@ func TestListProducts_LeavesEditorialEmpty(t *testing.T) {
 	if len(list) != 1 {
 		t.Fatalf("got %d products", len(list))
 	}
-	if len(list[0].Images) != 0 || len(list[0].Highlights) != 0 || len(list[0].UsageCards) != 0 {
+	if len(list[0].Highlights) != 0 || len(list[0].UsageCards) != 0 {
 		t.Errorf("the listing loaded editorial content it does not render: %+v", list[0])
+	}
+	if len(list[0].Images) != 1 || list[0].Images[0].URL != "/uploads/a.jpg" {
+		t.Errorf("the listing should carry the card's photos: %+v", list[0].Images)
+	}
+	if list[0].Video != nil {
+		t.Error("the listing loaded the video, which no card plays")
 	}
 
 	// ...while the detail read does load it.

@@ -170,6 +170,7 @@ export const en = {
     gallery: {
       label: 'Product images',
       image: 'Image {{n}}',
+      video: 'Product video',
     },
     meta: {
       harvest: 'Harvest',

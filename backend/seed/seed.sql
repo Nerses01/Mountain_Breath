@@ -583,6 +583,58 @@ JOIN products src ON src.slug = v.product_slug
 JOIN products dst ON dst.slug = v.related_slug
 ON CONFLICT (product_id, related_id) DO UPDATE SET sort_order = EXCLUDED.sort_order;
 
+-- ── Card galleries (decision #99: the hover slideshow) ────────────────────
+-- Three products get multi-photo galleries so dev and Playwright can see the
+-- cards cycle; the other three stay empty on purpose — the hatched
+-- placeholder is a state the storefront must keep rendering well.
+--
+-- The "photos" are inline SVG data URIs: solid color swatches that render in
+-- any <img> with no files on disk and no binary blobs in git. Distinct fills
+-- per position, so a cycling card VISIBLY changes — which is exactly what an
+-- e2e assertion needs to see. No seeded video: a data-URI video is
+-- impractical, and the video path is exercised through the admin upload.
+--
+-- Seed OWNS these three galleries (same delete-and-reinsert convention as
+-- every section above), so re-running it replaces admin experiments on these
+-- products. The three-photo cap is a store rule for NEW uploads; these
+-- inserts stay within it anyway.
+DELETE FROM product_images
+WHERE kind = 'image'
+  AND product_id IN (SELECT id FROM products WHERE slug IN
+      ('mountain-wildflower-honey', 'fresh-royal-jelly', 'bee-pollen-granules'));
+
+INSERT INTO product_images (product_id, url, sort_order, is_primary)
+SELECT p.id, v.url, v.sort_order, v.is_primary
+FROM (VALUES
+    ('mountain-wildflower-honey', 0, TRUE,
+     'data:image/svg+xml,%3Csvg xmlns=''http://www.w3.org/2000/svg'' viewBox=''0 0 4 3''%3E%3Crect width=''4'' height=''3'' fill=''%23d9a441''/%3E%3C/svg%3E'),
+    ('mountain-wildflower-honey', 1, FALSE,
+     'data:image/svg+xml,%3Csvg xmlns=''http://www.w3.org/2000/svg'' viewBox=''0 0 4 3''%3E%3Crect width=''4'' height=''3'' fill=''%23b97a2a''/%3E%3C/svg%3E'),
+    ('mountain-wildflower-honey', 2, FALSE,
+     'data:image/svg+xml,%3Csvg xmlns=''http://www.w3.org/2000/svg'' viewBox=''0 0 4 3''%3E%3Crect width=''4'' height=''3'' fill=''%23854d1e''/%3E%3C/svg%3E'),
+    ('fresh-royal-jelly', 0, TRUE,
+     'data:image/svg+xml,%3Csvg xmlns=''http://www.w3.org/2000/svg'' viewBox=''0 0 4 3''%3E%3Crect width=''4'' height=''3'' fill=''%23f2e6c9''/%3E%3C/svg%3E'),
+    ('fresh-royal-jelly', 1, FALSE,
+     'data:image/svg+xml,%3Csvg xmlns=''http://www.w3.org/2000/svg'' viewBox=''0 0 4 3''%3E%3Crect width=''4'' height=''3'' fill=''%23dcc891''/%3E%3C/svg%3E'),
+    ('bee-pollen-granules', 0, TRUE,
+     'data:image/svg+xml,%3Csvg xmlns=''http://www.w3.org/2000/svg'' viewBox=''0 0 4 3''%3E%3Crect width=''4'' height=''3'' fill=''%23e8b53a''/%3E%3C/svg%3E'),
+    ('bee-pollen-granules', 1, FALSE,
+     'data:image/svg+xml,%3Csvg xmlns=''http://www.w3.org/2000/svg'' viewBox=''0 0 4 3''%3E%3Crect width=''4'' height=''3'' fill=''%23c99722''/%3E%3C/svg%3E')
+) AS v(product_slug, sort_order, is_primary, url)
+JOIN products p ON p.slug = v.product_slug;
+
+-- Alt text: the product's own name per locale, the same rule as migration
+-- 000011's backfill — no better description exists for a swatch, and an
+-- empty alt would tell a screen reader the product photo is decorative.
+INSERT INTO product_image_translations (image_id, locale, alt)
+SELECT i.id, t.locale, t.name
+FROM product_images i
+JOIN product_translations t ON t.product_id = i.product_id
+WHERE i.kind = 'image'
+  AND i.product_id IN (SELECT id FROM products WHERE slug IN
+      ('mountain-wildflower-honey', 'fresh-royal-jelly', 'bee-pollen-granules'))
+ON CONFLICT (image_id, locale) DO UPDATE SET alt = EXCLUDED.alt;
+
 -- ══════════════════════════════════════════════════════════════════════════
 -- E4: reviews
 -- ══════════════════════════════════════════════════════════════════════════

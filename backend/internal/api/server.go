@@ -60,11 +60,13 @@ type ProductStore interface {
 	CreateProduct(ctx context.Context, p *domain.Product) error
 	UpdateProduct(ctx context.Context, p *domain.Product) error
 	UpdateVariant(ctx context.Context, variantID int64, prices domain.Money, stockQty int) error
-	UpdateProductImage(ctx context.Context, productID int64, imageURL string) error
 
 	// E3 editorial writes. Collections are replaced wholesale — see the note
 	// at the top of store/products_admin_detail.go for why.
 	AddProductImage(ctx context.Context, productID int64, url string, alts map[domain.Locale]string) (domain.ProductImage, error)
+	// The single video slot (migration 000026). Deleting goes through
+	// DeleteProductImage — the video IS a product_images row.
+	AddProductVideo(ctx context.Context, productID int64, url string) (domain.ProductImage, error)
 	SaveProductImages(ctx context.Context, productID int64, images []domain.ProductImage, alts map[int64]map[domain.Locale]string) error
 	DeleteProductImage(ctx context.Context, productID, imageID int64) error
 	SaveProductEditorial(ctx context.Context, productID int64, byLocale map[domain.Locale]domain.ProductEditorial) error
@@ -447,6 +449,8 @@ func (s *Server) Routes() chi.Router {
 			r.Post("/products", s.handleCreateProduct)
 			r.Put("/products/{id}", s.handleUpdateProduct)
 			r.Post("/products/{id}/image", s.handleUploadProductImage)
+			// The single video slot; its delete is the images route below.
+			r.Post("/products/{id}/video", s.handleUploadProductVideo)
 			r.Patch("/variants/{id}", s.handleUpdateVariant)
 
 			// E3: the editorial half of a product page.

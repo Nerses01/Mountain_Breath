@@ -443,6 +443,16 @@ export const api = {
       body: form,
     })
   },
+  // The single video slot. Replacing = deleteProductImage(video.id) first —
+  // the video is a gallery row, so the delete route is shared with photos.
+  uploadProductVideo: (id: number, file: File) => {
+    const form = new FormData()
+    form.append('video', file)
+    return request<{ video_url: string; video_id: number }>(
+      `/api/v1/admin/products/${id}/video`,
+      { method: 'POST', body: form },
+    )
+  },
   updateOrderStatus: (orderId: number, status: OrderStatus) =>
     request<Order>(`/api/v1/admin/orders/${orderId}/status`, {
       method: 'PATCH',

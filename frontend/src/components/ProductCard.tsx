@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import type { Product } from '../api/types'
 import { useAddToCartFlash } from '../lib/useAddToCartFlash'
+import { useHoverSlideshow } from '../lib/useHoverSlideshow'
 import { useLocale } from '../i18n/useLocale'
 import { Price } from './ui/Price'
 import { cx } from '../lib/cx'
@@ -55,6 +56,12 @@ export function ProductCard({
   // one hook, so the confirmation behaviour cannot drift between grids.
   const { addedQty, handleAdd } = useAddToCartFlash(onAdd)
 
+  // Hovering the card cycles its photos (decision #99) — same shared-hook
+  // arrangement as the flash, and inert on touch screens, under
+  // prefers-reduced-motion, and for single-photo products.
+  const images = product.images
+  const slideshow = useHoverSlideshow(images.length)
+
   // Variants arrive sorted by price, so the first is the "from" price.
   const cheapest = product.variants[0]
   const hasChoice = product.variants.length > 1
@@ -63,6 +70,14 @@ export function ProductCard({
 
   return (
     <article
+      // The hover handlers live on the CARD, not the image slot: the
+      // stretched-link overlay (the ::after below) sits above the image, so
+      // pointer events over the photo actually target the anchor — a
+      // listener on the image div would never hear them. On the article,
+      // every descendant counts, overlay included. Found by the e2e test,
+      // which hovers with a real pointer.
+      onMouseEnter={slideshow.onMouseEnter}
+      onMouseLeave={slideshow.onMouseLeave}
       className={cx(
         'group relative flex h-full flex-col gap-3 rounded-xl bg-card',
         layout === 'feature' ? 'gap-3.5 p-5' : 'p-4.5',
@@ -74,13 +89,31 @@ export function ProductCard({
           layout === 'feature' ? 'h-52' : 'h-50',
         )}
       >
-        {product.image_url ? (
-          <img
-            src={product.image_url}
-            alt=""
-            className="size-full object-cover"
-            loading="lazy"
-          />
+        {images[0] ? (
+          slideshow.warm ? (
+            // After the first hover every photo is mounted, stacked, one
+            // visible — the browser fetches the hidden ones right then, so
+            // the cycle never shows a blank frame. Before it, the plain
+            // hero below keeps a twelve-card grid at twelve requests.
+            images.map((img, i) => (
+              <img
+                key={img.url}
+                src={img.url}
+                alt=""
+                className={cx(
+                  'absolute inset-0 size-full object-cover',
+                  i !== slideshow.index && 'invisible',
+                )}
+              />
+            ))
+          ) : (
+            <img
+              src={images[0].url}
+              alt=""
+              className="size-full object-cover"
+              loading="lazy"
+            />
+          )
         ) : (
           // The mock draws a hatched placeholder with the shot description in
           // it. Real products have no photos yet, so the slot keeps the
@@ -107,6 +140,30 @@ export function ProductCard({
         {/* E8: the heart is live — one shared component owns the state, so
             this card and the product page can never disagree about it. */}
         <WishlistHeart productId={product.id} className="absolute right-3 top-3 z-10" />
+
+        {/* Position dots, only while the slideshow runs. aria-hidden: purely
+            decorative — the photos are alt="" (the name sits right below),
+            so narrating "photo 2 of 3" would describe nothing. Nudged up
+            when the sold-out chip occupies the bottom edge. */}
+        {slideshow.cycling && (
+          <div
+            aria-hidden
+            className={cx(
+              'absolute inset-x-0 z-10 flex justify-center gap-1.5',
+              inStock ? 'bottom-2.5' : 'bottom-13',
+            )}
+          >
+            {images.map((img, i) => (
+              <span
+                key={img.url}
+                className={cx(
+                  'size-1.5 rounded-full transition',
+                  i === slideshow.index ? 'bg-bark' : 'bg-card/80',
+                )}
+              />
+            ))}
+          </div>
+        )}
 
         {!inStock && (
           <span className="absolute inset-x-3 bottom-3 rounded-full bg-bark/90 px-3 py-1.5 text-center text-2xs font-semibold uppercase tracking-label text-ink-on-dark">

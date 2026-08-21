@@ -19,7 +19,9 @@ import (
 // transaction is simpler than diffing, and — because it is one transaction —
 // there is no moment where the product has half its bullets.
 
-// AddProductImage appends an upload to a product's gallery.
+// AddProductImage appends an upload to a product's gallery, refusing the
+// append with domain.ErrGalleryFull once the product holds MaxGalleryImages
+// photos.
 //
 // The first image a product ever gets becomes its primary automatically. A
 // gallery whose hero is unset renders nothing where the design's 520px hero
@@ -32,23 +34,46 @@ func (s *Store) AddProductImage(ctx context.Context, productID int64, url string
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// Lock the product row first. The cap below is a count-then-insert, and
+	// a count is only as good as what other transactions are doing while it
+	// runs: two concurrent uploads could each count 2 and both insert a 3rd.
+	// FOR UPDATE serializes them on the parent row — the same move the
+	// checkout makes on variant rows before decrementing stock. It also
+	// answers "no such product" here, so the FK can no longer fire below.
+	var exists bool
+	err = tx.QueryRow(ctx,
+		`SELECT true FROM products WHERE id = $1 FOR UPDATE`, productID).Scan(&exists)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ProductImage{}, domain.ErrNotFound
+		}
+		return domain.ProductImage{}, fmt.Errorf("locking product: %w", err)
+	}
+
 	var img domain.ProductImage
 	img.URL = url
 	err = tx.QueryRow(ctx, `
 		INSERT INTO product_images (product_id, url, sort_order, is_primary)
 		SELECT $1, $2,
 		       COALESCE(max(sort_order) + 1, 0),
-		       -- No rows yet ⇒ this one is the hero. count(*) over the same
-		       -- filtered set the max comes from, so both read one scan.
+		       -- No photos yet ⇒ this one is the hero. count(*) over the same
+		       -- filtered set the max comes from, so both read one scan. The
+		       -- kind filter matters twice here: a lone video must not
+		       -- suppress auto-hero on the first photo, and must not count
+		       -- toward the photo cap.
 		       count(*) = 0
-		FROM product_images WHERE product_id = $1
+		FROM product_images WHERE product_id = $1 AND kind = 'image'
+		-- An aggregate over zero rows still yields one row (count 0), so the
+		-- empty gallery passes. HAVING filters AFTER aggregation — a plain
+		-- WHERE could not look at the count.
+		HAVING count(*) < $3
 		RETURNING id, sort_order, is_primary`,
-		productID, url,
+		productID, url, domain.MaxGalleryImages,
 	).Scan(&img.ID, &img.SortOrder, &img.IsPrimary)
 	if err != nil {
-		var pgErr interface{ SQLState() string }
-		if errors.As(err, &pgErr) && pgErr.SQLState() == foreignKeyViolation {
-			return domain.ProductImage{}, domain.ErrNotFound
+		// No row returned = the HAVING swallowed the insert: gallery full.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ProductImage{}, domain.ErrGalleryFull
 		}
 		return domain.ProductImage{}, fmt.Errorf("inserting product image: %w", err)
 	}
@@ -58,6 +83,39 @@ func (s *Store) AddProductImage(ctx context.Context, productID int64, url string
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return domain.ProductImage{}, fmt.Errorf("committing add-image: %w", err)
+	}
+	return img, nil
+}
+
+// AddProductVideo fills the product's single video slot (migration 000026).
+//
+// One INSERT, no transaction: the "at most one video" rule lives in the
+// partial unique index, so the racy version of this function does not exist
+// — a second concurrent insert simply loses and surfaces ErrVideoExists.
+// Compare AddProductImage, whose cap is a count the database cannot enforce
+// declaratively and therefore needs the lock-then-count transaction.
+func (s *Store) AddProductVideo(ctx context.Context, productID int64, url string) (domain.ProductImage, error) {
+	img := domain.ProductImage{URL: url}
+	err := s.pool.QueryRow(ctx, `
+		INSERT INTO product_images (product_id, url, sort_order, is_primary, kind)
+		VALUES ($1, $2, 0, FALSE, 'video')
+		RETURNING id`,
+		productID, url,
+	).Scan(&img.ID)
+	if err != nil {
+		var pgErr interface{ SQLState() string }
+		if errors.As(err, &pgErr) {
+			switch pgErr.SQLState() {
+			case foreignKeyViolation:
+				return domain.ProductImage{}, domain.ErrNotFound
+			// The only unique index this INSERT can trip is the one-video
+			// one: is_primary is FALSE (one-primary is out) and the id is
+			// generated (PK is out).
+			case uniqueViolation:
+				return domain.ProductImage{}, domain.ErrVideoExists
+			}
+		}
+		return domain.ProductImage{}, fmt.Errorf("inserting product video: %w", err)
 	}
 	return img, nil
 }
@@ -99,11 +157,15 @@ func (s *Store) SaveProductImages(ctx context.Context, productID int64, images [
 
 	for _, img := range images {
 		// WHERE product_id too, not just id: without it a caller could
-		// reorder another product's images by guessing an id.
+		// reorder another product's images by guessing an id. And kind:
+		// the video is not part of the reorderable photo gallery, so a
+		// client that smuggles the video's id into this array hits zero
+		// rows → ErrNotFound, instead of the video-not-primary CHECK
+		// answering with a 500-shaped constraint violation.
 		tag, err := tx.Exec(ctx, `
 			UPDATE product_images
 			SET sort_order = $1, is_primary = $2
-			WHERE id = $3 AND product_id = $4`,
+			WHERE id = $3 AND product_id = $4 AND kind = 'image'`,
 			img.SortOrder, img.IsPrimary, img.ID, productID)
 		if err != nil {
 			return fmt.Errorf("updating image %d: %w", img.ID, err)
@@ -147,13 +209,16 @@ func (s *Store) DeleteProductImage(ctx context.Context, productID, imageID int64
 	}
 
 	if wasPrimary {
-		// Promote the next one in gallery order. No-op when the product has
-		// no images left, which is a legitimate state.
+		// Promote the next PHOTO in gallery order. No-op when the product
+		// has none left, which is a legitimate state. The kind filter keeps
+		// the video out of the running: promoting it would trip the
+		// video-not-primary CHECK, and a hero that renders in an <img> slot
+		// must be a photo anyway.
 		if _, err := tx.Exec(ctx, `
 			UPDATE product_images SET is_primary = TRUE
 			WHERE id = (
 			    SELECT id FROM product_images
-			    WHERE product_id = $1
+			    WHERE product_id = $1 AND kind = 'image'
 			    ORDER BY sort_order, id
 			    LIMIT 1
 			)`, productID); err != nil {

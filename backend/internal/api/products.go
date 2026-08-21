@@ -42,15 +42,24 @@ type benefitResponse struct {
 	Name string `json:"name"`
 }
 
+// cardImageResponse is a photo as a CARD sees it: url and alt, nothing else.
+// Hero first by the store's ordering, so [0] is what a static card renders
+// and the rest exist for the hover slideshow. The video never rides here —
+// a grid hover must not start a multi-megabyte download.
+type cardImageResponse struct {
+	URL string `json:"url"`
+	Alt string `json:"alt"`
+}
+
 type productResponse struct {
-	ID          int64             `json:"id"`
-	CategoryID  int64             `json:"category_id"`
-	Slug        string            `json:"slug"`
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	ImageURL    string            `json:"image_url"`
-	CreatedAt   time.Time         `json:"created_at"`
-	Variants    []variantResponse `json:"variants"`
+	ID          int64               `json:"id"`
+	CategoryID  int64               `json:"category_id"`
+	Slug        string              `json:"slug"`
+	Name        string              `json:"name"`
+	Description string              `json:"description"`
+	Images      []cardImageResponse `json:"images"`
+	CreatedAt   time.Time           `json:"created_at"`
+	Variants    []variantResponse   `json:"variants"`
 
 	// The denormalized review aggregate (migration 000015). On the CARD as
 	// well as the detail, because the design puts ★★★★★ on both — which is
@@ -109,10 +118,23 @@ type usageCardResponse struct {
 	Body   string `json:"body"`
 }
 
+// videoResponse is the single video slot. No is_primary — the hero is
+// always a photo (a CHECK in 000026 enforces it) — and Alt is the clip's
+// accessible label, same translations table as a photo's alt.
+type videoResponse struct {
+	ID  int64  `json:"id"`
+	URL string `json:"url"`
+	Alt string `json:"alt"`
+}
+
 type productDetailResponse struct {
 	productResponse
 
-	Images     []imageResponse     `json:"images"`
+	Images []imageResponse `json:"images"`
+	// A pointer so an absent video serializes as JSON null rather than a
+	// zero-valued object the client would have to probe field by field —
+	// one kind of absence, same rule as ship_to on an order.
+	Video      *videoResponse      `json:"video"`
 	Highlights []highlightResponse `json:"highlights"`
 	UsageCards []usageCardResponse `json:"usage_cards"`
 
@@ -145,10 +167,15 @@ func toProductDetailResponse(p domain.Product, currency domain.Currency) product
 	for _, c := range p.UsageCards {
 		cards = append(cards, usageCardResponse{Kicker: c.Kicker, Title: c.Title, Body: c.Body})
 	}
+	var video *videoResponse
+	if p.Video != nil {
+		video = &videoResponse{ID: p.Video.ID, URL: p.Video.URL, Alt: p.Video.Alt}
+	}
 
 	return productDetailResponse{
 		productResponse: toProductResponse(p, currency),
 		Images:          images,
+		Video:           video,
 		Highlights:      highlights,
 		UsageCards:      cards,
 		Disclaimer:      p.Disclaimer,
@@ -182,9 +209,13 @@ func toProductResponse(p domain.Product, currency domain.Currency) productRespon
 	for _, b := range p.Benefits {
 		benefits = append(benefits, benefitResponse{Slug: b.Slug, Name: b.Name})
 	}
+	cardImages := make([]cardImageResponse, 0, len(p.Images))
+	for _, img := range p.Images {
+		cardImages = append(cardImages, cardImageResponse{URL: img.URL, Alt: img.Alt})
+	}
 	return productResponse{
 		ID: p.ID, CategoryID: p.CategoryID, Slug: p.Slug, Name: p.Name,
-		Description: p.Description, ImageURL: p.ImageURL,
+		Description: p.Description, Images: cardImages,
 		CreatedAt: p.CreatedAt, Variants: variants,
 		CategorySlug: p.CategorySlug, CategoryName: p.CategoryName,
 		RatingAvg: p.Rating.Average, RatingCount: p.Rating.Count,

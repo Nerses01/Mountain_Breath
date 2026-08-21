@@ -1,13 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Gallery } from './Gallery'
-import type { ProductImage } from '../../api/types'
+import type { ProductImage, ProductVideo } from '../../api/types'
 
 const images: ProductImage[] = [
   { id: 1, url: '/uploads/a.jpg', alt: 'A jar of royal jelly', is_primary: true },
   { id: 2, url: '/uploads/b.jpg', alt: 'The texture, close up', is_primary: false },
   { id: 3, url: '/uploads/c.jpg', alt: 'The jar in a hand', is_primary: false },
 ]
+
+const video: ProductVideo = { id: 9, url: '/uploads/clip.mp4', alt: 'Harvest clip' }
 
 const tabs = () => screen.getAllByRole('tab')
 const strip = () => screen.getByRole('tablist')
@@ -108,5 +110,54 @@ describe('Gallery', () => {
     // A tablist of one is navigation with nowhere to go.
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
     expect(screen.getByAltText('A jar of royal jelly')).toBeVisible()
+  })
+
+  // ── The video tab (decision #99) ───────────────────────────────────────
+
+  it('renders the video as the LAST tab, reachable by keyboard', () => {
+    render(<Gallery images={images} video={video} productName="Fresh Royal Jelly" />)
+
+    // Same strip, one more tab — the keyboard contract covers it for free.
+    expect(tabs()).toHaveLength(4)
+    expect(tabs()[3]).toHaveTextContent('Harvest clip')
+
+    fireEvent.keyDown(strip(), { key: 'End' })
+    expect(tabs()[3]).toHaveAttribute('aria-selected', 'true')
+
+    const clip = document.querySelector('video')
+    expect(clip).toHaveAttribute('src', '/uploads/clip.mp4')
+    // The polite defaults: nothing plays or sounds until the visitor asks.
+    expect(clip).toHaveAttribute('controls')
+    expect(clip).toHaveProperty('muted', true)
+    expect(clip).not.toHaveAttribute('autoplay')
+  })
+
+  it('pauses a playing video when another tab is selected', () => {
+    // jsdom has no media pipeline: `paused` is forced to false to simulate
+    // a clip mid-playback, and pause() is spied both to assert and to keep
+    // "Not implemented" noise out of the run.
+    const playing = vi
+      .spyOn(HTMLMediaElement.prototype, 'paused', 'get')
+      .mockReturnValue(false)
+    const pause = vi
+      .spyOn(HTMLMediaElement.prototype, 'pause')
+      .mockImplementation(() => {})
+    render(<Gallery images={images} video={video} productName="Fresh Royal Jelly" />)
+
+    fireEvent.keyDown(strip(), { key: 'End' }) // onto the video
+    pause.mockClear()
+    fireEvent.keyDown(strip(), { key: 'Home' }) // away from it
+
+    // Sound and motion from a hidden panel is a bug in any language.
+    expect(pause).toHaveBeenCalled()
+    pause.mockRestore()
+    playing.mockRestore()
+  })
+
+  it('a lone video renders without a thumbnail strip', () => {
+    render(<Gallery images={[]} video={video} productName="Fresh Royal Jelly" />)
+
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(document.querySelector('video')).toHaveAttribute('src', '/uploads/clip.mp4')
   })
 })

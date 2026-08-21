@@ -226,7 +226,7 @@ func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]dom
 		SELECT p.id, p.category_id, p.slug,
 		       ` + sqlProductName + ` AS display_name,
 		       ` + sqlProductDesc + `,
-		       p.image_url, p.is_active, p.created_at,
+		       p.is_active, p.created_at,
 		       COALESCE(p.badge, ''), p.badge_tone, p.sales_count,
 		       c.slug, ` + sqlCategoryName + `,
 		       p.rating_avg::float8, p.rating_count
@@ -246,7 +246,7 @@ func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]dom
 	for rows.Next() {
 		var p domain.Product
 		if err := rows.Scan(&p.ID, &p.CategoryID, &p.Slug, &p.Name, &p.Description,
-			&p.ImageURL, &p.IsActive, &p.CreatedAt,
+			&p.IsActive, &p.CreatedAt,
 			&p.Badge, &p.BadgeTone, &p.SalesCount,
 			&p.CategorySlug, &p.CategoryName,
 			&p.Rating.Average, &p.Rating.Count); err != nil {
@@ -262,6 +262,12 @@ func (s *Store) ListProducts(ctx context.Context, f domain.ProductFilter) ([]dom
 		return nil, 0, err
 	}
 	if err := s.attachBenefits(ctx, products, f.EffectiveLocale()); err != nil {
+		return nil, 0, err
+	}
+	// The photos ride on the LIST since the hover slideshow (feature #99) —
+	// unlike highlights/usage cards, which stay detail-only, a card renders
+	// every photo it has.
+	if err := s.attachCardImages(ctx, products, f.EffectiveLocale()); err != nil {
 		return nil, 0, err
 	}
 
@@ -312,7 +318,7 @@ func (s *Store) GetProductBySlug(ctx context.Context, slug string, view domain.V
 		SELECT p.id, p.category_id, p.slug,
 		       `+sqlProductName+`,
 		       `+sqlProductDesc+`,
-		       p.image_url, p.is_active, p.created_at,
+		       p.is_active, p.created_at,
 		       COALESCE(p.badge, ''), p.badge_tone, p.sales_count,
 		       c.slug, `+sqlCategoryName+`,
 		       p.rating_avg::float8, p.rating_count,
@@ -330,7 +336,7 @@ func (s *Store) GetProductBySlug(ctx context.Context, slug string, view domain.V
 		WHERE p.slug = $1 AND p.is_active`,
 		slug, locale,
 	).Scan(&p.ID, &p.CategoryID, &p.Slug, &p.Name, &p.Description,
-		&p.ImageURL, &p.IsActive, &p.CreatedAt,
+		&p.IsActive, &p.CreatedAt,
 		&p.Badge, &p.BadgeTone, &p.SalesCount,
 		&p.CategorySlug, &p.CategoryName,
 		&p.Rating.Average, &p.Rating.Count,
@@ -501,6 +507,52 @@ func (s *Store) attachBenefits(ctx context.Context, products []domain.Product, l
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("iterating product benefit rows: %w", err)
+	}
+	return nil
+}
+
+// attachCardImages loads every product's PHOTOS in one ANY($1) query — the
+// same N+1 avoidance as attachVariants. This is the CARD's slice: url and
+// alt only, hero first, because the grid's hover slideshow needs every photo
+// but nothing else about them. The video is excluded by kind — a card never
+// downloads a clip. The detail read keeps its richer attachImages.
+func (s *Store) attachCardImages(ctx context.Context, products []domain.Product, locale domain.Locale) error {
+	if len(products) == 0 {
+		return nil
+	}
+
+	ids := make([]int64, len(products))
+	byID := make(map[int64]*domain.Product, len(products))
+	for i := range products {
+		ids[i] = products[i].ID
+		byID[products[i].ID] = &products[i]
+		products[i].Images = make([]domain.ProductImage, 0)
+	}
+
+	rows, err := s.pool.Query(ctx, `
+		SELECT i.product_id, i.url, COALESCE(t.alt, en.alt, '')
+		FROM product_images i
+		LEFT JOIN product_image_translations t  ON t.image_id  = i.id AND t.locale  = $2
+		LEFT JOIN product_image_translations en ON en.image_id = i.id AND en.locale = 'en'
+		WHERE i.product_id = ANY($1) AND i.kind = 'image'
+		ORDER BY i.product_id, i.is_primary DESC, i.sort_order, i.id`,
+		ids, locale)
+	if err != nil {
+		return fmt.Errorf("querying card images: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var productID int64
+		var img domain.ProductImage
+		if err := rows.Scan(&productID, &img.URL, &img.Alt); err != nil {
+			return fmt.Errorf("scanning card image row: %w", err)
+		}
+		p := byID[productID]
+		p.Images = append(p.Images, img)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterating card image rows: %w", err)
 	}
 	return nil
 }

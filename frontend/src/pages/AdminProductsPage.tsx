@@ -114,7 +114,6 @@ function CreateProductForm() {
       slug,
       name,
       description,
-      image_url: '',
       variants: variants.map(
         (v): NewVariantInput => ({
           sku: v.sku,
@@ -283,7 +282,6 @@ function ProductRow({ product }: { product: AdminProduct }) {
         category_id: product.category_id,
         name: product.name,
         description: product.description,
-        image_url: product.image_url,
         is_active: !product.is_active,
       },
     })
@@ -400,17 +398,24 @@ function ImageSlot({ product }: { product: AdminProduct }) {
   // than per-field ones, so only formError applies here.
   const { formError } = useFieldErrors(upload.error)
 
+  // The hero is images[0] — the API orders the gallery hero-first. Uploads
+  // APPEND; at three photos the server would answer 409 gallery_full, so the
+  // button says so up front instead of letting the admin pick a file the
+  // request is guaranteed to refuse.
+  const hero = product.images[0]
+  const full = product.images.length >= 3
+
   return (
     <div className="flex flex-col items-center">
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        disabled={upload.isPending}
-        title={product.image_url ? 'Replace photo' : 'Add photo'}
+        disabled={upload.isPending || full}
+        title={full ? 'Gallery full (3 photos max) — delete one in the content editor' : 'Add photo'}
         className="h-14 w-14 overflow-hidden rounded-lg border border-dashed border-stone-300 bg-stone-50 text-xs text-stone-400 hover:border-emerald-600 disabled:opacity-50"
       >
-        {product.image_url ? (
-          <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
+        {hero ? (
+          <img src={hero.url} alt={product.name} className="h-full w-full object-cover" />
         ) : upload.isPending ? (
           '…'
         ) : (

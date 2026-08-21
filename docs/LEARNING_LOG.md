@@ -17,7 +17,64 @@ Template for an entry:
 
 ---
 
-## 2026-08-19 — Phase F3 opens: the hero's first real image
+## 2026-08-20 — Product media: 3 photos + a video, and the hover slideshow (decision #99)
+
+**Worked on:** every product can now hold up to three photos and one short
+video. The video is a `product_images` row with a new `kind` column
+(migration 000026) — same upload/delete/alt machinery as photos, different
+constraints: a partial unique index caps it at one per product, a CHECK
+keeps it from ever being the hero. The photo cap lives in the store's
+`AddProductImage` transaction under a `FOR UPDATE` lock. A new
+`POST /admin/products/{id}/video` endpoint (50 MB, MP4/WebM, sniffed);
+`VideoEditor` in the admin content editor; the video as the gallery's last
+tab (pausing on switch-away). Cards on the shop grid, home page, related
+panel and wishlist now carry `images: [{url, alt}]` and cycle their photos
+under the cursor via a shared `useHoverSlideshow` hook — inert on touch,
+under `prefers-reduced-motion`, and for single-photo products. Migration
+000027 finally dropped `products.image_url`. Seeded three products with
+SVG-data-URI galleries so dev and Playwright have something to cycle.
+
+**Learned:**
+- *Tagged rows vs a second table* — SQL's version of a tagged union: one
+  table, a `kind` discriminator, and per-tag CHECK constraints. Chosen here
+  because the video's row shape is a photo's row shape; only the RULES
+  differ, and rules are what constraints are for. The reward was concrete:
+  the delete endpoint, the alt translations and the cascade worked for the
+  video with zero new code.
+- *What the DB can declare vs what it can only witness* — "at most one
+  video" is a partial unique index; "at most three photos" is a COUNT, and
+  a count can only be made true under a lock (`SELECT … FOR UPDATE`, then
+  `INSERT … SELECT … HAVING count(*) < 3`). Same shape as checkout's
+  oversell defence and #96's last-admin rule: the third time this lesson
+  has appeared, each time wearing a different table.
+- *Adding a constraint means auditing old writers* — the video-not-primary
+  CHECK turned two existing store paths into latent 500s: hero-promotion
+  on delete would have promoted the video, and the reorder UPDATE would
+  have let a client flag it primary. A constraint is not "added"; it is
+  added AGAINST every query that touches the table.
+- *Go's MP4 sniffing is brand-narrow* — `http.DetectContentType` says
+  `video/mp4` only for `ftyp` brands starting `mp4`; phone-recorded files
+  are `isom`/`avc1` and sniff as `application/octet-stream`. The fix is a
+  12-byte container check, and a test that would have caught the rejection
+  of every real-world upload.
+- *`matchMedia` as a capability gate* — `(hover: hover) and (pointer:
+  fine)` is the honest "does this device have a cursor?" question; on
+  touch, a tap fires `mouseenter` with no leave ever coming. Checking at
+  hover time instead of mount means an OS toggle is honoured without
+  listeners.
+- *The e2e caught what jsdom could not* — the stretched-link overlay
+  (`::after` covering the card) is the real hit target over the photo, so
+  hover handlers on the image container never fire in a browser; jsdom's
+  synthetic events happily lied about it. Handlers moved to the `<article>`.
+  A real pointer in a real browser is a different instrument, not a slower
+  copy of the unit test.
+
+**Questions / to revisit:**
+- Real photos and clips are still the family's to shoot — the seed swatches
+  prove the mechanics, not the shop.
+- If video files grow, `preload="metadata"` + Range requests are already
+  served by `http.FileServer`; a poster frame (extracted at upload) would
+  be the next quality step.
 
 **Worked on:** the home hero's placeholder (hatch texture + label) replaced
 by an actual photo of a honey jar — F3's first visible dent. The file was

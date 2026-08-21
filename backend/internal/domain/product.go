@@ -16,7 +16,22 @@ var (
 	ErrSKUTaken          = errors.New("sku already exists")
 	ErrVariantLabelTaken = errors.New("variant label already used for this product")
 	ErrCategoryNotFound  = errors.New("no such category")
+
+	// ErrGalleryFull: a product already holds MaxGalleryImages photos. The
+	// store raises it instead of inserting; the API maps it to 409 — the
+	// upload conflicts with the gallery's current state, nothing about the
+	// file itself was wrong.
+	ErrGalleryFull = errors.New("gallery already has the maximum number of images")
+	// ErrVideoExists mirrors it for the single video slot, enforced by the
+	// partial unique index in migration 000026.
+	ErrVideoExists = errors.New("product already has a video")
 )
+
+// MaxGalleryImages caps a product's PHOTOS (the video slot is separate).
+// Three plus the video matches the media a card and the gallery are designed
+// to hold. One named constant so the store's cap and any message about it
+// cannot drift apart.
+const MaxGalleryImages = 3
 
 // ProductText is the translatable half of a product. The slug, SKU, price
 // and stock are not in here on purpose — they mean the same thing in every
@@ -102,7 +117,6 @@ type Product struct {
 	ID         int64
 	CategoryID int64
 	Slug       string
-	ImageURL   string
 	IsActive   bool
 	CreatedAt  time.Time
 	Variants   []ProductVariant
@@ -143,10 +157,15 @@ type Product struct {
 	LabBatch    string
 	IsColdChain bool
 
-	// Editorial content, loaded only by the DETAIL read. The listing leaves
-	// these empty on purpose: a card shows none of them, and fetching six
-	// products' worth of bullets to render six cards is work nobody sees.
-	Images     []ProductImage
+	// Images is the photo gallery, hero first. Loaded by the detail read in
+	// full, and by the LIST/card reads as a thin url+alt slice — the cards'
+	// hover slideshow needs every photo, unlike the editorial content below,
+	// which stays detail-only because a card renders none of it.
+	Images []ProductImage
+	// Video is the single short clip (migration 000026), or nil — pointer-
+	// as-optional, the same job std::optional does in C++. Detail read only:
+	// cards never load the video.
+	Video      *ProductImage
 	Highlights []ProductHighlight
 	UsageCards []ProductUsageCard
 
@@ -162,25 +181,6 @@ type Product struct {
 
 	// Translations holds non-default locales only; English is the pair above.
 	Translations map[Locale]ProductText
-}
-
-// PrimaryImage is the gallery's hero, or the zero value when a product has
-// no images at all. The database guarantees at most one is_primary per
-// product (a partial unique index in 000011), so this cannot be ambiguous —
-// but it CAN be absent, which is why the second return value exists rather
-// than handing back a silently empty image.
-func (p Product) PrimaryImage() (ProductImage, bool) {
-	for _, img := range p.Images {
-		if img.IsPrimary {
-			return img, true
-		}
-	}
-	// Falling back to the first image rather than nothing: an uncurated
-	// gallery should still show a picture.
-	if len(p.Images) > 0 {
-		return p.Images[0], true
-	}
-	return ProductImage{}, false
 }
 
 type ProductVariant struct {

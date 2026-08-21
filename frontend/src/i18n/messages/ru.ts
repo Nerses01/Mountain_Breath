@@ -125,6 +125,7 @@ export const ru = {
     gallery: {
       label: 'Изображения продукта',
       image: 'Изображение {{n}}',
+      video: 'Видео товара',
     },
     meta: {
       harvest: 'Сбор',

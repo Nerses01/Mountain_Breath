@@ -194,7 +194,7 @@ export function ProductPage() {
 
       <div className="mt-4 grid gap-12 lg:grid-cols-2">
         <div className="relative">
-          <Gallery images={p.images} productName={p.name} />
+          <Gallery images={p.images} video={p.video} productName={p.name} />
           {p.badge && (
             <Badge tone={p.badge_tone} className="absolute left-4.5 top-4.5">
               {t(`catalog:badge.${p.badge}`)}

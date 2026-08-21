@@ -701,6 +701,15 @@ export function useUploadProductImage() {
   })
 }
 
+export function useUploadProductVideo() {
+  const invalidate = useInvalidateProducts()
+  return useMutation({
+    mutationFn: ({ id, file }: { id: number; file: File }) =>
+      api.uploadProductVideo(id, file),
+    onSuccess: invalidate,
+  })
+}
+
 // E3 editorial writes. All four invalidate the same caches as any other
 // product edit — a reordered gallery or a new bullet changes the product
 // page, and a curated related list changes another product's panel.

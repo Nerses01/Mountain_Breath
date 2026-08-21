@@ -57,3 +57,41 @@ test('every header and footer link resolves to a real page', async ({ page }) =>
   await page.getByRole('button', { name: 'Join' }).click()
   await expect(page.getByText(/check your inbox/)).toBeVisible()
 })
+
+// Decision #99: while the cursor rests on a product card, its photos cycle.
+// The seed gives mountain-wildflower-honey three distinct SVG swatches, so
+// "the visible photo changed" is a real pixel-level claim here, not a hope.
+// Headless desktop Chromium reports (hover: hover) and no reduced-motion
+// preference, which is exactly the device class the slideshow runs on.
+test('product cards cycle their photos under the cursor', async ({ page }) => {
+  await page.goto('/shop')
+
+  const card = page
+    .locator('article')
+    .filter({ hasText: 'Mountain Wildflower Honey' })
+    .first()
+  const visiblePhoto = card.locator('img:not(.invisible)').first()
+
+  const heroSrc = await visiblePhoto.getAttribute('src')
+  expect(heroSrc).toContain('data:image/svg')
+
+  // At rest only the hero is mounted — a grid of cards must not download
+  // every photo of every product up front.
+  await expect(card.locator('img')).toHaveCount(1)
+
+  // Hover the CARD, not the img: the stretched-link overlay is the actual
+  // hit target over the photo (the reason the handlers live on the
+  // article), and Playwright's actionability check knows it.
+  await card.hover()
+  // The hover mounts the whole stack…
+  await expect(card.locator('img')).toHaveCount(3)
+  // …and within the ~0.9s interval the visible photo is a DIFFERENT one.
+  await expect
+    .poll(async () => visiblePhoto.getAttribute('src'), { timeout: 3000 })
+    .not.toBe(heroSrc)
+
+  // Leaving snaps back to the hero, so the grid at rest is always the
+  // shop's chosen photos.
+  await page.mouse.move(0, 0)
+  await expect(visiblePhoto).toHaveAttribute('src', heroSrc!)
+})

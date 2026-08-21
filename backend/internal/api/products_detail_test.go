@@ -198,8 +198,11 @@ func TestEditorialEndpointsRequireAdmin(t *testing.T) {
 }
 
 // The two catalog endpoints answer different questions, and the payload split
-// is the reason both exist.
+// is the reason both exist. Since decision #99 the split runs through the
+// MIDDLE of the media: photos ride on the card (the hover slideshow renders
+// them), while the video and the editorial stay detail-only.
 func TestDetailCarriesEditorialAndTheListingDoesNot(t *testing.T) {
+	video := domain.ProductImage{ID: 9, URL: "/uploads/v.mp4", Alt: "Harvest clip"}
 	fake := newFakeStore()
 	fake.products = []domain.Product{{
 		ID: 1, Slug: "honey", Name: "Honey",
@@ -207,6 +210,7 @@ func TestDetailCarriesEditorialAndTheListingDoesNot(t *testing.T) {
 		HarvestNote: "August 2026, Hives 12–18",
 		Disclaimer:  "A food, not a medicine.",
 		Images:      []domain.ProductImage{{ID: 4, URL: "/uploads/a.jpg", Alt: "A jar", IsPrimary: true}},
+		Video:       &video,
 		Highlights:  []domain.ProductHighlight{{Text: "Steady natural energy"}},
 		UsageCards:  []domain.ProductUsageCard{{Kicker: "Morning", Title: "A spoon", Body: "Plain."}},
 	}}
@@ -217,6 +221,7 @@ func TestDetailCarriesEditorialAndTheListingDoesNot(t *testing.T) {
 		`"lab_batch":"WH-0626"`, `"is_cold_chain":true`,
 		`"harvest_note":"August 2026, Hives 12–18"`,
 		`"alt":"A jar"`, `"Steady natural energy"`, `"kicker":"Morning"`,
+		`"video":{"id":9,"url":"/uploads/v.mp4","alt":"Harvest clip"}`,
 	} {
 		if !strings.Contains(detail, want) {
 			t.Errorf("detail is missing %s", want)
@@ -224,10 +229,14 @@ func TestDetailCarriesEditorialAndTheListingDoesNot(t *testing.T) {
 	}
 
 	listing := doRequest(srv, http.MethodGet, "/api/v1/products", "", nil).Body.String()
-	for _, unwanted := range []string{"lab_batch", "harvest_note", "usage_cards", "highlights", "images"} {
+	for _, unwanted := range []string{"lab_batch", "harvest_note", "usage_cards", "highlights", "video"} {
 		if strings.Contains(listing, unwanted) {
 			t.Errorf("the card payload carries %q, which no card renders", unwanted)
 		}
+	}
+	// …but the photos DO ride on the card, thin: url and alt only.
+	if !strings.Contains(listing, `"images":[{"url":"/uploads/a.jpg","alt":"A jar"}]`) {
+		t.Errorf("the card payload is missing its photos: %s", listing)
 	}
 }
 

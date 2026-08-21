@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ProductCard } from './ProductCard'
@@ -15,7 +15,7 @@ const product: Product = {
   slug: 'mountain-wildflower-honey',
   name: 'Mountain Wildflower Honey',
   description: 'Sweet liquid made from flower nectar.',
-  image_url: '',
+  images: [],
   created_at: '2026-07-29T00:00:00Z',
   badge: 'best_seller',
   badge_tone: 'honey',
@@ -178,5 +178,98 @@ describe('ProductCard', () => {
     expect(
       screen.getByRole('link', { name: 'Mountain Wildflower Honey' }),
     ).toHaveAttribute('href', '/products/mountain-wildflower-honey')
+  })
+
+  describe('hover slideshow', () => {
+    const threePhotos = {
+      ...product,
+      images: [
+        { url: '/uploads/a.jpg', alt: 'jar' },
+        { url: '/uploads/b.jpg', alt: 'texture' },
+        { url: '/uploads/c.jpg', alt: 'in hand' },
+      ],
+    }
+
+    // jsdom has no matchMedia; the hook treats that as "cannot hover" and
+    // stays inert, so a hover-capable device is declared explicitly.
+    function pretendHoverDevice() {
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn((query: string) => ({
+          matches: !query.includes('prefers-reduced-motion'),
+        })),
+      )
+    }
+
+    const visibleSrc = (container: HTMLElement) =>
+      Array.from(container.querySelectorAll('img'))
+        .find((img) => !img.className.includes('invisible'))
+        ?.getAttribute('src')
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+      vi.useRealTimers()
+    })
+
+    it('cycles the photos while hovered and resets on leave', () => {
+      pretendHoverDevice()
+      vi.useFakeTimers()
+      const { container } = renderCard(threePhotos)
+      // Hover the CARD: the stretched-link overlay swallows pointer events
+      // over the photo itself, so that is where the handlers live.
+      const slot = container.querySelector('article')!
+
+      // At rest: one <img> — the grid must not fetch every photo of every
+      // card up front.
+      expect(container.querySelectorAll('img')).toHaveLength(1)
+
+      fireEvent.mouseEnter(slot)
+      // The hover mounts the whole stack (the browser starts fetching), and
+      // dots appear for orientation.
+      expect(container.querySelectorAll('img')).toHaveLength(3)
+      expect(visibleSrc(container)).toBe('/uploads/a.jpg')
+
+      act(() => vi.advanceTimersByTime(900))
+      expect(visibleSrc(container)).toBe('/uploads/b.jpg')
+
+      fireEvent.mouseLeave(slot)
+      // Back to the hero: a grid never ends up a patchwork of whatever
+      // frame each cursor left behind.
+      expect(visibleSrc(container)).toBe('/uploads/a.jpg')
+    })
+
+    it('stays still under prefers-reduced-motion', () => {
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => ({ matches: true })), // reduce: true — and hover: true
+      )
+      vi.useFakeTimers()
+      const { container } = renderCard(threePhotos)
+      const slot = container.querySelector('article')!
+
+      fireEvent.mouseEnter(slot)
+      act(() => vi.advanceTimersByTime(3000))
+
+      // Still the single hero image, no dots, nothing moving.
+      expect(container.querySelectorAll('img')).toHaveLength(1)
+      expect(visibleSrc(container)).toBe('/uploads/a.jpg')
+    })
+  })
+
+  it('renders the hero photo when the product has one, the placeholder when not', () => {
+    // images arrive hero-first from the API, so [0] is the card's photo.
+    const { container, unmount } = renderCard({
+      ...product,
+      images: [{ url: '/uploads/hero.jpg', alt: 'A jar of honey' }],
+    })
+
+    expect(container.querySelector('img')).toHaveAttribute('src', '/uploads/hero.jpg')
+    unmount()
+
+    // No photos: the slot keeps the card's geometry with the slug text
+    // instead of collapsing (aria-hidden — the name sits right below).
+    const empty = renderCard(product)
+    expect(empty.container.querySelector('img')).toBeNull()
+    expect(empty.getByText('mountain wildflower honey')).toBeInTheDocument()
   })
 })

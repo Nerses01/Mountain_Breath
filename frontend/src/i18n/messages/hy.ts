@@ -122,6 +122,7 @@ export const hy = {
     gallery: {
       label: 'Ապրանքի նկարներ',
       image: 'Նկար {{n}}',
+      video: 'Ապրանքի տեսանյութ',
     },
     meta: {
       harvest: 'Բերք',

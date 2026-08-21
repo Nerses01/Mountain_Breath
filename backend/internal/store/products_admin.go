@@ -42,11 +42,11 @@ func (s *Store) CreateProduct(ctx context.Context, p *domain.Product) error {
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	err = tx.QueryRow(ctx, `
-		INSERT INTO products (category_id, slug, name, description, image_url, is_active,
+		INSERT INTO products (category_id, slug, name, description, is_active,
 		                      lab_batch, is_cold_chain)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at`,
-		p.CategoryID, p.Slug, p.Name, p.Description, p.ImageURL, p.IsActive,
+		p.CategoryID, p.Slug, p.Name, p.Description, p.IsActive,
 		p.LabBatch, p.IsColdChain,
 	).Scan(&p.ID, &p.CreatedAt)
 	if err != nil {
@@ -142,10 +142,10 @@ func (s *Store) UpdateProduct(ctx context.Context, p *domain.Product) error {
 
 	tag, err := tx.Exec(ctx, `
 		UPDATE products
-		SET category_id = $1, name = $2, description = $3, image_url = $4, is_active = $5,
-		    lab_batch = $6, is_cold_chain = $7
-		WHERE id = $8`,
-		p.CategoryID, p.Name, p.Description, p.ImageURL, p.IsActive,
+		SET category_id = $1, name = $2, description = $3, is_active = $4,
+		    lab_batch = $5, is_cold_chain = $6
+		WHERE id = $7`,
+		p.CategoryID, p.Name, p.Description, p.IsActive,
 		p.LabBatch, p.IsColdChain, p.ID)
 	if err != nil {
 		if mapped := mapProductConstraint(err); mapped != nil {
@@ -163,18 +163,6 @@ func (s *Store) UpdateProduct(ctx context.Context, p *domain.Product) error {
 
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("committing update-product: %w", err)
-	}
-	return nil
-}
-
-func (s *Store) UpdateProductImage(ctx context.Context, productID int64, imageURL string) error {
-	tag, err := s.pool.Exec(ctx,
-		`UPDATE products SET image_url = $1 WHERE id = $2`, imageURL, productID)
-	if err != nil {
-		return fmt.Errorf("updating product image: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return domain.ErrNotFound
 	}
 	return nil
 }

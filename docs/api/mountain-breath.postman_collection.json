@@ -500,7 +500,7 @@
                 }
               ]
             },
-            "description": "Paginated list of active products with nested variants (sorted by price). Envelope: {items, page, per_page, total}.\n\nEach item carries `badge` (a KEY like best_seller, empty when there is none), `badge_tone` and `benefits` [{slug, name}]. `sales_count` is deliberately not published — it orders the list server-side and nothing else.\n\nLanguage: resolved per request as ?lang= > mb_locale cookie > Accept-Language > en. An unknown value falls back rather than failing."
+            "description": "Paginated list of active products with nested variants (sorted by price). Envelope: {items, page, per_page, total}.\n\nEach item carries `badge` (a KEY like best_seller, empty when there is none), `badge_tone`, `benefits` [{slug, name}] and `images` [{url, alt}] — the card's photos, hero first, up to three, alt already resolved into the request's language. The former scalar `image_url` is gone (the column was dropped); the product-page video is NOT here, only on the detail. `sales_count` is deliberately not published — it orders the list server-side and nothing else.\n\nLanguage: resolved per request as ?lang= > mb_locale cookie > Accept-Language > en. An unknown value falls back rather than failing."
           },
           "event": [
             {
@@ -1327,6 +1327,91 @@
                   "pm.test(\"answers with a code, not English prose\", () => {",
                   "    pm.expect(pm.response.json().error.fields.images)",
                   "        .to.eql(\"one_primary_image\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Admin — upload product video",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/admin/products/1/video",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "admin",
+                "products",
+                "1",
+                "video"
+              ]
+            },
+            "description": "Fills the product's SINGLE video slot (max 50 MB, MP4 or WebM — sniffed from the bytes, the filename is ignored). A second upload answers 409 video_exists: replacing means deleting the current clip via the images DELETE below (the video is a product_images row with kind='video') and uploading again.\n\nThe video appears only on the product page's gallery as the last tab — `GET /products/{slug}` carries it as a separate `video` field, null when absent. Cards never receive it.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "video",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"answers with the served url and the row id\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.video_url).to.match(/^\\/uploads\\//);",
+                  "    pm.expect(body.video_id).to.be.a(\"number\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Admin — delete gallery media",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{apiV1}}/admin/products/1/images/1",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "admin",
+                "products",
+                "1",
+                "images",
+                "1"
+              ]
+            },
+            "description": "Removes one row from the product's media — a photo OR the video, which share the table (kind column, migration 000026). Deleting the hero photo promotes the next PHOTO in gallery order automatically; the video is never promoted, because the hero renders in an <img> slot.\n\n404 when the image id does not belong to this product — the product_id guard, so ids cannot be guessed across products."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => {",
+                  "    pm.response.to.have.status(204);",
                   "});"
                 ]
               }
@@ -2920,7 +3005,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"category_id\": 1,\n    \"name\": \"Updated product name\",\n    \"description\": \"Updated English description\",\n    \"image_url\": \"\",\n    \"is_active\": true,\n    \"translations\": {\n        \"hy\": {\n            \"name\": \"Թարմացված անուն\",\n            \"description\": \"\"\n        },\n        \"ru\": {\n            \"name\": \"Обновлённое название\",\n            \"description\": \"\"\n        }\n    }\n}",
+              "raw": "{\n    \"category_id\": 1,\n    \"name\": \"Updated product name\",\n    \"description\": \"Updated English description\",\n    \"is_active\": true,\n    \"translations\": {\n        \"hy\": {\n            \"name\": \"Թարմացված անուն\",\n            \"description\": \"\"\n        },\n        \"ru\": {\n            \"name\": \"Обновлённое название\",\n            \"description\": \"\"\n        }\n    }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2995,7 +3080,7 @@
                 "image"
               ]
             },
-            "description": "Multipart upload, field name `image`. Content type is sniffed from magic bytes server-side (filename/headers ignored); wrong type → 400 unsupported_type, >5MB → 413. Select a file before sending — Postman cannot store file paths portably."
+            "description": "Multipart upload, field name `image`. Content type is sniffed from magic bytes server-side (filename/headers ignored); wrong type → 400 unsupported_type, >5MB → 413. A product holds at most 3 photos — a 4th upload answers 409 gallery_full (delete one first). Select a file before sending — Postman cannot store file paths portably."
           },
           "event": [
             {

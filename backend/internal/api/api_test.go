@@ -44,6 +44,7 @@ type fakeStore struct {
 	// stored: these tests are about request bodies becoming the right calls;
 	// the store's own behaviour is covered by the Docker-backed suite.
 	savedImages       []domain.ProductImage
+	savedVideo        *domain.ProductImage
 	lastImageAlts     map[domain.Locale]string
 	lastImageAltsByID map[int64]map[domain.Locale]string
 	deletedImageID    int64
@@ -276,16 +277,6 @@ func (f *fakeStore) UpdateProduct(_ context.Context, p *domain.Product) error {
 	return domain.ErrNotFound
 }
 
-func (f *fakeStore) UpdateProductImage(_ context.Context, productID int64, imageURL string) error {
-	for i := range f.products {
-		if f.products[i].ID == productID {
-			f.products[i].ImageURL = imageURL
-			return nil
-		}
-	}
-	return domain.ErrNotFound
-}
-
 func (f *fakeStore) ListRelated(_ context.Context, _ string, view domain.View) ([]domain.Product, error) {
 	f.lastLocale = view.EffectiveLocale()
 	f.lastCurrency = view.EffectiveCurrency()
@@ -312,10 +303,29 @@ func (f *fakeStore) AddProductImage(_ context.Context, productID int64, url stri
 	if !f.hasProduct(productID) {
 		return domain.ProductImage{}, domain.ErrNotFound
 	}
+	// The real store refuses the append past the cap; the fake mirrors that
+	// so the handler's 409 gallery_full (and its no-orphan-file cleanup) is
+	// exercised without a database.
+	if len(f.savedImages) >= domain.MaxGalleryImages {
+		return domain.ProductImage{}, domain.ErrGalleryFull
+	}
 	img := domain.ProductImage{ID: int64(len(f.savedImages) + 1), URL: url, IsPrimary: len(f.savedImages) == 0}
 	f.savedImages = append(f.savedImages, img)
 	f.lastImageAlts = alts
 	return img, nil
+}
+
+func (f *fakeStore) AddProductVideo(_ context.Context, productID int64, url string) (domain.ProductImage, error) {
+	if !f.hasProduct(productID) {
+		return domain.ProductImage{}, domain.ErrNotFound
+	}
+	// The partial unique index's job, played by the fake: one video only.
+	if f.savedVideo != nil {
+		return domain.ProductImage{}, domain.ErrVideoExists
+	}
+	video := domain.ProductImage{ID: 100, URL: url}
+	f.savedVideo = &video
+	return video, nil
 }
 
 func (f *fakeStore) hasProduct(id int64) bool {

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { Product, WishlistEntry } from '../../api/types'
 import { cx } from '../../lib/cx'
 import { useAddToCartFlash } from '../../lib/useAddToCartFlash'
+import { useHoverSlideshow } from '../../lib/useHoverSlideshow'
 import { useLocale } from '../../i18n/useLocale'
 import { Badge } from '../ui'
 import { Price } from '../ui/Price'
@@ -36,15 +37,40 @@ export function WishlistCard({
   // so the two grids cannot drift.
   const { addedQty, handleAdd } = useAddToCartFlash(onAdd)
 
+  // ...and the same hover slideshow, from the same hook, for the same
+  // no-drift reason (decision #99).
+  const images = entry.images
+  const slideshow = useHoverSlideshow(images.length)
+
   const cheapest = entry.variants[0]
   const hasChoice = entry.variants.length > 1
   const inStock = entry.variants.some((v) => v.stock_qty > 0)
 
   return (
-    <article className="group relative flex h-full flex-col gap-3 rounded-xl bg-card p-4.5">
+    <article
+      // On the CARD, not the image slot — the stretched-link overlay would
+      // swallow pointer events over the photo otherwise; see ProductCard.
+      onMouseEnter={slideshow.onMouseEnter}
+      onMouseLeave={slideshow.onMouseLeave}
+      className="group relative flex h-full flex-col gap-3 rounded-xl bg-card p-4.5"
+    >
       <div className="relative flex h-42 items-center justify-center overflow-hidden rounded-lg bg-panel">
-        {entry.image_url ? (
-          <img src={entry.image_url} alt="" className="size-full object-cover" loading="lazy" />
+        {images[0] ? (
+          slideshow.warm ? (
+            images.map((img, i) => (
+              <img
+                key={img.url}
+                src={img.url}
+                alt=""
+                className={cx(
+                  'absolute inset-0 size-full object-cover',
+                  i !== slideshow.index && 'invisible',
+                )}
+              />
+            ))
+          ) : (
+            <img src={images[0].url} alt="" className="size-full object-cover" loading="lazy" />
+          )
         ) : (
           <span
             aria-hidden
@@ -60,6 +86,27 @@ export function WishlistCard({
           </Badge>
         )}
         <WishlistHeart productId={entry.id} className="absolute right-3 top-3 z-10" />
+
+        {slideshow.cycling && (
+          <div
+            aria-hidden
+            className={cx(
+              'absolute inset-x-0 z-10 flex justify-center gap-1.5',
+              inStock ? 'bottom-2.5' : 'bottom-13',
+            )}
+          >
+            {images.map((img, i) => (
+              <span
+                key={img.url}
+                className={cx(
+                  'size-1.5 rounded-full transition',
+                  i === slideshow.index ? 'bg-bark' : 'bg-card/80',
+                )}
+              />
+            ))}
+          </div>
+        )}
+
         {!inStock && (
           <span className="absolute inset-x-3 bottom-3 rounded-full bg-bark/90 px-3 py-1.5 text-center text-2xs font-semibold uppercase tracking-label text-ink-on-dark">
             {t('catalog:outOfStock')}

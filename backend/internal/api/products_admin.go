@@ -46,7 +46,6 @@ type createProductRequest struct {
 	// language falls back to them.
 	Name        string              `json:"name"`
 	Description string              `json:"description"`
-	ImageURL    string              `json:"image_url"`
 	Variants    []newVariantRequest `json:"variants"`
 	// Optional, non-default locales only: {"hy": {"name": "...", ...}}.
 	// Additive, so existing clients are unaffected.
@@ -62,11 +61,14 @@ type createProductRequest struct {
 	IsColdChain bool   `json:"is_cold_chain"`
 }
 
+// Since decision #99 neither request carries image_url: photos and the video
+// enter exclusively through the upload endpoints, and these bodies describe
+// everything else. DisallowUnknownFields makes sending it a 400 — on purpose,
+// so a stale client fails loudly instead of writing to a dropped column.
 type updateProductRequest struct {
 	CategoryID   int64                         `json:"category_id"`
 	Name         string                        `json:"name"`
 	Description  string                        `json:"description"`
-	ImageURL     string                        `json:"image_url"`
 	IsActive     bool                          `json:"is_active"`
 	Translations map[string]productTextRequest `json:"translations"`
 
@@ -164,7 +166,6 @@ func (s *Server) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 		Slug:         req.Slug,
 		Name:         req.Name,
 		Description:  req.Description,
-		ImageURL:     req.ImageURL,
 		IsActive:     true,
 		Translations: toDomainTranslations(req.Translations),
 		Disclaimer:   req.Disclaimer,
@@ -237,7 +238,7 @@ func (s *Server) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
 
 	product := domain.Product{
 		ID: id, CategoryID: req.CategoryID, Name: req.Name,
-		Description: req.Description, ImageURL: req.ImageURL, IsActive: req.IsActive,
+		Description: req.Description, IsActive: req.IsActive,
 		Translations: translations,
 		Disclaimer:   req.Disclaimer,
 		StorageNote:  req.StorageNote,
