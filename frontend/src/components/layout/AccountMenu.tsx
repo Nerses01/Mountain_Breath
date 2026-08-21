@@ -10,7 +10,7 @@ import { ChevronDownIcon } from '../ui/icons'
 /**
  * A1: the header's signed-in control — the canvas's dark pill (avatar
  * initial, name, ▾) opening a dropdown to the four account screens and
- * sign-out. This is the header's "account menu open state" the canvas draws
+ * an admin-only back-office link, and sign-out. This is the header's "account menu open state" the canvas draws
  * at the top of every account screen.
  *
  * Pattern: MENU BUTTON (WAI-ARIA APG "menu button"), and deliberately not a
@@ -38,8 +38,10 @@ export function AccountMenu({ user }: { user: User }) {
   const [open, setOpen] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
-  // One ref holding all item nodes (4 links + sign-out) for roving focus.
+  // One ref holding all item nodes (4 links + optional admin link + sign-out)
+  // for roving focus.
   const itemsRef = useRef<(HTMLElement | null)[]>([])
+  const isAdmin = user.role === 'admin'
 
   // One identity rule everywhere (lib/displayName): the profile's name,
   // or the email's local part until one is set. The pill shows the FIRST
@@ -162,9 +164,25 @@ export function AccountMenu({ user }: { user: User }) {
             </Link>
           ))}
           <div role="presentation" className="mx-2 my-1 border-t border-line-soft" />
+          {/* Admin routes sit outside the locale tree, so this remains /admin
+              rather than localePath('/admin'). */}
+          {isAdmin && (
+            <Link
+              ref={(el) => {
+                itemsRef.current[ITEMS.length] = el
+              }}
+              role="menuitem"
+              tabIndex={-1}
+              to="/admin"
+              onClick={() => setOpen(false)}
+              className="rounded-xl px-3.5 py-2.5 font-display text-sm font-semibold text-ink-strong transition hover:bg-panel focus:bg-panel"
+            >
+              {t('account:nav.adminPanel')}
+            </Link>
+          )}
           <button
             ref={(el) => {
-              itemsRef.current[ITEMS.length] = el
+              itemsRef.current[ITEMS.length + (isAdmin ? 1 : 0)] = el
             }}
             type="button"
             role="menuitem"

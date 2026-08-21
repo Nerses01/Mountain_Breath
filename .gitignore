@@ -10,6 +10,7 @@ tmp/
 *.out
 coverage.txt
 CLAUDE.md
+AGENTS.md
 
 # --- Node / frontend ---
 node_modules/

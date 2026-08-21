@@ -33,12 +33,12 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 
-function renderMenu() {
+function renderMenu(menuUser = user) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <MemoryRouter>
       <QueryClientProvider client={qc}>
-        <AccountMenu user={user} />
+        <AccountMenu user={menuUser} />
       </QueryClientProvider>
     </MemoryRouter>,
   )
@@ -69,6 +69,16 @@ describe('AccountMenu', () => {
     expect(screen.getByRole('menuitem', { name: 'My orders' })).toHaveAttribute(
       'href',
       '/account/orders',
+    )
+  })
+
+  it('shows an admin-panel link only to admin users', () => {
+    const button = renderMenu({ ...user, role: 'admin' })
+    fireEvent.click(button)
+
+    expect(screen.getByRole('menuitem', { name: 'Admin panel' })).toHaveAttribute(
+      'href',
+      '/admin',
     )
   })
 
