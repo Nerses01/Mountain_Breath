@@ -300,7 +300,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "deploy/docker-compose.prod.yml,backend/migrations"
+          source: "deploy/docker-compose.prod.yml,deploy/observability,backend/migrations"
           target: ${{ vars.TARGET_DIR }}
           # The laptop is reachable only via Tailscale's DERP relay (double
           # NAT + CGNAT leaves no direct path), and relayed connection setup

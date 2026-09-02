@@ -216,6 +216,7 @@ POSTGRES_PASSWORD=<the generated hex string>
 POSTGRES_DB=mountain_breath
 DOMAIN=mountainbreath.com
 CLOUDFLARE_TUNNEL_TOKEN=<token from step 7>
+GRAFANA_PASSWORD=<another generated hex string — the Grafana admin login>
 EOF
 chmod 600 .env
 # If you ever change POSTGRES_PASSWORD after the first boot: the postgres
@@ -272,6 +273,31 @@ machine now and then. Over the tailnet that's one command from 💻:
 ```powershell
 scp deploy@mb-server:/opt/backups/mb_*.sql.gz D:\Backups\mountain-breath\
 ```
+
+## Observability (decision #101)
+
+The prod stack carries the same Prometheus + Alertmanager + Grafana trio
+as the local one, with one deliberate difference: **every port is bound
+to `127.0.0.1`** — answerable only from the laptop itself. Grafana is a
+password-protected admin surface (bots scan for those) and Prometheus
+has no auth at all, so neither is ever added to the tunnel; the shop is
+public, the graphs are private.
+
+You reach them over the tailnet from anywhere — the SSH `-L` flag makes
+your browser's localhost port travel to the laptop's:
+
+```powershell
+ssh -L 3000:localhost:3000 -L 9090:localhost:9090 capybara@homeserver
+# then in the browser, while that ssh stays open:
+#   http://localhost:3000  → Grafana (admin / GRAFANA_PASSWORD from deploy/.env)
+#   http://localhost:9090  → Prometheus's own query UI
+```
+
+The dashboards and alert rules are provisioned from
+`deploy/observability/` (the CI deploy copies that directory alongside
+the compose file). Alerts currently land only in Alertmanager's UI —
+wiring a real channel (Telegram) is a follow-up; the recipe is commented
+in `observability/alertmanager.yml`.
 
 ## Limits to know about
 

@@ -102,6 +102,31 @@ reserves the loaded layout's real shape (`role="status"`, gallery's
   read, not a guess — and running the two specs locally against the dev
   stack beat 12-minute CI round-trips.
 
+**CD shipped (same day, evening):** the first automated deploy landed
+after a five-failure debugging arc, each error dying strictly deeper
+than the last:
+1. *scp: `lookup homeserver: no such host`* — Docker container actions
+   inherit the host's ROUTES but not its RESOLVER; MagicDNS names don't
+   exist inside them → `DEPLOY_HOST` became the stable tailnet IP.
+2. *`dial tcp :22: i/o timeout` after one success* — the laptop is
+   DERP-relayed (double NAT + CGNAT), first contact takes tens of
+   seconds; the action's 30s default dial assumed a datacenter →
+   `timeout: 120s`, `command_timeout: 20m`.
+3. *e2e flake on a twice-green spec* — congested runner (60s test
+   timeout tripped); rerun, no code change. Distinguish page-vs-ruler
+   before "fixing".
+4. *Still unreachable* → added a gate step: `tailscale ping` from the
+   runner HOST (warms the WireGuard session the container reuses) +
+   `nc -z` loop with a readable error. The gate's "Logged out." output
+   exposed that the Tailscale action reports success even when
+   `tailscale up` fails every retry.
+5. *`400: requested tags [tag:ci] are invalid or not permitted`* —
+   worked at 15:34, rejected at 17:15, same code = external state
+   drift: the ACL's tagOwners had been edited around, orphaning the
+   OAuth client's tag binding (validated at issuance, like a dangling
+   pointer to a reallocated object). Fresh OAuth client → deploy green
+   in 1m10s, gate warmed the relay in 24s.
+
 **Questions / to revisit:**
 - ~~Which domain to buy~~ → `mountainbreath.net` (Namecheap), delegated
   to Cloudflare (aragorn/eva NS) and Active the same day.

@@ -103,6 +103,52 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # ── Observability (decision #101) ────────────────────────────────────
+  # Same trio as the local stack, one difference that IS the point: every
+  # port is bound to 127.0.0.1 — reachable from the laptop itself and
+  # nothing else. Grafana is a login surface and Prometheus has NO auth,
+  # so neither may ever face the internet; you reach them over the
+  # tailnet:  ssh -L 3000:localhost:3000 capybara@homeserver
+  # (docs/DEPLOYMENT_HOME.md → Observability).
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prom_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    volumes:
+      - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "127.0.0.1:9093:9093"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.0.0
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      # No dev fallback here: prod requires a real password in deploy/.env.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?set a strong one in deploy/.env}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 volumes:
   pgdata_prod:
   uploads_data:
+  prom_data:
+  grafana_data:
