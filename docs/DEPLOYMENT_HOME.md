@@ -287,10 +287,14 @@ You reach them over the tailnet from anywhere — the SSH `-L` flag makes
 your browser's localhost port travel to the laptop's:
 
 ```powershell
-ssh -L 3000:localhost:3000 -L 9090:localhost:9090 capybara@homeserver
+# The LEFT port is on your own machine and is a free choice — 3300/9390
+# here because the local dev stack usually already occupies 3000/9090
+# (forwarding onto a taken port either fails to bind or, worse, shows
+# you the LOCAL Grafana while you believe you're looking at prod).
+ssh -L 3300:localhost:3000 -L 9390:localhost:9090 capybara@homeserver
 # then in the browser, while that ssh stays open:
-#   http://localhost:3000  → Grafana (admin / GRAFANA_PASSWORD from deploy/.env)
-#   http://localhost:9090  → Prometheus's own query UI
+#   http://localhost:3300  → prod Grafana (admin / GRAFANA_PASSWORD from deploy/.env)
+#   http://localhost:9390  → prod Prometheus's query UI
 ```
 
 The dashboards and alert rules are provisioned from

@@ -17,6 +17,39 @@ Template for an entry:
 
 ---
 
+## 2026-09-03 — Post-launch consolidation: one backlog (decision #102)
+
+**Worked on:** the day-after-launch paperwork. A full re-read of every
+plan (PROJECT_PLAN 9–11, PLAN_ERA_2's open decision, PLAN_ERA_3 F1–F6,
+PLAN_ACCOUNT deferrals) plus every "Questions / to revisit" since the
+08-15 audit → **docs/BACKLOG.md**, the single home of open work (7
+sections: go-live residue, launch content, payments, UX-by-evidence,
+engineering debts, a tripwire table with named firing events, a learning
+shelf). The era plans were cleared of open items — each keeps its
+history, goals and done-whens, with per-item pointers into the backlog;
+Phase 9's two-era-stale FROZEN note replaced by what actually shipped;
+Phase 11 retired as parking lot; CLAUDE.md now steers to BACKLOG.md.
+
+**Learned:**
+- *Plans drift in two directions* — the 08-15 audit found gaps no doc
+  recorded (under-documentation), and three weeks later its own F1
+  described a road not taken (over-specification aged into fiction:
+  "Cloudflare Tunnel considered and declined" was the live
+  architecture's exact opposite). Consolidation is re-basing the plan
+  onto reality, like a rebase onto a moved main.
+- *A backlog needs an exit rule to stay trustworthy* — leave by
+  shipping (tick + decision number) or rejection (strike + reason);
+  anything else and the list rots back into folklore.
+- *Tripwires ≠ tasks* — "do X" and "decide X when event Y fires" rot
+  differently; giving the latter their own table with named firing
+  events keeps them from masquerading as work or being deleted as
+  stale.
+- *The reconciliation section (§0) is the audit's receipt* — recording
+  what closed differently than planned (#99, #100/#101) is what makes
+  the next audit cheap.
+
+---
+
 ## 2026-09-02 — Phase 9: home server behind CGNAT → Cloudflare tunnel (decision #100, reversing #12)
 
 **Worked on:** the hosting decision that unblocks Phase 9, twice. Plan A

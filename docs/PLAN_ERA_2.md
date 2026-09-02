@@ -207,7 +207,8 @@ answered earlier than it needs to be.
 - [ ] **4. Product editorial fields** (E3): explicit columns and child
       tables, or one JSONB `content` column? Columns give constraints and
       clean admin forms; JSONB avoids a migration per field but loses FK
-      safety.
+      safety. *→ the era's one still-open decision; carried in
+      [BACKLOG.md](BACKLOG.md) §5 since 2026-09-03.*
 - [x] **5. Social sign-in — Google real, Apple a stub.** The
       authorization-code flow is built and tested against a fake Google;
       going live needs only a free OAuth client pasted into `backend/.env`
