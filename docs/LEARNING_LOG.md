@@ -17,6 +17,61 @@ Template for an entry:
 
 ---
 
+## 2026-09-02 — Phase 9: home server behind CGNAT → Cloudflare tunnel (decision #100, reversing #12)
+
+**Worked on:** the hosting decision that unblocks Phase 9, twice. Plan A
+(a laptop + DuckDNS + router port forwarding) was fully built, then
+killed by a reality check and discarded: the ISP's router-facing address
+turned out to be private (`192.168.197.84` on the ZTE F673AV9's WAN row)
+— CGNAT, no IPv6, inbound impossible at any setting. Plan B shipped:
+laptop + owned domain + Cloudflare **named tunnel**. `deploy/
+docker-compose.prod.yml` swaps Caddy for an outbound-only `cloudflared`
+connector (token in `.env`, hostname→`web:80` routing in the Cloudflare
+dashboard), gains `MB_PUBLIC_URL: https://${DOMAIN}` and the E8 mail/
+OAuth pass-through; the CI deploy job joins the tailnet as an ephemeral
+`tag:ci` node (Tailscale GitHub Action) so SSH-push CD works with no
+public SSH; new runbook `docs/DEPLOYMENT_HOME.md` (laptop-as-server
+systemd/BIOS settings, hardening shrunk to "ufw allows only OpenSSH",
+domain + tunnel walkthrough, CI secrets, backups over tailnet).
+
+**Learned:**
+- *`ifconfig.me` proves egress, not ingress* — the outside world reflects
+  the ISP's NAT exit; only the router's own WAN interface row says
+  whether inbound traffic can ever reach you. Diagnosis chain that
+  settled it: public IP from inside → `tracert -d` shows a *private* hop
+  beyond the router → the router's WAN row shows RFC1918. Each step
+  narrowed; only the last was conclusive.
+- *Same symptom, two diagnoses* — at another site a private WAN IP meant
+  double NAT (a mesh router behind the ISP box): fixable free with
+  DMZ/bridge. One router deep, it means CGNAT: fixable only by the ISP.
+- *CGNAT needn't use `100.64/10`* — this ISP builds it from plain
+  `192.168.x` space. Address class matters, not the label.
+- *Outbound-only tunneling inverts reachability* — cloudflared (public
+  web) and Tailscale (management) both dial out and let traffic ride
+  back down the open connection; NAT never sees an inbound SYN. The C++
+  analogy is dependency inversion, applied to packets.
+- *TLS termination is a location decision* — the visitor's padlock only
+  proves the browser↔edge leg; who holds the private key (our Caddy vs
+  Cloudflare's edge) is architecture, invisible to users. #12 chose
+  end-to-end; #100 knowingly trades it because the tunnel's edge
+  termination is what CGNAT left on the table.
+- *Config can live outside the repo* — the tunnel's hostname→service
+  routing is dashboard state, not a file; the compose service holds only
+  a token saying "I am that tunnel". Worth remembering when something
+  "isn't in the repo but works".
+- *A laptop is a server with a built-in UPS* — once logind lid handling
+  is ignored, sleep targets are `mask`ed (un-startable even as a
+  dependency, unlike `disable`), and BIOS restores power-on after AC
+  loss.
+
+**Questions / to revisit:**
+- Which domain to buy (registrar: Cloudflare at-cost vs Porkbun).
+- Off-machine backup automation (currently a manual `scp` over tailnet).
+- One day on a VPS: keep the tunnel, or reinstate Caddy (kept
+  `deploy/Caddyfile`) and reclaim end-to-end TLS.
+
+---
+
 ## 2026-08-20 — Product media: 3 photos + a video, and the hover slideshow (decision #99)
 
 **Worked on:** every product can now hold up to three photos and one short

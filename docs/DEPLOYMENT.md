@@ -4,6 +4,14 @@ From an empty VPS to a live, HTTPS-served, auto-deploying shop. Written for
 Ubuntu 24.04 LTS on any provider (Hetzner/DigitalOcean/etc., smallest tier
 is plenty). Commands marked 💻 run on your Windows machine, 🖥️ on the server.
 
+> **The deployment actually in use is a home laptop + Cloudflare named
+> tunnel** — [DEPLOYMENT_HOME.md](DEPLOYMENT_HOME.md) (decision #100,
+> reversing #12 after the ISP turned out to run CGNAT). This file stays as
+> the VPS variant and migration target. Note for that day:
+> `docker-compose.prod.yml` is now tunnel-shaped (cloudflared, no Caddy);
+> on a VPS you either keep the tunnel or reinstate a Caddy service using
+> the kept `deploy/Caddyfile` — see the last section of the home runbook.
+
 ## Interim: public demo URL with no VPS and no domain
 
 Until the VPS exists, a **Cloudflare quick tunnel** exposes the local

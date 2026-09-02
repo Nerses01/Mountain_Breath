@@ -261,14 +261,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Securely copy the Compose file AND your migrations folder to your VPS
-      - name: Copy files to VPS
+      # 1b. Home-server deployment (decision #100): the server sits behind
+      # CGNAT with no inbound ports at all. The runner joins the private
+      # Tailscale network as an ephemeral node (tag:ci, auto-removed when
+      # the job ends) and reaches the laptop by its tailnet name —
+      # DEPLOY_HOST is that name, not a public IP. OAuth client: Tailscale
+      # admin console → Settings → OAuth clients, scope auth_keys, tag
+      # tag:ci (docs/DEPLOYMENT_HOME.md, step 5).
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      # 2. Securely copy the Compose file AND your migrations folder to the server
+      - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "deploy/docker-compose.prod.yml,deploy/Caddyfile,backend/migrations"
+          source: "deploy/docker-compose.prod.yml,backend/migrations"
           target: ${{ vars.TARGET_DIR }}
 
       # 3. SSH in and start the containers
@@ -294,12 +308,11 @@ jobs:
             # Login to GHCR on the VPS
             echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             
-            # Pull the new images and start them
+            # Pull the new images and start them. No reload step needed for
+            # the tunnel: its routing lives in the Cloudflare dashboard, and
+            # `up -d` recreates any service whose image changed.
             docker compose -f deploy/docker-compose.prod.yml pull
             docker compose -f deploy/docker-compose.prod.yml up -d
-            
-            # Force Caddy to reload its configuration file
-            docker compose -f deploy/docker-compose.prod.yml restart caddy
-            
+
             # Clean up old images
             docker image prune -f
