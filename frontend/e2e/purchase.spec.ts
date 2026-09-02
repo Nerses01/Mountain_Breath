@@ -105,9 +105,12 @@ test('a new customer can buy a product end to end', async ({ page }) => {
   await expect(page.getByText('Code WELCOME10')).toBeVisible()
 
   // --- it appears in the order history too ---
+  // (A2 account area: the page is "My orders" per the canvas, and the order
+  // card lists the product name with a "· 1 item" count line.)
   await page.getByRole('link', { name: '← All your orders' }).click()
-  await expect(page.getByRole('heading', { name: 'Your orders' })).toBeVisible()
-  await expect(page.getByText(/1 × Mountain Wildflower Honey/)).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'My orders', level: 1 })).toBeVisible()
+  await expect(page.getByText('Mountain Wildflower Honey')).toBeVisible()
+  await expect(page.getByText(/1 item/)).toBeVisible()
 
   // --- and the cart is empty again ---
   await page.getByRole('banner').getByRole('link', { name: /^Cart/ }).click()

@@ -86,11 +86,24 @@ reserves the loaded layout's real shape (`role="status"`, gallery's
   not the last commit* — the failure list is "everything since the last
   PR", which is why the culprits predated the deploy commit that
   triggered the run.
+- *Second round: the specs, not the app, were stale* — the account-area
+  redesign (A1–A3) renamed headings ("My orders", "Wishlist",
+  "Addresses") and replaced the header's Account link with the menu
+  button; the canvas arbitrated every rename (rule #16) and the app
+  matched it each time, so the tests moved. Playwright's
+  `error-context.md` snapshot (page DOM at failure) made each fix a
+  read, not a guess — and running the two specs locally against the dev
+  stack beat 12-minute CI round-trips.
 
 **Questions / to revisit:**
 - ~~Which domain to buy~~ → `mountainbreath.net` (Namecheap), delegated
   to Cloudflare (aragorn/eva NS) and Active the same day.
 - Off-machine backup automation (currently a manual `scp` over tailnet).
+- Dead i18n keys the A-phases left behind (`ordersTitle`, `account.title`
+  "Your account", `addresses.title` "Address book") — a cleanup sweep.
+- CI e2e re-downloads the Playwright browser every run (~1 min); an
+  actions/cache on `~/.cache/ms-playwright` keyed by the Playwright
+  version would trim it if run time starts to matter.
 - One day on a VPS: keep the tunnel, or reinstate Caddy (kept
   `deploy/Caddyfile`) and reclaim end-to-end TLS.
 

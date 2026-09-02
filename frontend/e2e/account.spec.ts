@@ -38,8 +38,10 @@ test('hearts, save-for-later and the address book survive a session', async ({ p
   await expect(page.getByRole('link', { name: /In cart/ })).toBeVisible()
 
   // --- the wishlist page lists the saved card ---
+  // (A3: the page heading is "Wishlist" per the canvas; the role+level keeps
+  // this from matching the header's Wishlist link or the heart buttons.)
   await page.getByRole('banner').getByRole('link', { name: 'Wishlist' }).click()
-  await expect(page.getByRole('heading', { name: 'Your wishlist' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Wishlist', level: 1 })).toBeVisible()
   await expect(
     page.getByRole('link', { name: 'Mountain Wildflower Honey' }),
   ).toBeVisible()
@@ -50,8 +52,12 @@ test('hearts, save-for-later and the address book survive a session', async ({ p
   await expect(page.getByText('Your cart is empty.')).toBeVisible()
 
   // --- the address book ---
-  await page.getByRole('banner').getByRole('link', { name: 'Account' }).click()
-  await expect(page.getByRole('heading', { name: 'Your account' })).toBeVisible()
+  // A1 replaced the header's "Account" link with the menu-button pill (the
+  // user's name, title = email); "Addresses" is one of its menuitems and
+  // the page it opens is the canvas's "Address book".
+  await page.getByTitle(email).click()
+  await page.getByRole('menuitem', { name: 'Addresses' }).click()
+  await expect(page.getByRole('heading', { name: 'Addresses', level: 1 })).toBeVisible()
   await page.getByRole('button', { name: 'Add an address' }).click()
   await page.getByLabel('Label').fill('Home')
   await page.getByLabel('First name').fill('Anahit')
@@ -63,8 +69,10 @@ test('hearts, save-for-later and the address book survive a session', async ({ p
   await page.getByRole('button', { name: 'Save address' }).click()
 
   // The first entry became the default whatever the checkbox said — the
-  // checkout's prefill needs one to stand on.
-  await expect(page.getByText('Home')).toBeVisible()
-  await expect(page.getByText('Default')).toBeVisible()
+  // checkout's prefill needs one to stand on. Scoped to main: the header's
+  // "Home" nav link would otherwise also match the label text.
+  await expect(page.getByRole('main').getByText('Home')).toBeVisible()
+  // exact: the page subtitle also contains the word ("The default one…").
+  await expect(page.getByText('Default', { exact: true })).toBeVisible()
   await expect(page.getByText('14 Abovyan St, apt 6')).toBeVisible()
 })
