@@ -205,14 +205,23 @@ sudo mkdir -p /opt/mountain-breath && sudo chown deploy:deploy /opt/mountain-bre
 git clone https://github.com/Nerses01/Mountain_Breath.git /opt/mountain-breath
 cd /opt/mountain-breath/deploy
 
+# hex, not base64: the password rides inside a URL
+# (postgres://mb:PASSWORD@postgres/…), and base64's / + = characters
+# break URL parsing. Hex is URL-safe by construction.
+openssl rand -hex 24
+
 cat > .env <<'EOF'
 POSTGRES_USER=mb
-POSTGRES_PASSWORD=<generate a long random one>
+POSTGRES_PASSWORD=<the generated hex string>
 POSTGRES_DB=mountain_breath
 DOMAIN=mountainbreath.com
 CLOUDFLARE_TUNNEL_TOKEN=<token from step 7>
 EOF
 chmod 600 .env
+# If you ever change POSTGRES_PASSWORD after the first boot: the postgres
+# image only APPLIES the password when initializing an empty volume, so an
+# edit here silently diverges from what the database expects. Before any
+# data exists, `down -v` + up is the fix; after, change it inside Postgres.
 
 cd /opt/mountain-breath
 docker compose -f deploy/docker-compose.prod.yml pull
