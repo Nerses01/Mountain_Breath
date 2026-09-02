@@ -47,7 +47,9 @@ test('a new customer can buy a product end to end', async ({ page }) => {
   ).toBeVisible()
 
   // --- add to cart ---
-  await page.getByRole('button', { name: 'Add to cart' }).click()
+  // Five add-buttons render here (buy box + four related-card quick-adds);
+  // the buy box is the only one that quotes the price in its label.
+  await page.getByRole('button', { name: /^Add to cart — / }).click()
   // the button flips to its "in cart" state — derived from the cart query
   await page.getByRole('link', { name: /In cart/ }).click()
 

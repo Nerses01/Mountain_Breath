@@ -64,8 +64,32 @@ domain + tunnel walkthrough, CI secrets, backups over tailnet).
   dependency, unlike `disable`), and BIOS restores power-on after AC
   loss.
 
+**Also worked on (same day):** the dev→master PR tripped the two
+PR-only CI gates — first e2e+Lighthouse run since Aug 21, so it audited
+everything merged since. e2e: `getByRole('button', {name:'Add to cart'})`
+now matches 5 buttons (buy box + four related-card quick-adds) — fixed
+with `/^Add to cart — /`, the buy box being the only one quoting the
+price. Lighthouse: product page 0.82 < 0.85 budget, caused by one 0.36
+CLS event — the one-line "Loading…" state let the footer paint high, and
+the arriving content hurled it ~1500px; replaced with a skeleton that
+reserves the loaded layout's real shape (`role="status"`, gallery's
+`h-130` box mirrored).
+
+**Learned (CI gates):**
+- *Playwright's `getByRole` name is substring + case-insensitive by
+  default*, and strict mode refuses ambiguity instead of guessing — the
+  failure names the design flaw in the locator, not in the page.
+- *CLS only scores shifts inside the viewport* — so a skeleton needn't
+  mirror the whole page, just reserve the first truthful screenful; the
+  footer below the fold can move freely.
+- *Expensive CI gates that run only on PRs audit the accumulated delta,
+  not the last commit* — the failure list is "everything since the last
+  PR", which is why the culprits predated the deploy commit that
+  triggered the run.
+
 **Questions / to revisit:**
-- Which domain to buy (registrar: Cloudflare at-cost vs Porkbun).
+- ~~Which domain to buy~~ → `mountainbreath.net` (Namecheap), delegated
+  to Cloudflare (aragorn/eva NS) and Active the same day.
 - Off-machine backup automation (currently a manual `scp` over tailnet).
 - One day on a VPS: keep the tunnel, or reinstate Caddy (kept
   `deploy/Caddyfile`) and reclaim end-to-end TLS.

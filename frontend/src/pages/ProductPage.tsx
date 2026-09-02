@@ -106,7 +106,41 @@ export function ProductPage() {
   })
 
   if (product.isPending) {
-    return <PageShell>{t('common:state.loading')}</PageShell>
+    // A skeleton mirroring the loaded layout's shape, not a one-line
+    // "Loading…": with a short placeholder the footer paints high in the
+    // viewport and the arriving content hurls it ~1500px down — one 0.36
+    // CLS shift, which alone sank the page's Lighthouse budget. Only
+    // shifts inside the viewport score, so reserving the first screenful
+    // truthfully (the gallery's real h-130 box, its h-24 thumbnails) is
+    // what zeroes it. The canvas never draws loading states — this one is
+    // ours to design (working agreement, standing exception #2).
+    return (
+      <div
+        role="status"
+        aria-label={t('common:state.loading')}
+        className="mx-auto max-w-360 animate-pulse px-6 py-8 pb-24 md:pb-8 lg:px-14"
+      >
+        <div className="h-4 w-64 rounded bg-panel" />
+        <div className="mt-4 grid gap-12 lg:grid-cols-2">
+          <div>
+            <div className="h-130 rounded-2xl bg-panel" />
+            <div className="mt-4 flex gap-4">
+              <div className="h-24 w-24 rounded-lg bg-panel" />
+              <div className="h-24 w-24 rounded-lg bg-panel" />
+              <div className="h-24 w-24 rounded-lg bg-panel" />
+            </div>
+          </div>
+          <div className="flex flex-col gap-6">
+            <div className="h-10 w-3/4 rounded bg-panel" />
+            <div className="h-5 w-40 rounded bg-panel" />
+            <div className="h-28 rounded-2xl bg-panel" />
+            <div className="h-12 w-56 rounded-full bg-panel" />
+            <div className="h-14 rounded-full bg-panel" />
+          </div>
+        </div>
+        <div className="mt-16 h-64 rounded-2xl bg-panel" />
+      </div>
+    )
   }
 
   if (product.isError) {

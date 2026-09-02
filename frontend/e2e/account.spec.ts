@@ -31,8 +31,10 @@ test('hearts, save-for-later and the address book survive a session', async ({ p
   await heart.click()
   await expect(heart).toHaveAttribute('aria-pressed', 'true')
 
-  // ...and put a jar in the cart for the save-for-later step.
-  await page.getByRole('button', { name: 'Add to cart' }).click()
+  // ...and put a jar in the cart for the save-for-later step. Five
+  // add-buttons render here (buy box + four related-card quick-adds); the
+  // buy box is the only one that quotes the price in its label.
+  await page.getByRole('button', { name: /^Add to cart — / }).click()
   await expect(page.getByRole('link', { name: /In cart/ })).toBeVisible()
 
   // --- the wishlist page lists the saved card ---
