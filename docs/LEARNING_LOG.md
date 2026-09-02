@@ -64,6 +64,13 @@ domain + tunnel walkthrough, CI secrets, backups over tailnet).
   dependency, unlike `disable`), and BIOS restores power-on after AC
   loss.
 
+**Outcome (same day):** first boot on the laptop succeeded after one
+detour — the generated base64 `POSTGRES_PASSWORD` contained `/`, which
+lawfully re-segmented the migrate DSN (the URL parser read `mb` as host
+and the password's first chunk as the port; fixed by `openssl rand -hex`,
+runbook amended) — and **https://mountainbreath.net went live**, served
+through Cloudflare's Yerevan edge from the CGNAT'd laptop.
+
 **Also worked on (same day):** the dev→master PR tripped the two
 PR-only CI gates — first e2e+Lighthouse run since Aug 21, so it audited
 everything merged since. e2e: `getByRole('button', {name:'Add to cart'})`
