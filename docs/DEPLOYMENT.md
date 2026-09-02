@@ -4,6 +4,42 @@ From an empty VPS to a live, HTTPS-served, auto-deploying shop. Written for
 Ubuntu 24.04 LTS on any provider (Hetzner/DigitalOcean/etc., smallest tier
 is plenty). Commands marked 💻 run on your Windows machine, 🖥️ on the server.
 
+> **The deployment actually in use is a home laptop + Cloudflare named
+> tunnel** — [DEPLOYMENT_HOME.md](DEPLOYMENT_HOME.md) (decision #100,
+> reversing #12 after the ISP turned out to run CGNAT). This file stays as
+> the VPS variant and migration target. Note for that day:
+> `docker-compose.prod.yml` is now tunnel-shaped (cloudflared, no Caddy);
+> on a VPS you either keep the tunnel or reinstate a Caddy service using
+> the kept `deploy/Caddyfile` — see the last section of the home runbook.
+
+## Interim: public demo URL with no VPS and no domain
+
+Until the VPS exists, a **Cloudflare quick tunnel** exposes the local
+containerized stack at a free `https://<random>.trycloudflare.com` URL —
+no account, no DNS, no open ports (cloudflared connects *outbound* to
+Cloudflare; visitors are relayed back down that connection). 💻:
+
+```powershell
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.tunnel.yml up -d --build
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.tunnel.yml logs cloudflared   # the URL is in here
+```
+
+Seed + admin promotion are the same as step 6 below (swap in
+`docker-compose.yml`). Limits to know about:
+
+- The URL is **random and changes every restart** of the cloudflared
+  container — re-share it each time. A stable URL needs a domain in
+  Cloudflare (named tunnel), which arrives with the VPS anyway.
+- The site is up only while this machine is on; no uptime promise.
+- Google sign-in stays off (its redirect URI must be registered per exact
+  origin — pointless with a churning URL). Leave the keys unset and the
+  button explains itself.
+- Password-reset emails would link to `MB_PUBLIC_URL`; with SMTP unset they
+  land in the api log anyway, so leave both alone for demos.
+- Keep `MB_ENV=dev`: the browser↔Cloudflare leg is HTTPS, but the
+  cloudflared→nginx leg is plain HTTP on the compose network, which is fine
+  for a demo and required until real TLS termination exists end-to-end.
+
 ## 0. What you need first
 
 - A VPS (2GB RAM is comfortable) — note its public IP
@@ -120,7 +156,13 @@ Open `https://shop.example.com` — certificate and redirect are automatic
 (Caddy). Then seed the catalog and create your admin:
 
 ```bash
-cat backend/seed/seed.sql | docker compose -f deploy/docker-compose.prod.yml exec -T postgres psql -U mb -d mountain_breath
+# COPY the file in; do not pipe it. Piping runs the stream through the shell's
+# encoding — on a Windows host that silently mangles every non-ASCII byte, so
+# the Armenian and Russian translations land as mojibake or as literal '?'.
+# Nothing errors: the result is valid UTF-8, just wrong. `cp` moves raw bytes.
+docker compose -f deploy/docker-compose.prod.yml cp backend/seed/seed.sql postgres:/tmp/seed.sql
+docker compose -f deploy/docker-compose.prod.yml exec -T postgres \
+  psql -U mb -d mountain_breath -v ON_ERROR_STOP=1 -f /tmp/seed.sql
 # register your account through the website UI first, then:
 docker compose -f deploy/docker-compose.prod.yml exec postgres \
   psql -U mb -d mountain_breath -c "UPDATE users SET role='admin' WHERE email='you@example.com';"

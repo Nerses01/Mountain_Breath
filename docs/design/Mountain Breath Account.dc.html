@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #F3E2D0; font-family: Karla, system-ui, sans-serif; }
+  a { color: #E4761F; text-decoration: none; }
+  a:hover { color: #B8541A; }
+  * { box-sizing: border-box; }
+</style>
+</helmet>
+
+<div style="display: flex; flex-direction: column; gap: 64px; padding: 56px 40px 96px; background: #F3E2D0;">
+
+  <div style="width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px;">
+    <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; color: #A9714B;">Mountain Breath — Account section</div>
+    <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 40px; color: #46281C; letter-spacing: -0.02em;">Orders, wishlist, addresses, settings</div>
+    <div style="font-size: 17px; color: #7C5A45; max-width: 620px;">Four logged-in screens sharing one shell: the store header with the account menu open state, and a left rail that swaps content on the right.</div>
+  </div>
+
+  <!-- ══════════ 07 ORDERS ══════════ -->
+  <div style="width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 13px; color: #FFF8EE; background: #46281C; padding: 6px 12px; border-radius: 999px; letter-spacing: 0.12em;">07</div>
+      <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Account — my orders</div>
+    </div>
+    <div data-screen-label="07 Orders" style="background: #FDEFE0; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 70px -40px rgba(70,40,28,0.45);">
+
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 24px 56px; background: #FEF4E8; border-bottom: 1px solid #F2E1CC;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 11px; background: #F6C244; display: flex; align-items: center; justify-content: center; font-family: Poppins, sans-serif; font-weight: 800; color: #46281C;">M</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 17px; color: #46281C; letter-spacing: 0.04em;">MOUNTAIN BREATH</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 34px; font-family: Poppins, sans-serif; font-weight: 500; font-size: 15px; color: #5C3B2A;">
+          <span>Home</span><span>Shop</span><span>Our hive</span><span>Benefits</span><span>Journal</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <div style="display: flex; align-items: center; gap: 10px; background: #46281C; color: #FFF8EE; padding: 8px 16px 8px 8px; border-radius: 999px;">
+            <div style="width: 30px; height: 30px; border-radius: 999px; background: #F6C244; color: #46281C; font-family: Poppins, sans-serif; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center;">AS</div>
+            <div style="font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px;">Anahit ▾</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 9px; border: 1.5px solid #E9C9A8; color: #46281C; padding: 9px 17px; border-radius: 999px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px;">Cart · 3</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 300px 1fr; gap: 32px; padding: 40px 56px 56px;">
+
+        <div style="display: flex; flex-direction: column; gap: 18px;">
+          <div style="background: #46281C; border-radius: 22px; padding: 26px; display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+              <div style="width: 54px; height: 54px; border-radius: 999px; background: #F6C244; color: #46281C; font-family: Poppins, sans-serif; font-weight: 800; font-size: 20px; display: flex; align-items: center; justify-content: center;">AS</div>
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 18px; color: #FFF8EE;">Anahit Sargsyan</div>
+                <div style="font-size: 13px; color: #C9AA92;">Hive club member</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <div style="flex: 1; background: rgba(255,248,238,0.08); border-radius: 14px; padding: 12px 14px;"><div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 20px; color: #F6C244;">7</div><div style="font-size: 12px; color: #C9AA92;">Orders</div></div>
+              <div style="flex: 1; background: rgba(255,248,238,0.08); border-radius: 14px; padding: 12px 14px;"><div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 20px; color: #F6C244;">8%</div><div style="font-size: 12px; color: #C9AA92;">Member price</div></div>
+            </div>
+          </div>
+
+          <div style="background: #FFF8EE; border-radius: 22px; padding: 14px; display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; align-items: center; gap: 12px; background: #E4761F; color: #FFF8EE; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px;"><span style="width: 20px; text-align: center;">▤</span> My orders <span style="margin-left: auto; background: #FFF8EE; color: #E4761F; border-radius: 999px; font-size: 12px; padding: 2px 9px; font-weight: 800;">7</span></div>
+            <div style="display: flex; align-items: center; gap: 12px; color: #5C3B2A; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center; color: #C08A5E;">♡</span> Wishlist <span style="margin-left: auto; color: #A9714B; font-size: 13px;">5</span></div>
+            <div style="display: flex; align-items: center; gap: 12px; color: #5C3B2A; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center; color: #C08A5E;">⌂</span> Addresses</div>
+                        <div style="display: flex; align-items: center; gap: 12px; color: #5C3B2A; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center; color: #C08A5E;">⚙</span> Settings</div>
+            <div style="border-top: 1px solid #F2E1CC; margin: 6px 8px 2px;"></div>
+            <div style="display: flex; align-items: center; gap: 12px; color: #A9714B; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center;">→</span> Log out</div>
+          </div>
+
+          <div style="background: #F6C244; border-radius: 22px; padding: 22px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 16px; color: #46281C;">Reorder in one tap</div>
+            <div style="font-size: 14px; line-height: 1.6; color: #5C3B2A;">Your usual: wildflower honey 500 g and propolis tincture.</div>
+            <div style="background: #46281C; color: #FFF8EE; text-align: center; font-family: Poppins, sans-serif; font-weight: 700; font-size: 14px; padding: 12px; border-radius: 999px; margin-top: 4px;">Reorder · $33.00</div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+          <div style="display: flex; align-items: flex-end; justify-content: space-between;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 36px; color: #46281C; letter-spacing: -0.025em;">My orders</div>
+              <div style="font-size: 15px; color: #7C5A45;">Everything you have ordered from the meadow, newest first.</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <div style="background: #46281C; color: #FFF8EE; border-radius: 999px; padding: 10px 18px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 13px;">All · 7</div>
+              <div style="border: 1.5px solid #EED9C0; color: #5C3B2A; border-radius: 999px; padding: 10px 18px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 13px;">On the way · 1</div>
+              <div style="border: 1.5px solid #EED9C0; color: #5C3B2A; border-radius: 999px; padding: 10px 18px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 13px;">Delivered · 6</div>
+            </div>
+          </div>
+
+          <!-- active order with tracker -->
+          <div style="background: #FFF8EE; border-radius: 22px; padding: 28px; display: flex; flex-direction: column; gap: 22px; border: 2px solid #E4761F;">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 20px;">
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 19px; color: #46281C;">Order #MB-1047</div>
+                  <div style="background: #F6C244; color: #46281C; font-family: Poppins, sans-serif; font-weight: 700; font-size: 12px; letter-spacing: 0.08em; padding: 5px 12px; border-radius: 999px; text-transform: uppercase;">On the way</div>
+                </div>
+                <div style="font-size: 14px; color: #7C5A45;">Placed 14 Aug 2026 · 3 items · chilled parcel</div>
+              </div>
+              <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 22px; color: #46281C;">$64.00</div>
+                <div style="font-size: 13px; color: #A9714B;">30,600 ֏</div>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 0;">
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; width: 120px;"><div style="width: 30px; height: 30px; border-radius: 999px; background: #E4761F; color: #FFF8EE; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700;">✓</div><div style="font-size: 12px; font-weight: 700; color: #46281C; text-align: center;">Packed</div><div style="font-size: 11px; color: #A9714B;">14 Aug</div></div>
+              <div style="flex: 1; height: 3px; background: #E4761F; border-radius: 999px; margin-bottom: 34px;"></div>
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; width: 120px;"><div style="width: 30px; height: 30px; border-radius: 999px; background: #E4761F; color: #FFF8EE; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700;">✓</div><div style="font-size: 12px; font-weight: 700; color: #46281C; text-align: center;">With courier</div><div style="font-size: 11px; color: #A9714B;">15 Aug</div></div>
+              <div style="flex: 1; height: 3px; background: linear-gradient(90deg, #E4761F 0 55%, #EED9C0 55%); border-radius: 999px; margin-bottom: 34px;"></div>
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; width: 120px;"><div style="width: 30px; height: 30px; border-radius: 999px; border: 3px solid #E4761F; background: #FFF8EE; color: #E4761F; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800;">…</div><div style="font-size: 12px; font-weight: 700; color: #46281C; text-align: center;">Out for delivery</div><div style="font-size: 11px; color: #A9714B;">Today</div></div>
+              <div style="flex: 1; height: 3px; background: #EED9C0; border-radius: 999px; margin-bottom: 34px;"></div>
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; width: 120px;"><div style="width: 30px; height: 30px; border-radius: 999px; border: 2px solid #EED9C0; background: #FFF8EE; color: #C9A483; display: flex; align-items: center; justify-content: center; font-size: 12px;">4</div><div style="font-size: 12px; font-weight: 600; color: #A9714B; text-align: center;">Delivered</div><div style="font-size: 11px; color: #C9A483;">—</div></div>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; background: #FDEFE0; border-radius: 16px; padding: 16px 20px;">
+              <div style="display: flex; align-items: center; gap: 14px;">
+                <div style="display: flex; gap: 8px;">
+                  <div style="width: 52px; height: 52px; border-radius: 12px; background: repeating-linear-gradient(135deg, #F7DCBC 0 8px, #FBE9D4 8px 16px); display: flex; align-items: center; justify-content: center; font-family: ui-monospace, monospace; font-size: 8px; color: #9A6944; text-align: center;">jelly</div>
+                  <div style="width: 52px; height: 52px; border-radius: 12px; background: repeating-linear-gradient(135deg, #F7DCBC 0 8px, #FBE9D4 8px 16px); display: flex; align-items: center; justify-content: center; font-family: ui-monospace, monospace; font-size: 8px; color: #9A6944; text-align: center;">honey</div>
+                  <div style="width: 52px; height: 52px; border-radius: 12px; background: repeating-linear-gradient(135deg, #F7DCBC 0 8px, #FBE9D4 8px 16px); display: flex; align-items: center; justify-content: center; font-family: ui-monospace, monospace; font-size: 8px; color: #9A6944; text-align: center;">propolis</div>
+                </div>
+                <div style="font-size: 14px; color: #5C3B2A;">Fresh Royal Jelly · Wildflower Honey · Propolis Tincture</div>
+              </div>
+              <div style="display: flex; gap: 10px;">
+                <div style="background: #E4761F; color: #FFF8EE; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; padding: 12px 20px; border-radius: 999px;">Track parcel</div>
+                <div style="border: 1.5px solid #EED9C0; color: #46281C; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; padding: 12px 20px; border-radius: 999px;">Details</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- past orders -->
+          <div style="background: #FFF8EE; border-radius: 22px; padding: 8px 28px;">
+            <sc-for list="{{ orders }}" as="o" hint-placeholder-count="3">
+              <div style="display: grid; grid-template-columns: 1.3fr 1fr auto auto; gap: 20px; align-items: center; padding: 22px 0; border-bottom: 1px solid #F2E1CC;">
+                <div style="display: flex; flex-direction: column; gap: 3px;">
+                  <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 16px; color: #46281C;">{{ o.id }}</div>
+                  <div style="font-size: 13px; color: #7C5A45;">{{ o.date }} · {{ o.items }}</div>
+                </div>
+                <div style="font-size: 14px; color: #7C5A45;">{{ o.summary }}</div>
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+                  <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 17px; color: #46281C;">{{ o.usd }}</div>
+                  <div style="font-size: 12px; color: #A9714B;">{{ o.amd }}</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="background: #EAF2E3; color: #4C7A3D; font-family: Poppins, sans-serif; font-weight: 700; font-size: 12px; padding: 6px 13px; border-radius: 999px;">Delivered</div>
+                  <div style="border: 1.5px solid #EED9C0; color: #46281C; font-family: Poppins, sans-serif; font-weight: 600; font-size: 13px; padding: 9px 16px; border-radius: 999px;">Reorder</div>
+                </div>
+              </div>
+            </sc-for>
+            <div style="padding: 18px 0; text-align: center; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; color: #E4761F;">Show 3 older orders ▾</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 08 WISHLIST ══════════ -->
+  <div style="width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 13px; color: #FFF8EE; background: #46281C; padding: 6px 12px; border-radius: 999px; letter-spacing: 0.12em;">08</div>
+      <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Account — wishlist</div>
+    </div>
+    <div data-screen-label="08 Wishlist" style="background: #FDEFE0; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 70px -40px rgba(70,40,28,0.45);">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 24px 56px; background: #FEF4E8; border-bottom: 1px solid #F2E1CC;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 11px; background: #F6C244; display: flex; align-items: center; justify-content: center; font-family: Poppins, sans-serif; font-weight: 800; color: #46281C;">M</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 17px; color: #46281C; letter-spacing: 0.04em;">MOUNTAIN BREATH</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 34px; font-family: Poppins, sans-serif; font-weight: 500; font-size: 15px; color: #5C3B2A;">
+          <span>Home</span><span>Shop</span><span>Our hive</span><span>Benefits</span><span>Journal</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <div style="display: flex; align-items: center; gap: 10px; background: #46281C; color: #FFF8EE; padding: 8px 16px 8px 8px; border-radius: 999px;">
+            <div style="width: 30px; height: 30px; border-radius: 999px; background: #F6C244; color: #46281C; font-family: Poppins, sans-serif; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center;">AS</div>
+            <div style="font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px;">Anahit ▾</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 9px; border: 1.5px solid #E9C9A8; color: #46281C; padding: 9px 17px; border-radius: 999px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px;">Cart · 3</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 300px 1fr; gap: 32px; padding: 40px 56px 56px;">
+        <div style="display: flex; flex-direction: column; gap: 18px;">
+          <div style="background: #FFF8EE; border-radius: 22px; padding: 14px; display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; align-items: center; gap: 12px; color: #5C3B2A; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center; color: #C08A5E;">▤</span> My orders <span style="margin-left: auto; color: #A9714B; font-size: 13px;">7</span></div>
+            <div style="display: flex; align-items: center; gap: 12px; background: #E4761F; color: #FFF8EE; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px;"><span style="width: 20px; text-align: center;">♡</span> Wishlist <span style="margin-left: auto; background: #FFF8EE; color: #E4761F; border-radius: 999px; font-size: 12px; padding: 2px 9px; font-weight: 800;">5</span></div>
+            <div style="display: flex; align-items: center; gap: 12px; color: #5C3B2A; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center; color: #C08A5E;">⌂</span> Addresses</div>
+                        <div style="display: flex; align-items: center; gap: 12px; color: #5C3B2A; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center; color: #C08A5E;">⚙</span> Settings</div>
+            <div style="border-top: 1px solid #F2E1CC; margin: 6px 8px 2px;"></div>
+            <div style="display: flex; align-items: center; gap: 12px; color: #A9714B; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center;">→</span> Log out</div>
+          </div>
+          <div style="background: #46281C; border-radius: 22px; padding: 24px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 17px; color: #FFF8EE;">Price-drop alerts</div>
+            <div style="font-size: 14px; line-height: 1.65; color: #C9AA92;">We email you when a wishlisted jar goes on member offer or comes back from a new harvest.</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,248,238,0.08); border-radius: 14px; padding: 12px 16px;">
+              <div style="font-size: 14px; color: #FFF8EE; font-weight: 600;">Alerts on</div>
+              <div style="width: 42px; height: 24px; border-radius: 999px; background: #F6C244; position: relative;"><div style="position: absolute; right: 3px; top: 3px; width: 18px; height: 18px; border-radius: 999px; background: #46281C;"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+          <div style="display: flex; align-items: flex-end; justify-content: space-between;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 36px; color: #46281C; letter-spacing: -0.025em;">Wishlist</div>
+              <div style="font-size: 15px; color: #7C5A45;">Five saved items · worth $101.00 together</div>
+            </div>
+            <div style="background: #46281C; color: #FFF8EE; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; padding: 12px 22px; border-radius: 999px;">Add all to cart</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+            <sc-for list="{{ wishlist }}" as="w" hint-placeholder-count="5">
+              <div style="background: #FFF8EE; border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 12px; position: relative;">
+                <div style="position: relative; height: 170px; border-radius: 14px; background: repeating-linear-gradient(135deg, #F7DCBC 0 10px, #FBE9D4 10px 20px); display: flex; align-items: center; justify-content: center;">
+                  <div style="font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #9A6944; text-align: center;">{{ w.slot }}</div>
+                  <div style="position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 999px; background: #E4761F; color: #FFF8EE; display: flex; align-items: center; justify-content: center; font-size: 13px;">♥</div>
+                  <sc-if value="{{ w.badge }}" hint-placeholder-val="{{ false }}">
+                    <div style="position: absolute; top: 10px; left: 10px; background: #46281C; color: #F6C244; font-family: Poppins, sans-serif; font-weight: 700; font-size: 10px; letter-spacing: 0.1em; padding: 5px 10px; border-radius: 999px; text-transform: uppercase;">{{ w.badge }}</div>
+                  </sc-if>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 3px;">
+                  <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 16px; color: #46281C;">{{ w.name }}</div>
+                  <div style="font-size: 13px; color: #7C5A45;">{{ w.size }} · saved {{ w.saved }}</div>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
+                  <div style="display: flex; flex-direction: column;">
+                    <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 17px; color: #E4761F;">{{ w.usd }}</div>
+                    <div style="font-size: 12px; color: #A9714B;">{{ w.amd }}</div>
+                  </div>
+                  <sc-if value="{{ w.inStock }}" hint-placeholder-val="{{ true }}">
+                    <div style="background: #46281C; color: #FFF8EE; font-family: Poppins, sans-serif; font-weight: 600; font-size: 13px; padding: 10px 16px; border-radius: 999px;">Add to cart</div>
+                  </sc-if>
+                  <sc-if value="{{ w.outOfStock }}" hint-placeholder-val="{{ false }}">
+                    <div style="border: 1.5px solid #EED9C0; color: #A9714B; font-family: Poppins, sans-serif; font-weight: 600; font-size: 13px; padding: 10px 16px; border-radius: 999px;">Notify me</div>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
+
+            <div style="border: 2px dashed #E0C4A4; border-radius: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; min-height: 280px;">
+              <div style="width: 44px; height: 44px; border-radius: 999px; background: #FFF8EE; color: #C08A5E; display: flex; align-items: center; justify-content: center; font-size: 19px;">♡</div>
+              <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; text-align: center;">Save more from the shop</div>
+              <div style="font-size: 13px; color: #A9714B; text-align: center; max-width: 200px;">Tap the heart on any product to keep it here.</div>
+              <div style="font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; color: #E4761F;">Browse the shelf →</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 09 ADDRESSES ══════════ -->
+  <div style="width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 13px; color: #FFF8EE; background: #46281C; padding: 6px 12px; border-radius: 999px; letter-spacing: 0.12em;">09</div>
+      <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Account — addresses</div>
+    </div>
+    <div data-screen-label="09 Addresses" style="background: #FDEFE0; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 70px -40px rgba(70,40,28,0.45);">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 24px 56px; background: #FEF4E8; border-bottom: 1px solid #F2E1CC;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 11px; background: #F6C244; display: flex; align-items: center; justify-content: center; font-family: Poppins, sans-serif; font-weight: 800; color: #46281C;">M</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 17px; color: #46281C; letter-spacing: 0.04em;">MOUNTAIN BREATH</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 34px; font-family: Poppins, sans-serif; font-weight: 500; font-size: 15px; color: #5C3B2A;">
+          <span>Home</span><span>Shop</span><span>Our hive</span><span>Benefits</span><span>Journal</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <div style="display: flex; align-items: center; gap: 10px; background: #46281C; color: #FFF8EE; padding: 8px 16px 8px 8px; border-radius: 999px;">
+            <div style="width: 30px; height: 30px; border-radius: 999px; background: #F6C244; color: #46281C; font-family: Poppins, sans-serif; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center;">AS</div>
+            <div style="font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px;">Anahit ▾</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 9px; border: 1.5px solid #E9C9A8; color: #46281C; padding: 9px 17px; border-radius: 999px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px;">Cart · 3</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 300px 1fr; gap: 32px; padding: 40px 56px 56px;">
+        <div style="background: #FFF8EE; border-radius: 22px; padding: 14px; display: flex; flex-direction: column; gap: 4px; align-self: start;">
+          <div style="display: flex; align-items: center; gap: 12px; color: #5C3B2A; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center; color: #C08A5E;">▤</span> My orders <span style="margin-left: auto; color: #A9714B; font-size: 13px;">7</span></div>
+          <div style="display: flex; align-items: center; gap: 12px; color: #5C3B2A; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center; color: #C08A5E;">♡</span> Wishlist <span style="margin-left: auto; color: #A9714B; font-size: 13px;">5</span></div>
+          <div style="display: flex; align-items: center; gap: 12px; background: #E4761F; color: #FFF8EE; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px;"><span style="width: 20px; text-align: center;">⌂</span> Addresses <span style="margin-left: auto; background: #FFF8EE; color: #E4761F; border-radius: 999px; font-size: 12px; padding: 2px 9px; font-weight: 800;">2</span></div>
+          <div style="display: flex; align-items: center; gap: 12px; color: #5C3B2A; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center; color: #C08A5E;">⚙</span> Settings</div>
+          <div style="border-top: 1px solid #F2E1CC; margin: 6px 8px 2px;"></div>
+          <div style="display: flex; align-items: center; gap: 12px; color: #A9714B; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center;">→</span> Log out</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+          <div style="display: flex; align-items: flex-end; justify-content: space-between;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 36px; color: #46281C; letter-spacing: -0.025em;">Addresses</div>
+              <div style="font-size: 15px; color: #7C5A45;">Where we send the jars. The default one is used at checkout.</div>
+            </div>
+            <div style="background: #46281C; color: #FFF8EE; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; padding: 12px 22px; border-radius: 999px;">+ Add address</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+            <div style="background: #FFF8EE; border: 2px solid #E4761F; border-radius: 22px; padding: 26px; display: flex; flex-direction: column; gap: 14px;">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 18px; color: #46281C;">Home</div>
+                  <div style="background: #F6C244; color: #46281C; font-family: Poppins, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.08em; padding: 4px 11px; border-radius: 999px; text-transform: uppercase;">Default</div>
+                </div>
+                <div style="width: 34px; height: 34px; border-radius: 999px; border: 1.5px solid #EED9C0; display: flex; align-items: center; justify-content: center; color: #8A5E42; font-size: 14px;">✎</div>
+              </div>
+              <div style="font-size: 15px; line-height: 1.75; color: #5C3B2A;">Anahit Sargsyan<br>14 Abovyan St, apt 6<br>Yerevan 0009, Armenia<br>+374 99 123 456</div>
+              <div style="display: flex; align-items: center; gap: 10px; font-size: 14px; color: #6E4B36; background: #FDEFE0; border-radius: 12px; padding: 11px 14px;"><span style="width: 20px; height: 20px; border-radius: 6px; background: #E4761F; color: #FFF8EE; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">✓</span> Leave with the neighbour if I am out</div>
+              <div style="display: flex; gap: 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; padding-top: 2px;">
+                <div style="color: #E4761F;">Edit</div>
+                <div style="color: #A9714B;">Remove</div>
+              </div>
+            </div>
+
+            <div style="background: #FFF8EE; border-radius: 22px; padding: 26px; display: flex; flex-direction: column; gap: 14px;">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 18px; color: #46281C;">Office</div>
+                <div style="width: 34px; height: 34px; border-radius: 999px; border: 1.5px solid #EED9C0; display: flex; align-items: center; justify-content: center; color: #8A5E42; font-size: 14px;">✎</div>
+              </div>
+              <div style="font-size: 15px; line-height: 1.75; color: #5C3B2A;">Anahit Sargsyan<br>2 Vazgen Sargsyan St, floor 4<br>Yerevan 0010, Armenia<br>+374 99 123 456</div>
+              <div style="display: flex; align-items: center; gap: 10px; font-size: 14px; color: #A9714B; background: #FDEFE0; border-radius: 12px; padding: 11px 14px;"><span style="width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid #D8B99A; flex-shrink: 0;"></span> Reception accepts chilled parcels</div>
+              <div style="display: flex; gap: 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; padding-top: 2px; margin-top: auto;">
+                <div style="color: #E4761F;">Edit</div>
+                <div style="color: #E4761F;">Make default</div>
+                <div style="color: #A9714B;">Remove</div>
+              </div>
+            </div>
+
+            <div style="border: 2px dashed #E0C4A4; border-radius: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 30px; min-height: 220px;">
+              <div style="width: 44px; height: 44px; border-radius: 999px; background: #FFF8EE; color: #C08A5E; display: flex; align-items: center; justify-content: center; font-size: 20px;">+</div>
+              <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C;">Add a new address</div>
+              <div style="font-size: 13px; color: #A9714B; text-align: center; max-width: 220px;">Courier covers Yerevan daily; regions ship Mon–Thu so chilled jars never sit over the weekend.</div>
+            </div>
+
+            <div style="background: #46281C; border-radius: 22px; padding: 26px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 17px; color: #FFF8EE;">Pickup from the apiary</div>
+              <div style="font-size: 14px; line-height: 1.65; color: #C9AA92;">Skip the courier — collect from the meadow gate and see the hives. Saturdays, 10:00–16:00.</div>
+              <div style="display: flex; align-items: center; gap: 10px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; color: #F6C244; margin-top: auto;">Set as pickup point →</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 10 SETTINGS ══════════ -->
+  <div style="width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 13px; color: #FFF8EE; background: #46281C; padding: 6px 12px; border-radius: 999px; letter-spacing: 0.12em;">10</div>
+      <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Account — settings</div>
+    </div>
+    <div data-screen-label="10 Settings" style="background: #FDEFE0; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 70px -40px rgba(70,40,28,0.45);">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 24px 56px; background: #FEF4E8; border-bottom: 1px solid #F2E1CC;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 11px; background: #F6C244; display: flex; align-items: center; justify-content: center; font-family: Poppins, sans-serif; font-weight: 800; color: #46281C;">M</div>
+          <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 17px; color: #46281C; letter-spacing: 0.04em;">MOUNTAIN BREATH</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 34px; font-family: Poppins, sans-serif; font-weight: 500; font-size: 15px; color: #5C3B2A;">
+          <span>Home</span><span>Shop</span><span>Our hive</span><span>Benefits</span><span>Journal</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <div style="display: flex; align-items: center; gap: 10px; background: #46281C; color: #FFF8EE; padding: 8px 16px 8px 8px; border-radius: 999px;">
+            <div style="width: 30px; height: 30px; border-radius: 999px; background: #F6C244; color: #46281C; font-family: Poppins, sans-serif; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center;">AS</div>
+            <div style="font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px;">Anahit ▾</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 9px; border: 1.5px solid #E9C9A8; color: #46281C; padding: 9px 17px; border-radius: 999px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px;">Cart · 3</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 300px 1fr; gap: 32px; padding: 40px 56px 56px;">
+        <div style="background: #FFF8EE; border-radius: 22px; padding: 14px; display: flex; flex-direction: column; gap: 4px; align-self: start;">
+          <div style="display: flex; align-items: center; gap: 12px; color: #5C3B2A; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center; color: #C08A5E;">▤</span> My orders <span style="margin-left: auto; color: #A9714B; font-size: 13px;">7</span></div>
+          <div style="display: flex; align-items: center; gap: 12px; color: #5C3B2A; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center; color: #C08A5E;">♡</span> Wishlist <span style="margin-left: auto; color: #A9714B; font-size: 13px;">5</span></div>
+          <div style="display: flex; align-items: center; gap: 12px; color: #5C3B2A; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center; color: #C08A5E;">⌂</span> Addresses</div>
+                    <div style="display: flex; align-items: center; gap: 12px; background: #E4761F; color: #FFF8EE; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px;"><span style="width: 20px; text-align: center;">⚙</span> Settings</div>
+          <div style="border-top: 1px solid #F2E1CC; margin: 6px 8px 2px;"></div>
+          <div style="display: flex; align-items: center; gap: 12px; color: #A9714B; border-radius: 14px; padding: 14px 16px; font-family: Poppins, sans-serif; font-weight: 600; font-size: 15px;"><span style="width: 20px; text-align: center;">→</span> Log out</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 36px; color: #46281C; letter-spacing: -0.025em;">Settings</div>
+            <div style="font-size: 15px; color: #7C5A45;">Profile, language and what we send you.</div>
+          </div>
+
+          <div style="background: #FFF8EE; border-radius: 22px; padding: 28px; display: flex; flex-direction: column; gap: 18px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 16px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Profile</div>
+              <div style="font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; color: #E4761F;">Edit</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+              <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Full name</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 14px 16px; font-size: 15px; color: #46281C; background: #FDEFE0;">Anahit Sargsyan</div></div>
+              <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Email</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 14px 16px; font-size: 15px; color: #46281C; background: #FDEFE0;">anahit@email.com</div></div>
+              <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Phone</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 14px 16px; font-size: 15px; color: #46281C; background: #FDEFE0;">+374 99 123 456</div></div>
+              <div style="display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Password</div><div style="border: 1.5px solid #EED9C0; border-radius: 12px; padding: 14px 16px; font-size: 15px; color: #A9714B; background: #FDEFE0; display: flex; justify-content: space-between;"><span>••••••••••</span><span style="font-size: 13px; color: #E4761F; font-weight: 600;">Change</span></div></div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div style="background: #FFF8EE; border-radius: 22px; padding: 28px; display: flex; flex-direction: column; gap: 16px;">
+              <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 16px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Language & currency</div>
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Site language</div>
+                <div style="display: flex; gap: 10px;">
+                  <div style="flex: 1; border: 2px solid #E4761F; background: #FDEFE0; border-radius: 12px; padding: 13px; text-align: center; font-family: Poppins, sans-serif; font-weight: 700; font-size: 14px; color: #46281C;">English</div>
+                  <div style="flex: 1; border: 1.5px solid #EED9C0; border-radius: 12px; padding: 13px; text-align: center; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; color: #6E4B36;">Հայերեն</div>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="font-size: 13px; color: #7C5A45; font-weight: 600;">Show prices in</div>
+                <div style="display: flex; gap: 10px;">
+                  <div style="flex: 1; border: 2px solid #E4761F; background: #FDEFE0; border-radius: 12px; padding: 13px; text-align: center; font-family: Poppins, sans-serif; font-weight: 700; font-size: 14px; color: #46281C;">USD + AMD</div>
+                  <div style="flex: 1; border: 1.5px solid #EED9C0; border-radius: 12px; padding: 13px; text-align: center; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; color: #6E4B36;">USD</div>
+                  <div style="flex: 1; border: 1.5px solid #EED9C0; border-radius: 12px; padding: 13px; text-align: center; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; color: #6E4B36;">AMD</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="background: #FFF8EE; border-radius: 22px; padding: 28px; display: flex; flex-direction: column; gap: 14px;">
+              <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 16px; color: #46281C; letter-spacing: 0.06em; text-transform: uppercase;">Notifications</div>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+                <div style="display: flex; flex-direction: column; gap: 2px;"><div style="font-size: 15px; font-weight: 700; color: #46281C;">Order updates</div><div style="font-size: 13px; color: #A9714B;">Packed, shipped, delivered</div></div>
+                <div style="width: 42px; height: 24px; border-radius: 999px; background: #E4761F; position: relative; flex-shrink: 0;"><div style="position: absolute; right: 3px; top: 3px; width: 18px; height: 18px; border-radius: 999px; background: #FFF8EE;"></div></div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+                <div style="display: flex; flex-direction: column; gap: 2px;"><div style="font-size: 15px; font-weight: 700; color: #46281C;">Harvest notes</div><div style="font-size: 13px; color: #A9714B;">Monthly, what we are jarring</div></div>
+                <div style="width: 42px; height: 24px; border-radius: 999px; background: #E4761F; position: relative; flex-shrink: 0;"><div style="position: absolute; right: 3px; top: 3px; width: 18px; height: 18px; border-radius: 999px; background: #FFF8EE;"></div></div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+                <div style="display: flex; flex-direction: column; gap: 2px;"><div style="font-size: 15px; font-weight: 700; color: #46281C;">Wishlist alerts</div><div style="font-size: 13px; color: #A9714B;">Back in stock, member offers</div></div>
+                <div style="width: 42px; height: 24px; border-radius: 999px; background: #E4761F; position: relative; flex-shrink: 0;"><div style="position: absolute; right: 3px; top: 3px; width: 18px; height: 18px; border-radius: 999px; background: #FFF8EE;"></div></div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+                <div style="display: flex; flex-direction: column; gap: 2px;"><div style="font-size: 15px; font-weight: 700; color: #46281C;">SMS on delivery day</div><div style="font-size: 13px; color: #A9714B;">Courier window, +374 only</div></div>
+                <div style="width: 42px; height: 24px; border-radius: 999px; background: #EED9C0; position: relative; flex-shrink: 0;"><div style="position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 999px; background: #FFF8EE;"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="background: #FDEFE0; border: 1.5px solid #EED9C0; border-radius: 22px; padding: 22px 28px; display: flex; align-items: center; justify-content: space-between; gap: 20px;">
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <div style="font-family: Poppins, sans-serif; font-weight: 700; font-size: 15px; color: #46281C;">Delete account</div>
+              <div style="font-size: 13px; color: #A9714B;">Removes your orders, addresses and wishlist. Cannot be undone.</div>
+            </div>
+            <div style="border: 1.5px solid #C4432B; color: #C4432B; font-family: Poppins, sans-serif; font-weight: 600; font-size: 14px; padding: 11px 20px; border-radius: 999px; white-space: nowrap;">Delete…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1540,&quot;height&quot;:1000}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      orders: [
+        { id: "Order #MB-1032", date: "28 Jul 2026", items: "2 items", summary: "Wildflower Honey · Bee Pollen", usd: "$30.00", amd: "14,300 ֏" },
+        { id: "Order #MB-1018", date: "12 Jun 2026", items: "1 item", summary: "Propolis Tincture 30 ml", usd: "$19.00", amd: "9,100 ֏" },
+        { id: "Order #MB-0995", date: "30 Apr 2026", items: "3 items", summary: "Honey · Beeswax · Pollen", usd: "$39.00", amd: "18,600 ֏" },
+        { id: "Order #MB-0968", date: "14 Mar 2026", items: "1 item", summary: "Fresh Royal Jelly 25 g", usd: "$32.00", amd: "15,300 ֏" }
+      ],
+      wishlist: [
+        { name: "Fresh Royal Jelly", size: "50 g jar", saved: "2 weeks ago", usd: "$58.00", amd: "27,700 ֏", slot: "royal jelly", badge: "", inStock: true, outOfStock: false },
+        { name: "Bee Venom Serum", size: "15 ml bottle", saved: "1 month ago", usd: "$28.00", amd: "13,400 ֏", slot: "venom serum", badge: "New", inStock: true, outOfStock: false },
+        { name: "Pure Beeswax Blocks", size: "4 × 100 g", saved: "1 month ago", usd: "$9.00", amd: "4,300 ֏", slot: "beeswax blocks", badge: "", inStock: true, outOfStock: false },
+        { name: "Fresh Comb Honey", size: "340 g box", saved: "3 months ago", usd: "$22.00", amd: "10,500 ֏", slot: "comb honey", badge: "Harvest sold out", inStock: false, outOfStock: true },
+        { name: "Bee Pollen Granules", size: "250 g pouch", saved: "3 months ago", usd: "$16.00", amd: "7,600 ֏", slot: "pollen granules", badge: "", inStock: true, outOfStock: false }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

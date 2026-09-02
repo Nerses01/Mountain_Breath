@@ -27,8 +27,8 @@ func TestCreateProduct_Transactional(t *testing.T) {
 	p := domain.Product{
 		CategoryID: categoryID, Slug: "berry-jam", Name: "Berry Jam", IsActive: true,
 		Variants: []domain.ProductVariant{
-			{SKU: "JAM-300", Label: "300 g", PriceMinor: 250000, StockQty: 5},
-			{SKU: "JAM-600", Label: "600 g", PriceMinor: 450000, StockQty: 2},
+			{SKU: "JAM-300", Label: "300 g", Prices: domain.Money{domain.CurrencyUSD: 250000}, StockQty: 5},
+			{SKU: "JAM-600", Label: "600 g", Prices: domain.Money{domain.CurrencyUSD: 450000}, StockQty: 2},
 		},
 	}
 	if err := s.CreateProduct(ctx, &p); err != nil {
@@ -42,7 +42,7 @@ func TestCreateProduct_Transactional(t *testing.T) {
 	// behind — the transaction is the point of this test.
 	dup := domain.Product{
 		CategoryID: categoryID, Slug: "other-jam", Name: "Other", IsActive: true,
-		Variants: []domain.ProductVariant{{SKU: "JAM-300", Label: "1 kg", PriceMinor: 100, StockQty: 1}},
+		Variants: []domain.ProductVariant{{SKU: "JAM-300", Label: "1 kg", Prices: domain.Money{domain.CurrencyUSD: 100}, StockQty: 1}},
 	}
 	err := s.CreateProduct(ctx, &dup)
 	if !errors.Is(err, domain.ErrSKUTaken) {
@@ -60,7 +60,7 @@ func TestCreateProduct_Transactional(t *testing.T) {
 	// Unknown category maps to the right sentinel.
 	badCat := domain.Product{
 		CategoryID: 99999, Slug: "ghost", Name: "Ghost", IsActive: true,
-		Variants: []domain.ProductVariant{{SKU: "GH-1", Label: "1", PriceMinor: 1, StockQty: 0}},
+		Variants: []domain.ProductVariant{{SKU: "GH-1", Label: "1", Prices: domain.Money{domain.CurrencyUSD: 1}, StockQty: 0}},
 	}
 	if err := s.CreateProduct(ctx, &badCat); !errors.Is(err, domain.ErrCategoryNotFound) {
 		t.Errorf("err = %v, want ErrCategoryNotFound", err)

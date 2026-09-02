@@ -14,7 +14,7 @@ const validProductBody = `{
 	"name": "Mountain Jam",
 	"description": "Wild berry jam.",
 	"variants": [
-		{"sku": "JAM-1", "label": "300 g", "price_minor": 250000, "stock_qty": 10}
+		{"sku": "JAM-1", "label": "300 g", "prices": {"USD": 2500, "AMD": 9800}, "stock_qty": 10}
 	]
 }`
 
@@ -50,7 +50,7 @@ func TestCreateProduct(t *testing.T) {
 	t.Run("validation errors use variants[i] field paths", func(t *testing.T) {
 		fake := newFakeStore()
 		cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleAdmin})
-		body := `{"category_id": 1, "slug": "x y", "name": "", "variants": [{"sku": "", "label": "L", "price_minor": 0, "stock_qty": -1}]}`
+		body := `{"category_id": 1, "slug": "x y", "name": "", "variants": [{"sku": "", "label": "L", "prices": {"USD": 0, "XXX": 5}, "stock_qty": -1}]}`
 		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/admin/products", body, cookie)
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", rec.Code)
@@ -63,7 +63,7 @@ func TestCreateProduct(t *testing.T) {
 		if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
 			t.Fatal(err)
 		}
-		for _, key := range []string{"name", "slug", "variants[0].sku", "variants[0].price_minor", "variants[0].stock_qty"} {
+		for _, key := range []string{"name", "slug", "variants[0].sku", "variants[0].prices.USD", "variants[0].prices.XXX", "variants[0].stock_qty"} {
 			if _, ok := envelope.Error.Fields[key]; !ok {
 				t.Errorf("missing field error %q in %v", key, envelope.Error.Fields)
 			}
@@ -91,16 +91,25 @@ func TestUpdateVariant(t *testing.T) {
 	cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleAdmin})
 	server := newTestServer(fake)
 
-	rec := doRequest(server, http.MethodPatch, "/api/v1/admin/variants/7", `{"price_minor": 900, "stock_qty": 5}`, cookie)
+	rec := doRequest(server, http.MethodPatch, "/api/v1/admin/variants/7", `{"prices": {"USD": 900, "AMD": 3500}, "stock_qty": 5}`, cookie)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204 (body: %s)", rec.Code, rec.Body.String())
 	}
-	if fake.products[0].Variants[0].PriceMinor != 900 || fake.products[0].Variants[0].StockQty != 5 {
-		t.Errorf("variant not updated: %+v", fake.products[0].Variants[0])
+	got := fake.products[0].Variants[0]
+	if got.Prices[domain.CurrencyUSD] != 900 || got.Prices[domain.CurrencyAMD] != 3500 || got.StockQty != 5 {
+		t.Errorf("variant not updated: %+v", got)
 	}
 
-	rec = doRequest(server, http.MethodPatch, "/api/v1/admin/variants/999", `{"price_minor": 900, "stock_qty": 5}`, cookie)
+	rec = doRequest(server, http.MethodPatch, "/api/v1/admin/variants/999", `{"prices": {"USD": 900}, "stock_qty": 5}`, cookie)
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("status = %d, want 404", rec.Code)
+	}
+
+	// The base currency is not optional: without it nothing can be priced,
+	// not even by conversion, so a prices map that omits it is a 400 rather
+	// than a variant that quietly disappears from the shop.
+	rec = doRequest(server, http.MethodPatch, "/api/v1/admin/variants/7", `{"prices": {"AMD": 3500}, "stock_qty": 5}`, cookie)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("missing base price: status = %d, want 400 (body: %s)", rec.Code, rec.Body.String())
 	}
 }

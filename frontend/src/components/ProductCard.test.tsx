@@ -1,60 +1,275 @@
-import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ProductCard } from './ProductCard'
 import type { Product } from '../api/types'
 
 const product: Product = {
   id: 1,
   category_id: 1,
-  slug: 'wild-thyme-tea',
-  name: 'Wild Thyme Tea',
-  description: 'Fragrant wild thyme.',
-  image_url: '',
+  category_slug: 'honey',
+  category_name: 'Honey',
+  rating_avg: 4.67,
+  rating_count: 3,
+  slug: 'mountain-wildflower-honey',
+  name: 'Mountain Wildflower Honey',
+  description: 'Sweet liquid made from flower nectar.',
+  images: [],
   created_at: '2026-07-29T00:00:00Z',
+  badge: 'best_seller',
+  badge_tone: 'honey',
+  benefits: [
+    { slug: 'energy', name: 'Energy' },
+    { slug: 'sweetening', name: 'Sweetening' },
+  ],
+  currency: 'USD',
   variants: [
-    { id: 1, sku: 'TEA-1', label: '50 g', price_minor: 120000, stock_qty: 40 },
-    { id: 2, sku: 'TEA-2', label: '100 g', price_minor: 220000, stock_qty: 0 },
+    {
+      id: 1,
+      sku: 'HON-500',
+      label: '500 g',
+      price_minor: 1400,
+      prices: { USD: 1400, AMD: 6700 },
+      stock_qty: 40,
+    },
+    {
+      id: 2,
+      sku: 'HON-1K',
+      label: '1 kg',
+      price_minor: 2600,
+      prices: { USD: 2600, AMD: 12400 },
+      stock_qty: 6,
+    },
   ],
 }
 
 // Components using <Link> need a router context — MemoryRouter is the
-// test-friendly one (no real browser URL involved).
-function renderCard(p: Product) {
+// test-friendly one (no real browser URL involved). E8's live heart added
+// the query provider: the card now asks who is signed in.
+function renderCard(p: Product, onAdd?: (p: Product) => void) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <MemoryRouter>
-      <ProductCard product={p} />
+      <QueryClientProvider client={qc}>
+        <ProductCard product={p} onAdd={onAdd} />
+      </QueryClientProvider>
     </MemoryRouter>,
   )
 }
 
 describe('ProductCard', () => {
-  it('shows name, description, and both variants', () => {
+  it('shows the name, the "size · benefit" line and the from-price', () => {
     renderCard(product)
 
-    expect(screen.getByText('Wild Thyme Tea')).toBeInTheDocument()
-    expect(screen.getByText('Fragrant wild thyme.')).toBeInTheDocument()
-    expect(screen.getByText('50 g')).toBeInTheDocument()
-    expect(screen.getByText('100 g')).toBeInTheDocument()
+    expect(screen.getByText('Mountain Wildflower Honey')).toBeInTheDocument()
+    // The eyebrow is the CATEGORY, resolved server-side into the reader's
+    // language; the line under the name pairs the size with the product's
+    // first benefit by the taxonomy's sort_order.
+    expect(screen.getByText('Honey')).toBeInTheDocument()
+    expect(screen.getByText('500 g · Energy')).toBeInTheDocument()
+    // Two variants, so the price is labelled "from" — an unlabelled $14 on a
+    // product that also sells for $26 would be a lie of omission.
+    expect(screen.getByText('from $14.00')).toBeInTheDocument()
+    // ...and the design's muted second line, which is a SHELF price from the
+    // other market, not $14.00 run through a rate.
+    expect(screen.getByText('6,700 ֏')).toBeInTheDocument()
   })
 
-  it('formats prices from minor units', () => {
-    renderCard(product)
+  it('shows only one price when the shop has none in the other market', () => {
+    renderCard({
+      ...product,
+      variants: [{ ...product.variants[0], prices: { USD: 1400 } }],
+    })
 
-    expect(screen.getByText('1,200.00')).toBeInTheDocument()
-    expect(screen.getByText('2,200.00')).toBeInTheDocument()
+    expect(screen.getByText('$14.00')).toBeInTheDocument()
+    expect(screen.queryByText(/֏/)).not.toBeInTheDocument()
   })
 
-  it('marks stock state per variant', () => {
+  it('renders the badge KEY through the message catalogue, not raw', () => {
     renderCard(product)
 
-    expect(screen.getByText('40 left')).toBeInTheDocument()
-    expect(screen.getByText('out of stock')).toBeInTheDocument()
+    expect(screen.getByText('Best seller')).toBeInTheDocument()
+    expect(screen.queryByText('best_seller')).not.toBeInTheDocument()
   })
 
-  it('links to the product page', () => {
+  it('omits the badge when the product has none', () => {
+    renderCard({ ...product, badge: '' })
+
+    expect(screen.queryByText('Best seller')).not.toBeInTheDocument()
+  })
+
+  it('drops the "from" label when there is only one size', () => {
+    renderCard({ ...product, variants: [product.variants[0]] })
+
+    expect(screen.getByText('$14.00')).toBeInTheDocument()
+    expect(screen.queryByText('from $14.00')).not.toBeInTheDocument()
+  })
+
+  it('marks a product with no stock in any variant as out of stock', () => {
+    const soldOut = {
+      ...product,
+      variants: product.variants.map((v) => ({ ...v, stock_qty: 0 })),
+    }
+    renderCard(soldOut)
+
+    expect(screen.getByText('Out of stock')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add to cart' })).toBeDisabled()
+  })
+
+  it('stays in stock while ANY variant has some', () => {
+    const partial = {
+      ...product,
+      variants: [
+        { ...product.variants[0], stock_qty: 0 },
+        { ...product.variants[1], stock_qty: 3 },
+      ],
+    }
+    renderCard(partial, () => {})
+
+    expect(screen.queryByText('Out of stock')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add to cart' })).toBeEnabled()
+  })
+
+  it('hands the product to the Add handler', () => {
+    const onAdd = vi.fn()
+    renderCard(product, onAdd)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }))
+
+    expect(onAdd).toHaveBeenCalledWith(product)
+  })
+
+  it('flashes the confirmed cart count after an add, then rests again', async () => {
+    // The handler resolves to the count the SERVER answered with — the
+    // flash must show that number, not a local guess.
+    renderCard(product, () => Promise.resolve(2))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }))
+
+    expect(await screen.findByRole('button', { name: 'In cart: 2' })).toBeInTheDocument()
+    // ...and after the flash window the resting label returns. Generous
+    // timeout: the window itself is 1.8s of real time.
+    expect(
+      await screen.findByRole('button', { name: 'Add to cart' }, { timeout: 3000 }),
+    ).toBeInTheDocument()
+  }, 7000)
+
+  it('shows no flash when the handler resolves to nothing', async () => {
+    // A void handler (a caller that opted out of feedback) must not strand
+    // the button in a confirmation it cannot back up.
+    renderCard(product, () => {})
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }))
+
+    expect(screen.getByRole('button', { name: 'Add to cart' })).toBeInTheDocument()
+    expect(screen.queryByText(/In cart/)).not.toBeInTheDocument()
+  })
+
+  it('disables Add when no handler is wired (anonymous visitor)', () => {
     renderCard(product)
 
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/products/wild-thyme-tea')
+    expect(screen.getByRole('button', { name: 'Add to cart' })).toBeDisabled()
+  })
+
+  it('links the name to the product page', () => {
+    renderCard(product)
+
+    expect(
+      screen.getByRole('link', { name: 'Mountain Wildflower Honey' }),
+    ).toHaveAttribute('href', '/products/mountain-wildflower-honey')
+  })
+
+  describe('hover slideshow', () => {
+    const threePhotos = {
+      ...product,
+      images: [
+        { url: '/uploads/a.jpg', alt: 'jar' },
+        { url: '/uploads/b.jpg', alt: 'texture' },
+        { url: '/uploads/c.jpg', alt: 'in hand' },
+      ],
+    }
+
+    // jsdom has no matchMedia; the hook treats that as "cannot hover" and
+    // stays inert, so a hover-capable device is declared explicitly.
+    function pretendHoverDevice() {
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn((query: string) => ({
+          matches: !query.includes('prefers-reduced-motion'),
+        })),
+      )
+    }
+
+    const visibleSrc = (container: HTMLElement) =>
+      Array.from(container.querySelectorAll('img'))
+        .find((img) => !img.className.includes('invisible'))
+        ?.getAttribute('src')
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+      vi.useRealTimers()
+    })
+
+    it('cycles the photos while hovered and resets on leave', () => {
+      pretendHoverDevice()
+      vi.useFakeTimers()
+      const { container } = renderCard(threePhotos)
+      // Hover the CARD: the stretched-link overlay swallows pointer events
+      // over the photo itself, so that is where the handlers live.
+      const slot = container.querySelector('article')!
+
+      // At rest: one <img> — the grid must not fetch every photo of every
+      // card up front.
+      expect(container.querySelectorAll('img')).toHaveLength(1)
+
+      fireEvent.mouseEnter(slot)
+      // The hover mounts the whole stack (the browser starts fetching), and
+      // dots appear for orientation.
+      expect(container.querySelectorAll('img')).toHaveLength(3)
+      expect(visibleSrc(container)).toBe('/uploads/a.jpg')
+
+      act(() => vi.advanceTimersByTime(900))
+      expect(visibleSrc(container)).toBe('/uploads/b.jpg')
+
+      fireEvent.mouseLeave(slot)
+      // Back to the hero: a grid never ends up a patchwork of whatever
+      // frame each cursor left behind.
+      expect(visibleSrc(container)).toBe('/uploads/a.jpg')
+    })
+
+    it('stays still under prefers-reduced-motion', () => {
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => ({ matches: true })), // reduce: true — and hover: true
+      )
+      vi.useFakeTimers()
+      const { container } = renderCard(threePhotos)
+      const slot = container.querySelector('article')!
+
+      fireEvent.mouseEnter(slot)
+      act(() => vi.advanceTimersByTime(3000))
+
+      // Still the single hero image, no dots, nothing moving.
+      expect(container.querySelectorAll('img')).toHaveLength(1)
+      expect(visibleSrc(container)).toBe('/uploads/a.jpg')
+    })
+  })
+
+  it('renders the hero photo when the product has one, the placeholder when not', () => {
+    // images arrive hero-first from the API, so [0] is the card's photo.
+    const { container, unmount } = renderCard({
+      ...product,
+      images: [{ url: '/uploads/hero.jpg', alt: 'A jar of honey' }],
+    })
+
+    expect(container.querySelector('img')).toHaveAttribute('src', '/uploads/hero.jpg')
+    unmount()
+
+    // No photos: the slot keeps the card's geometry with the slug text
+    // instead of collapsing (aria-hidden — the name sits right below).
+    const empty = renderCard(product)
+    expect(empty.container.querySelector('img')).toBeNull()
+    expect(empty.getByText('mountain wildflower honey')).toBeInTheDocument()
   })
 })

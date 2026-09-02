@@ -38,12 +38,14 @@ func (s *Store) CreateSession(ctx context.Context, token string, userID int64, e
 func (s *Store) GetUserBySession(ctx context.Context, token string) (domain.User, error) {
 	var u domain.User
 	err := s.pool.QueryRow(ctx, `
-		SELECT u.id, u.email, u.password_hash, u.role, u.created_at
+		SELECT u.id, u.email, u.password_hash, u.role, u.created_at,
+		       u.full_name, u.phone, u.notify_order_updates
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
 		WHERE s.token_hash = $1 AND s.expires_at > now()`,
 		hashToken(token),
-	).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.CreatedAt)
+	).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.CreatedAt,
+		&u.FullName, &u.Phone, &u.NotifyOrderUpdates)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.User{}, domain.ErrNotFound
@@ -59,4 +61,20 @@ func (s *Store) DeleteSession(ctx context.Context, token string) error {
 		return fmt.Errorf("deleting session: %w", err)
 	}
 	return nil
+}
+
+// CountSessions is the data view's honesty about auth state (F2, decision
+// #97): how many devices currently hold a live key to this account. Only
+// unexpired rows count — an expired session is a dead fact awaiting the
+// cleanup job, not something "we store about you" in any meaningful sense.
+func (s *Store) CountSessions(ctx context.Context, userID int64) (int, error) {
+	var n int
+	err := s.pool.QueryRow(ctx, `
+		SELECT count(*)::int FROM sessions
+		WHERE user_id = $1 AND expires_at > now()`,
+		userID).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("counting sessions: %w", err)
+	}
+	return n, nil
 }

@@ -13,6 +13,17 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:8080',
       '/uploads': 'http://localhost:8080',
+      '/sitemap.xml': 'http://localhost:8080',
+    },
+  },
+  // vite preview (the built app, used by Lighthouse CI) does NOT inherit
+  // server.proxy — without this mirror the audited pages would render
+  // against a dead API and measure an error state.
+  preview: {
+    proxy: {
+      '/api': 'http://localhost:8080',
+      '/uploads': 'http://localhost:8080',
+      '/sitemap.xml': 'http://localhost:8080',
     },
   },
   test: {

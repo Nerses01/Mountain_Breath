@@ -55,6 +55,7 @@ to GHCR.
 | Document | Purpose |
 |---|---|
 | [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) | Goals, tech stack rationale, and the phased learning roadmap |
+| [docs/PLAN_ERA_2.md](docs/PLAN_ERA_2.md) | Era II roadmap: turning the design into the real storefront |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, domain model, API conventions, decisions log |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Server setup runbook: hardening, TLS, CD, backups |
 | [docs/RULES.md](docs/RULES.md) | Working rules for the collaboration |
