@@ -12,15 +12,45 @@ const (
 	RoleAdmin    = "admin"
 )
 
+// A5: the harvest-notes toggle's three states, as the settings screen sees
+// them. "none" covers never-subscribed AND unsubscribed — both restart the
+// same way (a fresh double-opt-in).
+const (
+	NewsletterNone       = "none"
+	NewsletterPending    = "pending"
+	NewsletterSubscribed = "subscribed"
+)
+
 type User struct {
 	ID           int64
 	Email        string
 	PasswordHash string
 	Role         string
 	CreatedAt    time.Time
+
+	// A5 (canvas 10): the profile the settings screen edits. Empty strings,
+	// not pointers — one kind of absence, and the UI falls back to the
+	// email without a nil branch.
+	FullName string
+	Phone    string
+	// The one notification preference with a sender to honour it (decision
+	// log #87): F2's status-change mailer checks this before sending.
+	NotifyOrderUpdates bool
 }
 
 func (u User) IsAdmin() bool { return u.Role == RoleAdmin }
+
+// F2 (decision #96): the role write path's vocabulary. ValidRole answers
+// the 400-shaped question; ErrLastAdmin is the 409-shaped invariant "the
+// shop always has at least one admin" — a COUNT invariant like the promo
+// cap, so it cannot be a constraint or an index and is enforced under a
+// lock in the store. Losing the last admin would mean psql is the only
+// way back in: the exact dependency F2 exists to remove.
+var ErrLastAdmin = errors.New("cannot demote the only admin")
+
+func ValidRole(s string) bool {
+	return s == RoleCustomer || s == RoleAdmin
+}
 
 var (
 	ErrEmailTaken = errors.New("email already registered")
@@ -37,11 +67,34 @@ func NormalizeEmail(email string) string {
 
 func ValidateRegistration(email, password string) map[string]string {
 	fields := make(map[string]string)
-	if _, err := mail.ParseAddress(email); err != nil {
-		fields["email"] = "must be a valid email address"
+	if !ValidEmail(email) {
+		fields["email"] = ValidationEmailFormat
 	}
-	if len(password) < 8 {
-		fields["password"] = "must be at least 8 characters"
+	if len(password) < PasswordMinLength {
+		fields["password"] = ValidationPasswordTooShort
 	}
 	return fields
+}
+
+// ValidateProfile checks the settings form's two fields (A5). Both are
+// OPTIONAL — an account works without them — so only excess is refused;
+// emptiness is a valid answer, not an error.
+func ValidateProfile(fullName, phone string) map[string]string {
+	fields := make(map[string]string)
+	if len(fullName) > 120 {
+		fields["full_name"] = ValidationTooLong
+	}
+	if len(phone) > 40 {
+		fields["phone"] = ValidationTooLong
+	}
+	return fields
+}
+
+// ValidEmail is the one address check, shared since E9 by registration and
+// the newsletter form. net/mail implements the RFC's grammar — a hand-rolled
+// regex would reject real addresses the RFC allows, which is the postal-code
+// lesson (ValidateAddress) applied to email.
+func ValidEmail(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
 }

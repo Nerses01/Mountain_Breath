@@ -1,0 +1,32 @@
+# Temporary public URL for the local stack — no VPS, no domain, no Cloudflare
+# account. A "quick tunnel": cloudflared dials OUT to Cloudflare's edge and
+# keeps the connection open; visitors hit a random https://….trycloudflare.com
+# URL and Cloudflare relays them back down that pipe. Nothing inbound ever
+# reaches this machine, so no port-forwarding or firewall changes.
+#
+# This is an OVERLAY — it only adds a service, so it must be combined with the
+# main compose file (compose merges the files left to right):
+#
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.tunnel.yml up -d --build
+#
+# The public URL is printed in cloudflared's log (changes on every restart):
+#
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.tunnel.yml logs cloudflared
+#
+# Demo/preview only: quick tunnels carry no uptime promise and the URL churns.
+# The real deployment (VPS + domain, docs/DEPLOYMENT.md) replaces this.
+services:
+  cloudflared:
+    # Unpinned on purpose, unlike the rest of the stack: cloudflared is a
+    # client of Cloudflare's service and old releases get cut off — the
+    # opposite trade-off from postgres, where surprise upgrades are the risk.
+    image: cloudflare/cloudflared:latest
+    # --url points at the nginx container over the compose-internal network
+    # (same request-time DNS name the web container itself uses for "api").
+    # Postgres stays unreachable: it has no published ports and the tunnel
+    # only forwards HTTP to web:80.
+    command: tunnel --no-autoupdate --url http://web:80
+    depends_on:
+      web:
+        condition: service_started
+    restart: unless-stopped

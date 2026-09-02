@@ -1,0 +1,13 @@
+# Everything public is crawlable; the private and session-shaped routes
+# are excluded — a crawler in a checkout is noise for everyone.
+User-agent: *
+Disallow: /cart
+Disallow: /checkout
+Disallow: /account
+Disallow: /wishlist
+Disallow: /admin
+Allow: /
+
+# The sitemap URL must be absolute per the spec; it is announced here once
+# the shop has its domain (Phase 9). Until then crawlers find
+# /sitemap.xml at the origin root, which is the conventional location.

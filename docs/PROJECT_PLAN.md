@@ -297,21 +297,29 @@ A permanent parking lot for future plans. **Anyone adds ideas here anytime**
 section with tasks and a definition of done. Nothing here is committed-to —
 it exists so ideas survive.
 
+*(Audited 2026-08-15 against Era II — closed lines ticked with the phase
+that closed them; every open line now also lives in a structured phase of
+[PLAN_ERA_3.md](PLAN_ERA_3.md), which is where it gets scoped.)*
+
 **Product / business:**
-- [x] ~~Search v2~~ — done 2026-07-31 (promoted to the Search track); multilingual *content* (Armenian/Russian descriptions in FTS) still open if the catalog goes multilingual
-- [ ] Payments: real provider integration (research Armenian options: Idram, Ameriabank vPOS, …)
-- [ ] Order e-mail notifications (confirmation, status changes)
-- [ ] Anonymous carts (buy without registering first)
-- [ ] Product image galleries (multiple photos) + server-side thumbnails/resizing
-- [ ] Customer-facing order cancellation (while pending)
+- [x] ~~Search v2~~ — done 2026-07-31 (promoted to the Search track); ~~multilingual content in FTS~~ — done in E1.5 (per-locale generated tsvector, built-in armenian/russian configs)
+- [ ] Payments: real provider integration (research Armenian options: Idram, Ameriabank vPOS, …) → **Era III F4**
+- [x] ~~Order e-mail confirmation~~ — done in E8 (trilingual, via the Mailer); status-change emails still open → **Era III F2**
+- [ ] Anonymous carts (buy without registering first) → **Era III F5**
+- [x] ~~Product image galleries~~ — done in E3; server-side thumbnails/resizing still open, behind photography → **Era III F3**
+- [ ] Customer-facing order cancellation (while pending) → **Era III F2**
+- [ ] Back-in-stock "Notify me" subscriptions — design drawn on the wishlist canvas (08); deferred per PLAN_ACCOUNT.md §2 #6
+- [ ] Apiary pickup as a delivery method (canvas 09; touches checkout pricing) — PLAN_ACCOUNT.md §2 #6
+- [ ] SMS delivery-day notices (+374; canvas 10's fourth toggle) — PLAN_ACCOUNT.md §2 #6
+- [ ] Wishlist price-drop / member-offer emails, the sender half (canvas 08's rail card) — PLAN_ACCOUNT.md §2 #6
 
 **Engineering:**
-- [ ] Login rate limiting + auth hardening batch (security headers, session cleanup job)
-- [ ] OpenAPI spec + generated TS client (replace hand-maintained types.ts)
-- [ ] k6 breaking-point experiment (find what fails first under 10x load)
-- [ ] S3-compatible object storage for uploads (when hosting matures)
-- [ ] Log aggregation + OpenTelemetry tracing
-- [ ] Category management: edit/delete/reorder in admin UI
+- [x] ~~Login rate limiting~~ — done in E8 (per IP+email, also guards forgot-password and newsletter); auth hardening batch (security headers, session cleanup job) still open → **Era III F6**
+- [ ] OpenAPI spec + generated TS client (replace hand-maintained types.ts) → **Era III F6**
+- [x] ~~k6 breaking-point, first pass~~ — E10 found the real bottleneck (Postgres JIT; p95 3,090ms → 11.6ms); the re-run on real hardware → **Era III F6**
+- [ ] S3-compatible object storage for uploads (when hosting matures) → **Era III F3**
+- [ ] Log aggregation + OpenTelemetry tracing → **Era III F6**
+- [ ] Category management: edit/delete/reorder in admin UI → **Era III F2**
 
 ## 5. Milestone Summary
 
@@ -328,3 +336,10 @@ it exists so ideas survive.
 - [RULES.md](RULES.md) — how we work together (read this first each session)
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system design and domain model
 - [LEARNING_LOG.md](LEARNING_LOG.md) — journal of learned topics per session/phase
+- [PLAN_ERA_2.md](PLAN_ERA_2.md) — **Era II** (phases E1–E10): building the
+  designed storefront from `Mountain Breath Store.dc.html`.
+  ✅ **Complete 2026-08-15.**
+- [PLAN_ERA_3.md](PLAN_ERA_3.md) — **Era III** (phases F1–F6): from built to
+  open for business — the unfrozen Phase 9, every debt both eras wrote
+  down, and two gaps found by auditing the running system against the
+  documents. Phase 11 above stays open and feeds every era.

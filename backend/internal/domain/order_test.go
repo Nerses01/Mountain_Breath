@@ -35,6 +35,24 @@ func TestValidOrderTransition(t *testing.T) {
 	}
 }
 
+// F2: the customer's window is PENDING only — narrower than the machine,
+// which also allows confirmed → cancelled for the admin. The test walks
+// every status so a new state cannot silently widen the window.
+func TestCustomerMayCancelOrder(t *testing.T) {
+	for status, want := range map[string]bool{
+		OrderPending:   true,
+		OrderConfirmed: false,
+		OrderShipped:   false,
+		OrderDelivered: false,
+		OrderCancelled: false,
+		"garbage":      false,
+	} {
+		if got := CustomerMayCancelOrder(status); got != want {
+			t.Errorf("CustomerMayCancelOrder(%q) = %v, want %v", status, got, want)
+		}
+	}
+}
+
 func TestValidOrderStatus(t *testing.T) {
 	for _, valid := range []string{OrderPending, OrderConfirmed, OrderShipped, OrderDelivered, OrderCancelled} {
 		if !ValidOrderStatus(valid) {

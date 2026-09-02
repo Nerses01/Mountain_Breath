@@ -22,5 +22,16 @@ services:
       timeout: 3s
       retries: 5
 
+  # E8: the dev mail catcher. The API speaks REAL SMTP to :1025 (so the
+  # production path is exercised, not mocked), and every message it sends
+  # lands in a mailbox UI at http://localhost:8025 instead of anyone's
+  # actual inbox. No auth, no persistence — a catcher, not a relay.
+  mailpit:
+    image: axllent/mailpit
+    container_name: mb-mailpit
+    ports:
+      - "1025:1025" # SMTP — MB_SMTP_ADDR=localhost:1025
+      - "8025:8025" # web UI
+
 volumes:
   pgdata:

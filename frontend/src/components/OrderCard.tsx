@@ -1,5 +1,8 @@
+import { useTranslation } from 'react-i18next'
 import type { Order, OrderStatus } from '../api/types'
-import { formatPrice } from '../lib/format'
+import { Link } from 'react-router'
+import { formatMoney } from '../lib/format'
+import { useLocale } from '../i18n/useLocale'
 
 const statusStyles: Record<OrderStatus, string> = {
   pending: 'bg-amber-100 text-amber-800',
@@ -10,18 +13,27 @@ const statusStyles: Record<OrderStatus, string> = {
 }
 
 export function StatusBadge({ status }: { status: OrderStatus }) {
+  const { t } = useTranslation()
   return (
     <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusStyles[status]}`}>
-      {status}
+      {t(`account:status.${status}`)}
     </span>
   )
 }
 
 export function OrderCard({ order, children }: { order: Order; children?: React.ReactNode }) {
+  const { t } = useTranslation()
+  const { localePath } = useLocale()
   return (
     <article className="rounded-xl border border-stone-200 bg-white p-5">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="font-semibold text-stone-800">Order #{order.id}</span>
+        {/* E6 gave each order a page; the card's number is the way in. */}
+        <Link
+          to={localePath(`/account/orders/${order.id}`)}
+          className="font-semibold text-stone-800 hover:text-emerald-800 hover:underline"
+        >
+          {t('account:orderNumber', { id: order.id })}
+        </Link>
         <StatusBadge status={order.status} />
         {order.user_email && <span className="text-xs text-stone-400">{order.user_email}</span>}
         <span className="ml-auto text-xs text-stone-400">
@@ -35,14 +47,21 @@ export function OrderCard({ order, children }: { order: Order; children?: React.
             <span className="text-stone-600">
               {it.qty} × {it.name} <span className="text-stone-400">({it.label})</span>
             </span>
-            <span className="text-stone-700">{formatPrice(it.price_minor * it.qty)}</span>
+            {/* The ORDER's currency, not the shopper's current one: an order
+                is a record of what was charged, and switching the footer
+                switcher must not re-denominate a receipt. */}
+            <span className="text-stone-700">
+              {formatMoney(it.price_minor * it.qty, order.currency)}
+            </span>
           </li>
         ))}
       </ul>
 
       <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-3">
         <span className="text-sm text-stone-500">Total</span>
-        <span className="font-bold text-stone-800">{formatPrice(order.total_minor)}</span>
+        <span className="font-bold text-stone-800">
+          {formatMoney(order.total_minor, order.currency)}
+        </span>
       </div>
 
       {children}

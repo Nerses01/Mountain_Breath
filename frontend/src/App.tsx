@@ -1,45 +1,133 @@
-import { Link, Route, Routes } from 'react-router'
-import { AuthStatus } from './components/AuthStatus'
-import { CartLink } from './components/CartLink'
+import { Navigate, Route, Routes, useParams } from 'react-router'
+import { AccountLayout } from './components/account/AccountLayout'
+import { Layout } from './components/layout/Layout'
+import { useLocale } from './i18n/useLocale'
+import { PREFIXED_LOCALES } from './i18n/locales'
+import { AddressesPage } from './pages/AddressesPage'
 import { AdminOrdersPage } from './pages/AdminOrdersPage'
+import { AdminPromosPage } from './pages/AdminPromosPage'
+import { AdminUsersPage } from './pages/AdminUsersPage'
 import { AdminPage } from './pages/AdminPage'
 import { AdminProductsPage } from './pages/AdminProductsPage'
+import { AdminReviewsPage } from './pages/AdminReviewsPage'
 import { CartPage } from './pages/CartPage'
-import { CatalogPage } from './pages/CatalogPage'
+import { ContentPage } from './pages/ContentPage'
+import { JournalPage, JournalPostPage } from './pages/JournalPage'
+import { NewsletterConfirmPage, NewsletterUnsubscribePage } from './pages/NewsletterPages'
+import { CheckoutPage } from './pages/CheckoutPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
+import { OrderDetailPage } from './pages/OrderDetailPage'
+import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { OrdersPage } from './pages/OrdersPage'
 import { ProductPage } from './pages/ProductPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
+import { SettingsPage } from './pages/SettingsPage'
+import { ShopPage } from './pages/ShopPage'
+import { WishlistPage } from './pages/WishlistPage'
+
+/**
+ * A1: the old flat account paths redirect to their nested homes. A tiny
+ * component rather than a bare <Navigate>, for two reasons: the target must
+ * keep the LOCALE prefix (/hy/orders → /hy/account/orders — Navigate knows
+ * nothing about locales), and a `:param` in the pattern must survive the
+ * move (/orders/42 → /account/orders/42), which needs useParams at render
+ * time. `replace` keeps Back working: the redirect leaves no history entry
+ * to bounce off of.
+ */
+export function LegacyRedirect({ to }: { to: string }) {
+  const { localePath } = useLocale()
+  const params = useParams()
+  const target = to.replace(/:(\w+)/g, (_, name: string) => params[name] ?? '')
+  return <Navigate to={localePath(target)} replace />
+}
+
+/**
+ * The storefront pages, defined once and mounted under every locale prefix.
+ * Paths are RELATIVE (no leading slash) so the same list works at `/` and
+ * at `/hy`.
+ */
+function storefrontRoutes() {
+  return [
+    // E2 splits the two apart: `/` was the catalog because there was no home
+    // page to put there. Now `/` is the designed Home and `/shop` is the
+    // faceted listing — which is also why the filter state can live in the
+    // query string, since `/shop` is the only page that has any.
+    <Route key="index" index element={<HomePage />} />,
+    <Route key="shop" path="shop" element={<ShopPage />} />,
+    <Route key="product" path="products/:slug" element={<ProductPage />} />,
+    <Route key="login" path="login" element={<LoginPage />} />,
+    <Route key="cart" path="cart" element={<CartPage />} />,
+    // A1 (account canvas): the four account screens nest under one layout
+    // route — AccountLayout renders the rail and guard, <Outlet /> renders
+    // whichever child matched (decision log #84). The index route makes bare
+    // /account land on orders, the canvas's first screen.
+    <Route key="account" path="account" element={<AccountLayout />}>
+      <Route index element={<Navigate to="orders" replace />} />
+      <Route path="orders" element={<OrdersPage />} />
+      <Route path="orders/:id" element={<OrderDetailPage />} />
+      <Route path="wishlist" element={<WishlistPage />} />
+      <Route path="addresses" element={<AddressesPage />} />
+      <Route path="settings" element={<SettingsPage />} />
+    </Route>,
+    // The E8-era flat paths live on as redirects — emailed links and
+    // bookmarks in every locale must keep working.
+    <Route key="orders-legacy" path="orders" element={<LegacyRedirect to="/account/orders" />} />,
+    <Route key="order-legacy" path="orders/:id" element={<LegacyRedirect to="/account/orders/:id" />} />,
+    <Route key="wishlist-legacy" path="wishlist" element={<LegacyRedirect to="/account/wishlist" />} />,
+    // E8: the reset flow. The reset route's token is a URL param because
+    // that is what the EMAILED link carries — the page just posts it back.
+    <Route key="forgot" path="forgot-password" element={<ForgotPasswordPage />} />,
+    <Route key="reset" path="reset-password/:token" element={<ResetPasswordPage />} />,
+    // E9: the content pages (markdown in the repo, decision #3), the
+    // journal, and the newsletter's emailed-link landing pages.
+    <Route key="our-hive" path="our-hive" element={<ContentPage slug="our-hive" />} />,
+    <Route key="benefits" path="benefits" element={<ContentPage slug="benefits" />} />,
+    <Route key="shipping" path="shipping" element={<ContentPage slug="shipping" />} />,
+    <Route key="contact" path="contact" element={<ContentPage slug="contact" />} />,
+    <Route key="terms" path="terms" element={<ContentPage slug="terms" />} />,
+    <Route key="privacy" path="privacy" element={<ContentPage slug="privacy" />} />,
+    <Route key="journal" path="journal" element={<JournalPage />} />,
+    <Route key="journal-post" path="journal/:slug" element={<JournalPostPage />} />,
+    <Route key="nl-confirm" path="newsletter/confirm/:token" element={<NewsletterConfirmPage />} />,
+    <Route key="nl-unsub" path="newsletter/unsubscribe/:token" element={<NewsletterUnsubscribePage />} />,
+  ]
+}
 
 function App() {
   return (
-    <div className="min-h-screen bg-stone-100">
-      <header className="border-b border-stone-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-4">
-          <span className="text-2xl">🏔️</span>
-          <Link to="/" className="flex-1">
-            <h1 className="text-xl font-bold text-stone-800">Mountain Breath</h1>
-            <p className="text-xs text-stone-400">
-              tea · coffee · honey from the mountains
-            </p>
-          </Link>
-          <CartLink />
-          <AuthStatus />
-        </div>
-      </header>
+    <Routes>
+      {/* English lives at the root with no prefix — the stated default, so
+          every link written elsewhere keeps working unprefixed. */}
+      <Route path="/" element={<Layout />}>
+        {storefrontRoutes()}
+      </Route>
+      {/* Checkout sits OUTSIDE Layout: the design gives it its own minimal
+          chrome (logo, steps, "Secure") and no site nav — the one page the
+          shop wants no wandering from is the one with the money on it. */}
+      <Route path="/checkout" element={<CheckoutPage />} />
 
-      {/* The router swaps the page component based on the URL — no server
-          round-trip, just React rendering a different component. */}
-      <Routes>
-        <Route path="/" element={<CatalogPage />} />
-        <Route path="/products/:slug" element={<ProductPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/orders" element={<OrdersPage />} />
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="/admin/products" element={<AdminProductsPage />} />
-        <Route path="/admin/orders" element={<AdminOrdersPage />} />
-      </Routes>
-    </div>
+      {/* The other languages are enumerated rather than matched with a
+          `/:locale` param. A param would happily match `/cart` and treat
+          "cart" as a language, silently rendering the home page there. */}
+      {PREFIXED_LOCALES.map((code) => (
+        <Route key={code} path={`/${code}`} element={<Layout />}>
+          {storefrontRoutes()}
+        </Route>
+      ))}
+      {PREFIXED_LOCALES.map((code) => (
+        <Route key={`${code}-checkout`} path={`/${code}/checkout`} element={<CheckoutPage />} />
+      ))}
+
+      {/* Admin keeps its own chrome: no storefront header or footer, and no
+          locale prefix — it is a back office, not a shopfront. */}
+      <Route path="/admin" element={<AdminPage />} />
+      <Route path="/admin/products" element={<AdminProductsPage />} />
+      <Route path="/admin/orders" element={<AdminOrdersPage />} />
+      <Route path="/admin/promos" element={<AdminPromosPage />} />
+      <Route path="/admin/reviews" element={<AdminReviewsPage />} />
+      <Route path="/admin/users" element={<AdminUsersPage />} />
+    </Routes>
   )
 }
 

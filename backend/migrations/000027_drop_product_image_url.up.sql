@@ -1,0 +1,11 @@
+-- The drop that 000011 promised would happen "in migration 000015" and never
+-- did (000015 became reviews). Since E3 the column has been a liability, not
+-- just a leftover: uploads kept it in sync, but changing the hero or deleting
+-- an image through the gallery endpoints did NOT, so the card image and the
+-- gallery hero could silently disagree. As of this change every read path —
+-- cards included — loads product_images, so the column loses its last reader
+-- and the desync bug loses its subject.
+--
+-- Same add-backfill-then-drop sequence as the 000007 name columns: 000011
+-- added the table and backfilled it FROM this column; now the column goes.
+ALTER TABLE products DROP COLUMN image_url;

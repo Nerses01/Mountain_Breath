@@ -1,1 +1,355 @@
 @import 'tailwindcss';
+
+/* Fonts are self-hosted (npm packages served from our own origin) instead of
+   a Google Fonts <link>: one less third party in the request path, no extra
+   DNS + TLS handshake before text can paint, and it keeps working under a
+   future CSP that forbids outside origins. Poppins ships as static weights,
+   so we import only the five the design uses; Karla has a variable build,
+   where one file covers the whole 400–700 range.
+
+   The `latin-` prefix matters: plain `@fontsource/poppins/400.css` pulls in
+   every subset Google publishes, which for Poppins means shipping ~450 kB of
+   Devanagari this shop will never render. Import the subset, not the font. */
+@import '@fontsource/poppins/latin-400.css';
+@import '@fontsource/poppins/latin-500.css';
+@import '@fontsource/poppins/latin-600.css';
+@import '@fontsource/poppins/latin-700.css';
+@import '@fontsource/poppins/latin-800.css';
+@import '@fontsource-variable/karla';
+
+/* Armenian and Russian coverage. Neither Poppins nor Karla ships a single
+   Armenian or Cyrillic glyph, so without these two faces those languages
+   fall back to whatever the OS substitutes and the typography breaks for two
+   of the three locales.
+
+   Declared by hand rather than imported: `@fontsource-variable/noto-sans`
+   ships eight subsets in one stylesheet (greek, devanagari, vietnamese…),
+   all of which Vite would bundle. These are the two files we actually need,
+   ~20 kB and ~28 kB, with unicode-ranges copied verbatim from the packages.
+
+   The payoff of unicode-range is that this costs English visitors NOTHING:
+   a browser only downloads a face once a character in its range appears on
+   the page. It is also per-CHARACTER, not per-element — so an Armenian
+   product name sitting inside an English page renders correctly without any
+   :lang() rule or wrapper. */
+@font-face {
+  font-family: 'Noto Sans Cyrillic';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/noto-sans/files/noto-sans-cyrillic-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: 'Noto Sans Armenian';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/noto-sans-armenian/files/noto-sans-armenian-armenian-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range: U+0308, U+0530-058F, U+2010, U+2024, U+25CC, U+FB13-FB17;
+}
+
+/* Everything in @theme becomes BOTH a CSS custom property and a Tailwind
+   utility: `--color-panel` generates `bg-panel`, `text-panel`, `border-panel`
+   and friends. Tokens live here and nowhere else — a raw hex code anywhere
+   else in the codebase is a bug (docs/PLAN_ERA_2.md, phase E1). */
+@theme {
+  /* ---- Surfaces, lightest last ------------------------------------- */
+  --color-page: #f3e2d0; /* the canvas behind everything */
+  --color-panel: #fdefe0; /* screen / section background */
+  --color-panel-soft: #fef4e8; /* header strip, alternating bands */
+  --color-card: #fff8ee; /* cards, inputs, anything raised */
+
+  /* ---- Dark surfaces ----------------------------------------------- */
+  --color-bark: #46281c; /* footer, dark cards, dark buttons */
+  --color-bark-soft: #5a3626; /* dividers and inputs on bark */
+
+  /* ---- Ink on light surfaces ---------------------------------------
+     Contrast measured against the WORST light surface, --color-page
+     (#f3e2d0) — E10's axe run caught the original mistake of measuring
+     against panel only: ink-muted read 4.67:1 there but 4.17:1 on page,
+     where the hero, breadcrumbs and result counts actually sit. WCAG 2.1:
+       ink         5.5:1 on page  AA (7.3 on card)
+       ink-body    6.1:1          AA
+       ink-soft    4.9:1          AA
+       ink-muted   4.9:1          AA   (darkened twice: mock's #a9714b →
+                                       #93603c at E1, → #855636 at E10)
+       ink-faint   3.2:1  FAILS normal text — large/decorative only        */
+  --color-ink: #46281c; /* headings */
+  --color-ink-strong: #5c3b2a;
+  --color-ink-body: #6e4b36; /* default body copy */
+  --color-ink-soft: #7c5a45; /* secondary copy */
+  --color-ink-muted: #855636; /* meta, captions, labels */
+  --color-ink-faint: #a9714b; /* ONLY ≥18.66px bold or non-text */
+
+  /* ---- Ink on bark ---------------------------------------------------
+     Measured against --color-bark (#46281c):
+       on-dark        16.6:1  AA
+       on-dark-body    8.9:1  AA
+       on-dark-soft    6.1:1  AA
+       on-dark-muted   4.2:1  FAILS normal text — large/decorative only
+     Same trap as --color-ink-faint on the light side, and the design walks
+     into it the same way: the footer's bottom bar sets #a98a74 at 13px.
+     Use -soft for body-size text on bark; -muted is for ≥18.66px bold.     */
+  --color-ink-on-dark: #fff8ee;
+  --color-ink-on-dark-body: #dfc3ac;
+  --color-ink-on-dark-soft: #c9aa92;
+  --color-ink-on-dark-muted: #a98a74;
+
+  /* ---- Brand --------------------------------------------------------
+     The mock's orange (#e4761f) cannot legally carry text: as a background
+     under #fff8ee it measures 2.9:1 and as text on panel 2.7:1, both under
+     the 4.5:1 floor. So it stays a decorative fill, and a darkened twin
+     does every job involving letters.
+
+     E10 darkened the twin AGAIN (#b8541a → #9d4714). E1's value was rated
+     "AA for ≥18.66px bold" as text — and eight phases of body-size orange
+     links then leaned on it, which the axe run caught on every page. The
+     current value passes as NORMAL text on the worst light surface, and
+     the primary button only gained contrast:
+       #fff8ee on brand-ink   5.95:1  AA
+       brand-ink on page      4.96:1  AA at any size                       */
+  --color-brand: #e4761f; /* fills and glows — never behind text */
+  --color-brand-ink: #9d4714; /* primary button bg + orange text */
+  --color-honey: #f6c244; /* accent panels, badges, on-bark headings */
+
+  /* ---- Feedback -----------------------------------------------------
+     The mock draws no error state anywhere — no invalid field, no failed
+     payment — so this one is ours rather than the designer's. Picked warm
+     enough to sit in the palette instead of shouting stock red, and checked
+     like every other pair: 6.3:1 on --color-card, comfortably AA.          */
+  --color-danger: #a33a22;
+
+  /* ---- Lines -------------------------------------------------------- */
+  --color-line: #eed9c0; /* default border */
+  --color-line-soft: #f2e1cc; /* list separators */
+  --color-line-strong: #e9c9a8; /* icon buttons */
+
+  /* ---- Type families ------------------------------------------------
+     The Noto faces are per-script fallbacks, not alternatives: CSS resolves
+     font-family per character, so a Latin letter matches Poppins/Karla and
+     only an Armenian or Cyrillic one falls through to Noto. Order matters —
+     the Latin face must come first or Noto would claim the Latin text too. */
+  --font-display: 'Poppins', 'Noto Sans Armenian', 'Noto Sans Cyrillic',
+    ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Karla', 'Noto Sans Armenian', 'Noto Sans Cyrillic',
+    ui-sans-serif, system-ui, sans-serif;
+
+  /* ---- Display scale ------------------------------------------------
+     The mock draws nine distinct heading sizes (68/46/44/42/40/38/34/32/26).
+     A scale exists to collapse that: five steps cover every heading, and the
+     1–2px differences nobody can see stop being decisions. Line-height and
+     letter-spacing ride along with the size so a heading is one class.      */
+  --text-display-xs: 1.625rem; /* 26px — card headings */
+  --text-display-xs--line-height: 1.15;
+  --text-display-xs--letter-spacing: -0.02em;
+
+  --text-display-sm: 2rem; /* 32px — sub-sections */
+  --text-display-sm--line-height: 1.15;
+  --text-display-sm--letter-spacing: -0.02em;
+
+  --text-display-md: 2.375rem; /* 38px — section headings */
+  --text-display-md--line-height: 1.1;
+  --text-display-md--letter-spacing: -0.025em;
+
+  --text-display-lg: 2.875rem; /* 46px — page titles */
+  --text-display-lg--line-height: 1.05;
+  --text-display-lg--letter-spacing: -0.03em;
+
+  --text-display-xl: 4.25rem; /* 68px — hero only */
+  --text-display-xl--line-height: 1.02;
+  --text-display-xl--letter-spacing: -0.03em;
+
+  /* Body copy keeps Tailwind's own scale (xs 12 / sm 14 / base 16 / lg 18)
+     so nothing familiar shifts underfoot; only the eyebrow size is missing
+     from it. */
+  --text-2xs: 0.6875rem; /* 11px — badges, eyebrows */
+
+  /* ---- Tracking ----------------------------------------------------- */
+  --tracking-label: 0.12em; /* small caps labels */
+  --tracking-eyebrow: 0.22em; /* the wide uppercase kickers */
+
+  /* ---- Radii, following the mock's ladder --------------------------- */
+  --radius-sm: 0.375rem; /* 6px  — checkboxes */
+  --radius-md: 0.75rem; /* 12px — inputs, small tiles */
+  --radius-lg: 1rem; /* 16px — inner cards, thumbnails */
+  --radius-xl: 1.25rem; /* 20px — cards */
+  --radius-2xl: 1.5rem; /* 24px — panels */
+  --radius-3xl: 1.75rem; /* 28px — full screens */
+
+  /* ---- Shadows ------------------------------------------------------
+     The mock also ladders a --shadow-cta orange glow under primary
+     buttons; dropped by request (Aug 2026) — it read as a smear under the
+     dark checkout card. */
+  --shadow-screen: 0 30px 70px -40px rgb(70 40 28 / 0.45);
+
+  /* ---- Motion --------------------------------------------------------
+     One confirmation pulse, used by the card's Add button when the cart
+     count flashes in. Defined as a theme token so `animate-pop` exists as
+     a class; pair it with `motion-reduce:animate-none` wherever used. */
+  --animate-pop: pop 300ms ease-out;
+  @keyframes pop {
+    0% {
+      transform: scale(1);
+    }
+    40% {
+      transform: scale(1.12);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+}
+
+@layer base {
+  body {
+    background-color: var(--color-page);
+    color: var(--color-ink-body);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* The design shows no focus states anywhere, which would leave a keyboard
+     user with no idea where they are. One global rule gives every control a
+     visible ring for free. :focus-visible rather than :focus so it appears
+     for keyboards and not on mouse clicks. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-ink);
+    outline-offset: 2px;
+  }
+}
+
+/* The dual price slider's thumbs (see components/ui/PriceRange.tsx).
+   Hand-written CSS rather than Tailwind utilities because these are vendor
+   PSEUDO-ELEMENTS: ::-webkit-slider-thumb cannot be reached from a class on
+   the element, and the two vendor rules cannot be combined into one selector
+   list — a browser that does not understand one of them discards the whole
+   rule, so WebKit and Firefox get a block each.
+
+   pointer-events is the important line. The two stacked <input>s each cover
+   the full track, so the one painted on top would swallow every click meant
+   for the other. `none` on the input plus `auto` here makes only the 16px
+   thumbs interactive and lets the rest of the track fall through. */
+.range-thumb {
+  pointer-events: none;
+}
+
+.range-thumb::-webkit-slider-thumb {
+  pointer-events: auto;
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: var(--color-card);
+  border: 3px solid var(--color-brand);
+  cursor: pointer;
+}
+
+.range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: var(--color-card);
+  border: 3px solid var(--color-brand);
+  cursor: pointer;
+}
+
+.range-thumb:disabled::-webkit-slider-thumb {
+  border-color: var(--color-line-strong);
+  cursor: default;
+}
+
+.range-thumb:disabled::-moz-range-thumb {
+  border-color: var(--color-line-strong);
+  cursor: default;
+}
+
+/* ── Prose (E9) ──────────────────────────────────────────────────────────
+   The content pages' typography, hand-rolled on the design tokens rather
+   than pulling in @tailwindcss/typography — the plugin ships a whole
+   opinionated design we would then fight token by token; the pages need
+   nine rules. Applied by the Markdown component. */
+.prose {
+  max-width: 65ch;
+  color: var(--color-ink-body);
+  font-size: 1.0625rem;
+  line-height: 1.75;
+}
+
+.prose h1,
+.prose h2,
+.prose h3 {
+  font-family: var(--font-display);
+  color: var(--color-ink);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin-top: 2em;
+  margin-bottom: 0.6em;
+}
+
+.prose h1 {
+  font-size: 2.375rem;
+  line-height: 1.15;
+  margin-top: 0;
+}
+
+.prose h2 {
+  font-size: 1.625rem;
+  line-height: 1.3;
+}
+
+.prose h3 {
+  font-size: 1.1875rem;
+}
+
+.prose p,
+.prose ul,
+.prose ol {
+  margin-bottom: 1.1em;
+}
+
+.prose ul,
+.prose ol {
+  padding-inline-start: 1.4em;
+}
+
+.prose ul {
+  list-style: disc;
+}
+
+.prose ol {
+  list-style: decimal;
+}
+
+.prose li {
+  margin-bottom: 0.35em;
+}
+
+.prose a {
+  color: var(--color-brand-ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.prose strong {
+  color: var(--color-ink);
+}
+
+.prose blockquote {
+  border-inline-start: 3px solid var(--color-honey);
+  padding-inline-start: 1.1em;
+  color: var(--color-ink-soft);
+  font-style: italic;
+  margin-bottom: 1.1em;
+}
+
+.prose hr {
+  border: none;
+  border-top: 1px solid var(--color-line);
+  margin: 2.2em 0;
+}

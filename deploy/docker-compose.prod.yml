@@ -1,30 +1,37 @@
-# PRODUCTION stack — runs on the server from a clone at /opt/mountain-breath.
+# PRODUCTION stack — runs on the home server from a clone at /opt/mountain-breath.
 #   docker compose -f deploy/docker-compose.prod.yml up -d
 # Differences vs docker-compose.yml (local): images are PULLED from GHCR
-# (never built on the server), Caddy terminates HTTPS, MB_ENV=prod.
-# Secrets come from deploy/.env on the server (see docs/DEPLOYMENT.md).
+# (never built on the server), MB_ENV=prod, and the internet reaches us
+# through a Cloudflare named tunnel (decision #100, reversing #12): the
+# cloudflared service dials OUT to Cloudflare and visitors are relayed back
+# down that connection. HTTPS terminates at Cloudflare's edge with a real
+# certificate for ${DOMAIN}; nothing here listens on a public port, which is
+# what makes this deployable behind the ISP's CGNAT.
+# Secrets come from deploy/.env on the server (see docs/DEPLOYMENT_HOME.md).
 name: mountain-breath
 
 services:
-  # The only service exposed to the internet. Caddy obtains and renews
-  # Let's Encrypt certificates for ${DOMAIN} automatically.
-  caddy:
-    image: caddy:2-alpine
-    ports:
-      - "80:80"
-      - "8443:443"
+  # The only service that talks to the internet — outbound only. The tunnel
+  # itself (which hostname routes to which service) is configured in the
+  # Cloudflare dashboard and identified by the token; this container is just
+  # the connector. `latest` is deliberate where everything else is pinned:
+  # the connector speaks Cloudflare's own protocol and they expect it
+  # current — each deploy's `compose pull` refreshes it.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
     environment:
-      DOMAIN: ${DOMAIN:?set the site domain in deploy/.env}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?from the Zero Trust tunnel page — set in deploy/.env}
     depends_on:
       - web
     restart: unless-stopped
 
   web:
     image: ghcr.io/nerses01/mountain-breath-web:latest
+    ports:
+      # Host-local smoke test only (curl http://localhost:8081 on the
+      # server) — loopback-bound, invisible to the LAN and the internet.
+      - "127.0.0.1:8081:80"
     depends_on:
       api:
         condition: service_healthy
@@ -34,9 +41,21 @@ services:
     image: ghcr.io/nerses01/mountain-breath-api:latest
     environment:
       MB_ADDR: ":8080"
-      MB_ENV: prod # HTTPS exists here → Secure session cookies on
+      MB_ENV: prod # the browser side is HTTPS (Cloudflare edge) → Secure session cookies on
       MB_DATABASE_URL: postgres://${POSTGRES_USER:-mb}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-mountain_breath}?sslmode=disable
       MB_UPLOADS_DIR: /uploads
+      # The origin the BROWSER uses (emailed links, OAuth redirects).
+      # Derived from the tunnel's hostname so it cannot drift from it.
+      MB_PUBLIC_URL: https://${DOMAIN:?set the site domain in deploy/.env}
+      # Optional (E8): unset SMTP = mail lands in the api log; unset Google
+      # keys = the sign-in button explains itself. Same contract as the
+      # local stack.
+      MB_SMTP_ADDR: ${MB_SMTP_ADDR:-}
+      MB_SMTP_USERNAME: ${MB_SMTP_USERNAME:-}
+      MB_SMTP_PASSWORD: ${MB_SMTP_PASSWORD:-}
+      MB_MAIL_FROM: ${MB_MAIL_FROM:-}
+      MB_GOOGLE_CLIENT_ID: ${MB_GOOGLE_CLIENT_ID:-}
+      MB_GOOGLE_CLIENT_SECRET: ${MB_GOOGLE_CLIENT_SECRET:-}
     volumes:
       - uploads_data:/uploads
     depends_on:
@@ -73,7 +92,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-mb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in deploy/.env}
       POSTGRES_DB: ${POSTGRES_DB:-mountain_breath}
-    # no ports: unreachable from outside the compose network
+    # loopback-bound: reachable for psql on the server itself, not from
+    # outside the machine
     volumes:
       - pgdata_prod:/var/lib/postgresql/data
     healthcheck:
@@ -86,5 +106,3 @@ services:
 volumes:
   pgdata_prod:
   uploads_data:
-  caddy_data:
-  caddy_config:

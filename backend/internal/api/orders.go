@@ -1,8 +1,10 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
+	"github.com/Nerses01/Mountain_Breath/backend/internal/mail"
 )
 
 type orderItemResponse struct {
@@ -19,13 +22,89 @@ type orderItemResponse struct {
 	Qty        int    `json:"qty"`
 }
 
+// addressPayload is the one JSON shape an address has, in both directions:
+// the checkout request carries it up, the order response carries the frozen
+// snapshot back down. Sharing the struct is safe because the fields really
+// are the same — what differs is mutability, and JSON has no opinion on that.
+type addressPayload struct {
+	FirstName  string `json:"first_name"`
+	LastName   string `json:"last_name"`
+	Phone      string `json:"phone"`
+	Street     string `json:"street"`
+	City       string `json:"city"`
+	PostalCode string `json:"postal_code"`
+	Country    string `json:"country"`
+}
+
+func toAddressPayload(a domain.Address) addressPayload {
+	return addressPayload{
+		FirstName: a.FirstName, LastName: a.LastName, Phone: a.Phone,
+		Street: a.Street, City: a.City, PostalCode: a.PostalCode, Country: a.Country,
+	}
+}
+
+func (p addressPayload) toDomain() domain.Address {
+	return domain.Address{
+		FirstName: p.FirstName, LastName: p.LastName, Phone: p.Phone,
+		Street: p.Street, City: p.City, PostalCode: p.PostalCode, Country: p.Country,
+	}
+}
+
 type orderResponse struct {
-	ID         int64               `json:"id"`
-	Status     string              `json:"status"`
-	TotalMinor int64               `json:"total_minor"`
-	CreatedAt  time.Time           `json:"created_at"`
-	UserEmail  string              `json:"user_email,omitempty"` // admin view only
-	Items      []orderItemResponse `json:"items"`
+	ID        int64               `json:"id"`
+	Status    string              `json:"status"`
+	CreatedAt time.Time           `json:"created_at"`
+	UserEmail string              `json:"user_email,omitempty"` // admin view only
+	Items     []orderItemResponse `json:"items"`
+
+	// An order carries ONE currency and no second price, which is the
+	// deliberate difference from every other money-bearing response in this
+	// API. A cart can be read in either market; an order is a record of what
+	// was actually charged, and showing a converted alternative next to it
+	// would invite "but you charged me the other number".
+	Currency domain.Currency `json:"currency"`
+	// A decimal as a STRING (see domain.Order.FxRateUsed): JSON numbers are
+	// doubles in every mainstream parser, and this one is NUMERIC(18,8).
+	// Omitted entirely for a base-currency order, where no rate applied.
+	FxRateUsed *string `json:"fx_rate_used,omitempty"`
+
+	// E6: the five-figure breakdown the design's summary card draws.
+	// total_minor keeps its Phase 5 name and meaning — it IS the grand
+	// total — so every client written before E6 keeps working.
+	SubtotalMinor int64 `json:"subtotal_minor"`
+	ShippingMinor int64 `json:"shipping_minor"`
+	DiscountMinor int64 `json:"discount_minor"`
+	// E7: the composition of discount_minor (member + promo = discount),
+	// because the receipt draws them as separate lines; promo_code is the
+	// frozen text of the code that was redeemed, absent when none was.
+	MemberDiscountMinor int64  `json:"member_discount_minor"`
+	PromoDiscountMinor  int64  `json:"promo_discount_minor"`
+	PromoCode           string `json:"promo_code,omitempty"`
+	// Contained in the subtotal ("Prices include VAT"), never added on top;
+	// shown on the invoice line, absent from the arithmetic.
+	TaxMinor   int64 `json:"tax_minor"`
+	TotalMinor int64 `json:"total_minor"`
+
+	PaymentMethod string `json:"payment_method"`
+	PaymentStatus string `json:"payment_status"`
+
+	// The frozen snapshot. A pointer so pre-E6 orders honestly send null
+	// rather than seven empty strings pretending to be an address.
+	ShipTo             *addressPayload `json:"ship_to,omitempty"`
+	DeliveryNote       string          `json:"delivery_note,omitempty"`
+	LeaveWithNeighbour bool            `json:"leave_with_neighbour"`
+
+	// A2: the recorded timeline (oldest first) the tracker draws its dates
+	// from, and the cold-chain flag behind the "chilled parcel" tag. An old
+	// order may carry only its backfilled `pending` event — the tracker
+	// then shows position without dates rather than invented ones.
+	Events       []orderEventResponse `json:"events"`
+	HasColdChain bool                 `json:"has_cold_chain"`
+}
+
+type orderEventResponse struct {
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 func toOrderResponse(o domain.Order) orderResponse {
@@ -35,24 +114,115 @@ func toOrderResponse(o domain.Order) orderResponse {
 			Name: it.Name, Label: it.Label, PriceMinor: it.PriceMinor, Qty: it.Qty,
 		})
 	}
-	return orderResponse{
-		ID: o.ID, Status: o.Status, TotalMinor: o.TotalMinor,
-		CreatedAt: o.CreatedAt, UserEmail: o.UserEmail, Items: items,
+	events := make([]orderEventResponse, 0, len(o.Events))
+	for _, ev := range o.Events {
+		events = append(events, orderEventResponse{Status: ev.Status, CreatedAt: ev.CreatedAt})
 	}
+	resp := orderResponse{
+		ID: o.ID, Status: o.Status,
+		CreatedAt: o.CreatedAt, UserEmail: o.UserEmail, Items: items,
+		Events: events, HasColdChain: o.HasColdChain,
+		Currency: o.Currency, FxRateUsed: o.FxRateUsed,
+		SubtotalMinor: o.Totals.SubtotalMinor, ShippingMinor: o.Totals.ShippingMinor,
+		DiscountMinor: o.Totals.DiscountMinor, TaxMinor: o.Totals.TaxMinor,
+		MemberDiscountMinor: o.Totals.MemberDiscountMinor,
+		PromoDiscountMinor:  o.Totals.PromoDiscountMinor,
+		PromoCode:           o.PromoCode,
+		TotalMinor:          o.TotalMinor,
+		PaymentMethod: o.PaymentMethod, PaymentStatus: o.PaymentStatus,
+		DeliveryNote: o.DeliveryNote, LeaveWithNeighbour: o.LeaveWithNeighbour,
+	}
+	if o.ShipTo != nil {
+		ship := toAddressPayload(*o.ShipTo)
+		resp.ShipTo = &ship
+	}
+	return resp
+}
+
+// checkoutRequest is everything the client CONTRIBUTES to an order — and
+// there is no money in it, which is the security design of the endpoint.
+// DisallowUnknownFields turns a body that tries to send "total_minor" into a
+// 400 before any handler code runs: the server does not ignore a
+// client-supplied total, it refuses the request outright.
+//
+// Note what else is absent: card numbers. The design draws card fields, but
+// this API never accepts them — card payment is a stub until a real
+// provider (Phase 11) takes the card data on ITS servers. An API that
+// accepts card numbers "just to a stub" has put itself in scope for PCI
+// compliance for nothing.
+type checkoutRequest struct {
+	Address            addressPayload `json:"address"`
+	PaymentMethod      string         `json:"payment_method"`
+	DeliveryNote       string         `json:"delivery_note"`
+	LeaveWithNeighbour bool           `json:"leave_with_neighbour"`
 }
 
 // POST /orders — checkout: the current cart becomes an order.
 func (s *Server) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 	user, _ := userFrom(r.Context())
 
-	order, err := s.store.CreateOrder(r.Context(), user.ID)
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	var req checkoutRequest
+	if err := dec.Decode(&req); err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_json", "request body is not valid JSON: "+err.Error())
+		return
+	}
+
+	// The currency comes from the EDGE, never from the request body. A client
+	// that could name what it pays in could name the cheaper of two markets
+	// for a basket priced in the dearer one. The locale rides along in the
+	// same View (F2): the order snapshots the language the checkout happened
+	// in, so later mails about it speak to the customer, not to the admin
+	// whose click triggered them.
+	view := domain.View{
+		Currency: currencyFromContext(r.Context()),
+		Locale:   localeFromContext(r.Context()),
+	}
+
+	in := domain.CheckoutInput{
+		Address:            req.Address.toDomain(),
+		PaymentMethod:      req.PaymentMethod,
+		DeliveryNote:       req.DeliveryNote,
+		LeaveWithNeighbour: req.LeaveWithNeighbour,
+	}
+	if fields := domain.ValidateCheckout(in, view.EffectiveCurrency()); len(fields) > 0 {
+		s.respondValidationError(w, fields)
+		return
+	}
+
+	order, err := s.store.CreateOrder(r.Context(), user.ID, view, in)
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrEmptyCart):
 			s.respondError(w, http.StatusConflict, "empty_cart", "your cart is empty")
 		case errors.Is(err, domain.ErrInsufficientStock):
-			// err carries the product name; safe and useful for the customer
+			// The typed error carries name/label/available as DATA, so the
+			// client can say "only 3 left of X" in the reader's language and
+			// the customer can fix the cart instead of guessing. The English
+			// Message stays for curl and logs.
+			var short *domain.StockShortError
+			if errors.As(err, &short) {
+				s.respondErrorDetails(w, http.StatusConflict, "insufficient_stock", err.Error(),
+					map[string]any{
+						"name": short.Name, "label": short.Label, "available": short.Available,
+					})
+				return
+			}
 			s.respondError(w, http.StatusConflict, "insufficient_stock", err.Error())
+		case errors.Is(err, domain.ErrPriceUnavailable):
+			// 409, not 500: the shop is misconfigured for this market, not
+			// broken. The message names the product so the customer can drop
+			// it or switch currency, and so the family can fix the price.
+			s.respondError(w, http.StatusConflict, "price_unavailable", err.Error())
+		case errors.Is(err, domain.ErrPromoInvalid):
+			// The cart's code stopped being valid between apply and "Place
+			// the order". Refused, not silently repriced — the customer saw
+			// a total this order would no longer match. The client refreshes
+			// its preview, which names the reason inline.
+			s.respondError(w, http.StatusConflict, "promo_invalid", err.Error())
 		default:
 			s.log.Error("creating order", "error", err)
 			s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
@@ -60,7 +230,125 @@ func (s *Server) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.metrics.ordersCreated.Inc()
+
+	// E8: the confirmation mail, from the order's SNAPSHOTS (names and
+	// prices as charged), in the language the checkout happened in — read
+	// back off the ORDER now that F2 snapshots it, so this mail and every
+	// later status mail derive the language from the same recorded fact.
+	// Non-fatal by design: the order EXISTS — a mail hiccup after commit is
+	// a logged nuisance, never a 500 telling the customer their real order
+	// failed.
+	orderURL := fmt.Sprintf("%s%s/orders/%d", s.publicURL, localePathPrefix(order.Locale), order.ID)
+	if err := s.mailer.Send(r.Context(),
+		mail.OrderConfirmation(order.Locale, user.Email, order, orderURL)); err != nil {
+		s.log.Error("sending order confirmation", "order", order.ID, "error", err)
+	}
+
 	s.respondJSON(w, http.StatusCreated, toOrderResponse(order))
+}
+
+// GET /orders/{id} — the confirmation page's read. Owner or admin.
+func (s *Server) handleGetOrder(w http.ResponseWriter, r *http.Request) {
+	user, _ := userFrom(r.Context())
+
+	orderID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_id", "order id must be a number")
+		return
+	}
+
+	order, err := s.store.GetOrder(r.Context(), orderID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			s.respondError(w, http.StatusNotFound, "not_found", "no such order")
+			return
+		}
+		s.log.Error("getting order", "id", orderID, "error", err)
+		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
+
+	// 404 for someone else's order, deliberately NOT 403. The E4 rule ran
+	// the other way (a non-purchaser reviewing gets 403) because there the
+	// resource was public and only the ACTION was denied. An order is
+	// private data: a 403 would confirm to whoever is enumerating ids that
+	// order 12 exists and belongs to somebody — which is exactly the
+	// information a URL guesser is fishing for.
+	if order.UserID != user.ID && user.Role != domain.RoleAdmin {
+		s.respondError(w, http.StatusNotFound, "not_found", "no such order")
+		return
+	}
+
+	s.respondJSON(w, http.StatusOK, toOrderResponse(order))
+}
+
+// A2: what the reorder merge did, line by line. `issue` is a CODE the
+// client translates (the promo_issue contract): "" added in full,
+// "reduced" capped by stock, "out_of_stock" / "unavailable" skipped.
+type reorderLineResponse struct {
+	Name  string `json:"name"`
+	Label string `json:"label"`
+	Qty   int    `json:"qty"`
+	Issue string `json:"issue,omitempty"`
+}
+
+type reorderResponse struct {
+	Lines []reorderLineResponse `json:"lines"`
+}
+
+// POST /orders/{id}/reorder — merge a past order's lines back into the
+// cart (decision log #86). 200 even when every line was skipped: the merge
+// itself succeeded, and the body says what it could and could not add —
+// partial success is a result, not an error status.
+func (s *Server) handleReorder(w http.ResponseWriter, r *http.Request) {
+	user, _ := userFrom(r.Context())
+
+	orderID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_id", "order id must be a number")
+		return
+	}
+
+	// Ownership lives in the store call itself (it writes to the caller's
+	// cart); a stranger's order id comes back as ErrNotFound — the same
+	// existence-hiding 404 as handleGetOrder.
+	res, err := s.store.Reorder(r.Context(), user.ID, orderID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			s.respondError(w, http.StatusNotFound, "not_found", "no such order")
+			return
+		}
+		s.log.Error("reordering", "id", orderID, "error", err)
+		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
+
+	lines := make([]reorderLineResponse, 0, len(res.Lines))
+	for _, l := range res.Lines {
+		lines = append(lines, reorderLineResponse{Name: l.Name, Label: l.Label, Qty: l.Qty, Issue: l.Issue})
+	}
+	s.respondJSON(w, http.StatusOK, reorderResponse{Lines: lines})
+}
+
+// GET /account/address — the saved address for pre-filling the checkout
+// form. A first-time customer gets 404, which the client renders as an
+// empty form, not an error.
+func (s *Server) handleGetDefaultAddress(w http.ResponseWriter, r *http.Request) {
+	user, _ := userFrom(r.Context())
+
+	addr, err := s.store.DefaultAddress(r.Context(), user.ID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			s.respondError(w, http.StatusNotFound, "not_found", "no saved address")
+			return
+		}
+		s.log.Error("getting default address", "error", err)
+		s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
+	// The full entry payload (A4): the address fields plus the neighbour
+	// prefill; id/label ride along harmlessly.
+	s.respondJSON(w, http.StatusOK, toAddressEntryPayload(addr))
 }
 
 func (s *Server) handleListMyOrders(w http.ResponseWriter, r *http.Request) {
@@ -128,6 +416,118 @@ func (s *Server) handleUpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 			s.respondError(w, http.StatusConflict, "invalid_transition", err.Error())
 		default:
 			s.log.Error("updating order status", "error", err)
+			s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		}
+		return
+	}
+
+	s.sendOrderStatusMail(r.Context(), order)
+
+	s.respondJSON(w, http.StatusOK, toOrderResponse(order))
+}
+
+// sendOrderStatusMail tells the customer about a committed transition — in
+// the ORDER's language (its snapshot), and only if their
+// notify_order_updates toggle says so (decision #87 promised this check
+// when the toggle shipped). Non-fatal like the confirmation mail: the
+// transition is committed, and a mail problem is a logged nuisance, never
+// a 500 telling the caller the status change failed. Shared by the admin's
+// status endpoint and the customer's cancel (F2) — a self-cancelled order
+// still gets its letter, because the mail is the record of the change, not
+// a notification about somebody else's.
+func (s *Server) sendOrderStatusMail(ctx context.Context, order domain.Order) {
+	customer, err := s.store.GetUserByID(ctx, order.UserID)
+	if err != nil {
+		s.log.Error("loading customer for status mail", "order", order.ID, "error", err)
+		return
+	}
+	if !customer.NotifyOrderUpdates {
+		return
+	}
+	orderURL := fmt.Sprintf("%s%s/orders/%d", s.publicURL, localePathPrefix(order.Locale), order.ID)
+	if msg, ok := mail.OrderStatusUpdate(customer.Email, order, orderURL); ok {
+		if err := s.mailer.Send(ctx, msg); err != nil {
+			s.log.Error("sending status mail", "order", order.ID, "error", err)
+		}
+	}
+}
+
+// POST /orders/{id}/cancel — the customer's one self-service transition
+// (F2): out while the order is still pending. Past that window the machine
+// may still allow cancellation, but that arrow is the admin's — the
+// customer gets 409 too_late_to_cancel and the page tells them to get in
+// touch. A stranger's order id is a 404, indistinguishable from a missing
+// one (the handleGetOrder rule; ownership lives in the store because the
+// call writes).
+func (s *Server) handleCancelMyOrder(w http.ResponseWriter, r *http.Request) {
+	user, _ := userFrom(r.Context())
+
+	orderID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_id", "order id must be a number")
+		return
+	}
+
+	order, err := s.store.CancelOrderByCustomer(r.Context(), user.ID, orderID)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrNotFound):
+			s.respondError(w, http.StatusNotFound, "not_found", "no such order")
+		case errors.Is(err, domain.ErrTooLateToCancel):
+			s.respondError(w, http.StatusConflict, "too_late_to_cancel", err.Error())
+		default:
+			s.log.Error("cancelling order", "id", orderID, "error", err)
+			s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		}
+		return
+	}
+
+	s.sendOrderStatusMail(r.Context(), order)
+
+	s.respondJSON(w, http.StatusOK, toOrderResponse(order))
+}
+
+type updatePaymentRequest struct {
+	PaymentStatus string `json:"payment_status"`
+}
+
+// PATCH /admin/orders/{id}/payment — drive the OTHER state machine (F2):
+// whether money arrived, orthogonal to where the parcel is. This is the
+// write path the Era III audit found missing: E6 modelled the column and
+// nothing could ever flip it, so a bank-transfer order could never become
+// paid. The same three-way error split as the status handler: 400 for a
+// word that is not a payment status at all, 409 for a real status the
+// machine refuses from here, 404 for no such order.
+func (s *Server) handleUpdateOrderPayment(w http.ResponseWriter, r *http.Request) {
+	orderID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_id", "order id must be a number")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	var req updatePaymentRequest
+	if err := dec.Decode(&req); err != nil {
+		s.respondError(w, http.StatusBadRequest, "invalid_json", "request body is not valid JSON: "+err.Error())
+		return
+	}
+	if !domain.ValidPaymentStatus(req.PaymentStatus) {
+		s.respondValidationError(w, map[string]string{"payment_status": "unknown payment status"})
+		return
+	}
+
+	order, err := s.store.UpdateOrderPaymentStatus(r.Context(), orderID, req.PaymentStatus)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrNotFound):
+			s.respondError(w, http.StatusNotFound, "not_found", "no such order")
+		case errors.Is(err, domain.ErrInvalidTransition):
+			s.respondError(w, http.StatusConflict, "invalid_transition", err.Error())
+		default:
+			s.log.Error("updating payment status", "error", err)
 			s.respondError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 		}
 		return
