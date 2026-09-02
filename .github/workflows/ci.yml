@@ -275,6 +275,24 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
 
+      # 1c. The laptop is DERP-relayed (double NAT + CGNAT): the first
+      # WireGuard handshake can take tens of seconds, and the scp step's
+      # container dials before any session exists, then fails opaquely.
+      # Establish the session from the runner HOST (the container reuses
+      # it, since tailscale0 lives host-side) and gate on port 22 with a
+      # readable error instead of drone-scp's "i/o timeout".
+      - name: Wait for the server over the tailnet
+        run: |
+          tailscale ping -c 20 --timeout 5s ${{ secrets.DEPLOY_HOST }} || true
+          for i in $(seq 1 24); do
+            if nc -z -w 5 ${{ secrets.DEPLOY_HOST }} 22; then
+              echo "ssh port reachable"; exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::server unreachable over the tailnet after 2+ min — laptop offline, or tailscaled unhealthy on it?"
+          exit 1
+
       # 2. Securely copy the Compose file AND your migrations folder to the server
       - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
