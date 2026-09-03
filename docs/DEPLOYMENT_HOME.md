@@ -180,7 +180,7 @@ Create a tunnel → type **Cloudflared** → name it `mountain-breath`.
    `deploy/.env` in step 8.
 2. **Public hostname** tab → Add:
    - Hostname: your domain, e.g. `mountainbreath.com` (subdomain empty
-     for the apex; add a second entry for `www` later if wanted)
+     for the apex; `www` is a redirect, step 14 — never a second entry)
    - Service: **HTTP** → `web:80`
 
    `web:80` works because cloudflared runs *inside the compose network*,
@@ -237,7 +237,14 @@ stack itself (loopback smoke port, no internet involved); then 💻 open
 Zero Trust tunnels list the tunnel shows **HEALTHY**.
 
 Seed + admin promotion: exactly DEPLOYMENT.md step 6 (copy the seed file
-in with `compose cp`, never pipe it).
+in with `compose cp`, never pipe it). One line tells you whether both
+happened — a live shop wants a catalog and at least one admin:
+
+```bash
+docker compose -f deploy/docker-compose.prod.yml exec -T postgres psql -U mb -d mountain_breath -Atc \
+  "select (select count(*) from products) || ' products, ' || (select count(*) from users where role='admin') || ' admins'"
+# expect something like: 8 products, 1 admins
+```
 
 ## 9. Turn on continuous deployment
 
@@ -426,6 +433,74 @@ What pages, and when:
 A firing alert repeats every 4 h until it resolves. Silence one during
 planned work from Alertmanager's UI over the tailnet (Observability,
 below).
+
+## 13. Google sign-in in production (E8's button, decision #5)
+
+The code has been ready since E8: with `MB_GOOGLE_CLIENT_ID` and
+`MB_GOOGLE_CLIENT_SECRET` set, *Continue with Google* works; unset, the
+button explains itself. What production needs is a client that trusts
+the real callback URL, and a consent screen the public may use.
+
+💻 console.cloud.google.com → the project from E8 (or a new one):
+
+1. **APIs & Services → Credentials** → the OAuth client (type *Web
+   application*) → **Authorized redirect URIs** → add
+   `https://mountainbreath.net/api/v1/auth/oauth/google/callback`
+   (keep the localhost one for dev). Save; copy the Client ID and the
+   Client secret.
+2. **OAuth consent screen** (newer consoles: *Google Auth Platform →
+   Audience*): move from **Testing** to **In production** (*Publish
+   app*). Testing mode caps sign-in at 100 listed test users and expires
+   their tokens after a week. The basic scopes this app asks for (email,
+   profile) need no verification review, so publishing is one click.
+   Branding: app name "Mountain Breath", a support email, the home page.
+
+🖥️ On the laptop:
+
+```bash
+cd /opt/mountain-breath/deploy
+cat >> .env <<'EOF'
+MB_GOOGLE_CLIENT_ID=…apps.googleusercontent.com
+MB_GOOGLE_CLIENT_SECRET=GOCSPX-…
+EOF
+cd .. && docker compose -f deploy/docker-compose.prod.yml up -d api
+```
+
+**Test:** 💻 sign out of the live site, click *Continue with Google*,
+pick an account that has no Mountain Breath password — you land signed
+in, and the account page shows the Google-linked identity. A
+`redirect_uri_mismatch` page from Google means step 1's URI differs from
+`MB_PUBLIC_URL` + the callback path, character for character (scheme,
+host, no trailing slash).
+
+## 14. `www.mountainbreath.net` → the apex
+
+Not a second tunnel hostname. The site's `rel=canonical` and `hreflang`
+tags are built from `window.location.origin`, so serving the same pages
+at two hosts would publish two canonical URLs for every page — the
+duplicate-content problem E10's tags exist to prevent. The answer is
+one hostname and a redirect for the other, answered at Cloudflare's
+edge without ever reaching the laptop.
+
+💻 Cloudflare dashboard → the domain:
+
+1. **DNS → Add record**: type `CNAME`, name `www`, target
+   `mountainbreath.net`, Proxy status **Proxied** (orange cloud). The
+   record only has to exist so Cloudflare answers for the name; the
+   proxy is what lets a rule intercept it.
+2. **Rules → Redirect Rules → Create rule** → template **Redirect from
+   WWW to Root** (by hand: when hostname equals
+   `www.mountainbreath.net`, dynamic redirect to
+   `concat("https://mountainbreath.net", http.request.uri.path)`, status
+   301, preserve query string). Deploy.
+
+**Test** from anywhere:
+
+```powershell
+curl.exe -sI https://www.mountainbreath.net/shop | Select-String "HTTP|location"
+# HTTP/1.1 301 Moved Permanently
+# location: https://mountainbreath.net/shop
+```
 
 ## Observability (decision #101)
 

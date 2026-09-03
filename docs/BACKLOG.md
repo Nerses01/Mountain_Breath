@@ -38,7 +38,11 @@
 
 ## 1. Go-live residue — the do-next shelf
 
-The gap between "deploys itself" and "operated like you mean it":
+The gap between "deploys itself" and "operated like you mean it".
+Claude's parts shipped on 2026-09-03 (decisions #103–#106 and one `ci:`
+chore); what is left is **the operator checklist at the end of this
+section** — dashboard clicks and laptop-side files that no commit can
+do.
 
 - [x] **Backups: cron + a tested restore drill** — shipped 2026-09-03
       as decision #103: `deploy/backup.sh` (custom-format dump +
@@ -49,41 +53,57 @@ The gap between "deploys itself" and "operated like you mean it":
 - [x] Off-machine backup copies — #103: rclone → Cloudflare R2 inside
       `backup.sh`; remote dumps age out only after a successful copy
       (runbook 7b; the ad-hoc tailnet `scp` stays the escape hatch).
-- [ ] **Operator hands, on the laptop**: install `mb-backup.timer`, run
-      the first `restore.sh --drill`, create the R2 bucket + token and
-      fill `deploy/backup.env` (DEPLOYMENT.md steps 7 and 7b).
-- [ ] Verify prod is **seeded and an admin exists** (runbook first-boot
-      tail) — confirm the live DB isn't running on manual fumes.
 - [x] **Real SMTP relay** for production mail — decision #104,
       2026-09-03: Resend over SMTP; the mailer gained a conversation
       deadline, port-465 TLS, STARTTLS and a plaintext-credentials
       refusal, all pinned against a scripted relay in tests. Runbook
       step 11.
-- [ ] **Operator hands**: Resend account + the three DNS records in
-      Cloudflare, API key into `deploy/.env`, Email Routing for
-      `hive@mountainbreath.net`, a reset mail as the first test, then the
-      `_dmarc` record (DEPLOYMENT_HOME.md step 11).
-- [ ] **Google sign-in on prod**: OAuth client gains the
-      `https://mountainbreath.net` redirect URI; consent screen leaves
-      Testing mode (E8's checklist; F1 sweep line).
-- [ ] `www.mountainbreath.net` as a second tunnel public hostname
-      (30 seconds in the Zero Trust dashboard; session 09-02).
 - [x] **Alerts reach a phone** — decision #105, 2026-09-03: Telegram
       receiver in the prod compose (chat id interpolated from `.env`,
       token as a compose secret file), an HTML message template,
       `deploy/alert.sh` to fire/resolve by hand, and `backup.sh` paging
       its own failures through the same road. Runbook step 12.
-- [ ] **Operator hands**: BotFather token into
-      `deploy/observability/telegram.token`, `TELEGRAM_CHAT_ID` into
-      `deploy/.env`, then `alert.sh fire TestAlert` as the proof —
-      before the next master deploy (DEPLOYMENT_HOME.md step 12).
-- [ ] Confirm the laptop's tailnet **key expiry is disabled** (console
-      → Machines → homeserver badge) — silent CD death in ~180 days
-      otherwise (session 09-02).
-- [ ] CI hygiene, when convenient: bump the deploy job's
-      `actions/checkout@v4` → v5 (node20 deprecation warnings); cache
-      the Playwright browser (`~/.cache/ms-playwright` keyed by
-      Playwright version, ~1 min/run) (log 09-02).
+- [x] **Google sign-in on prod** — the code was ready since E8; the
+      missing piece was a runbook step with the exact redirect URI and
+      the consent-screen publish: DEPLOYMENT_HOME.md step 13
+      (2026-09-03). Operator part in the checklist.
+- [x] `www.mountainbreath.net` — NOT a second tunnel hostname (decision
+      #106): the canonical and hreflang tags are built from
+      `window.location.origin`, so two hostnames would publish two
+      canonical URLs per page. A Cloudflare redirect rule sends www to
+      the apex at the edge: DEPLOYMENT_HOME.md step 14 (2026-09-03).
+      Operator part in the checklist.
+- [x] CI hygiene — the deploy job on `actions/checkout@v5`; the
+      Playwright browser cached by the lockfile's Playwright version
+      (2026-09-03, `ci:`).
+
+**Your part — in this order.** Each is a runbook step; tick as you go.
+
+1. [ ] **Backups on the laptop**: install `mb-backup.timer`, run the
+       first `restore.sh --drill`, then the R2 bucket + token +
+       `deploy/backup.env` (DEPLOYMENT.md steps 7 and 7b).
+2. [ ] **Prod is seeded and has an admin** — the one-line check at the
+       end of DEPLOYMENT_HOME.md step 8.
+3. [ ] **Tailnet key expiry disabled** for the laptop (Tailscale console
+       → Machines → homeserver → ⋯ → Disable key expiry) — silent CD
+       death in ~180 days otherwise.
+4. [ ] **Telegram**: BotFather token → `deploy/observability/
+       telegram.token`, `TELEGRAM_CHAT_ID` → `deploy/.env`, restart
+       alertmanager, `alert.sh fire TestAlert` as the proof — **before
+       the next master merge**, or that deploy stops at the token check
+       (step 12).
+5. [ ] **Mail**: Resend account, the three DNS records, API key →
+       `deploy/.env`, Email Routing for `hive@mountainbreath.net`, a
+       password-reset mail to yourself as the proof, then the `_dmarc`
+       record (step 11).
+6. [ ] **Google sign-in**: redirect URI + consent screen published, keys
+       → `deploy/.env`, sign in with Google on the live site as the
+       proof (step 13).
+7. [ ] **www**: the CNAME + redirect rule in Cloudflare; `curl -I` shows
+       301 to the apex (step 14).
+8. [ ] **Merge dev → master** and watch the deploy go green — it now
+       carries the backup scripts, the mail client, and the alert
+       receiver.
 
 ## 2. Launch content (was Era III F3)
 

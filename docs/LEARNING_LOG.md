@@ -17,6 +17,49 @@ Template for an entry:
 
 ---
 
+## 2026-09-03 — Backlog §1 closes on Claude's side: Google prod sign-in, www, CI hygiene
+
+**Worked on:** the three §1 lines that were runbook or CI work rather
+than features. Runbook step 13 (Google sign-in in production: the exact
+redirect URI `MB_PUBLIC_URL` + `/api/v1/auth/oauth/google/callback`,
+the consent screen leaving Testing mode, the `.env` lines, the test and
+its one failure signature). Step 14: `www` becomes a Cloudflare redirect
+rule to the apex (decision #106) instead of the second tunnel hostname
+the backlog had assumed. A one-line seed-and-admin check under step 8.
+CI: the deploy job's checkout on v5 like the rest, and the Playwright
+browser cached by the lockfile's Playwright version. BACKLOG §1
+restructured: shipped lines on top, then an ordered operator checklist
+of everything only the developer can do.
+
+**Learned:**
+- *Read the app before adding a hostname* — the plan said "add www in
+  the tunnel, 30 seconds"; the canonical tags read
+  `window.location.origin`, so that would have published two canonical
+  URLs per page. A redirect at the edge is the right shape, and it never
+  touches the laptop. The 30-second task was 30 seconds of the wrong
+  thing.
+- *Cache keys name the thing that invalidates them* — keying the
+  browser cache by the Playwright version from the lockfile means a
+  Playwright bump misses once and nothing else ever does; hashing the
+  whole lockfile would throw the cache away on every unrelated bump.
+- *`playwright install` is idempotent* — with the build already in
+  `~/.cache/ms-playwright` it downloads nothing, so the cache step needs
+  no conditional around the install step.
+- *An operator checklist is a deliverable* — the residue of a go-live is
+  mostly dashboard clicks and files no commit can create; writing them
+  as an ordered list with a proof step each ("a reset mail to yourself",
+  "curl shows 301") is what turns "done on Claude's side" into done.
+
+**Questions / to revisit:**
+- Google's console keeps renaming the consent-screen pages; step 13
+  names both the old and the new path, and will need a refresh when the
+  next rename lands.
+- The www redirect leaves the tunnel with one hostname; if a `shop.` or
+  `admin.` name ever appears, decide then whether it is a redirect or a
+  route.
+
+---
+
 ## 2026-09-03 — Backlog §1: alerts reach a phone (decision #105)
 
 **Worked on:** the Telegram receiver, and the design question it
