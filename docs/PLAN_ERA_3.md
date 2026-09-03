@@ -1,5 +1,13 @@
 # Mountain Breath — Plan, Era III: from built to open for business
 
+> **📌 Historical since 2026-09-03.** F1 shipped 2026-09-02 (decisions
+> #100/#101 — Cloudflare tunnel from a home laptop, *not* this file's
+> VPS/port-forward plan; runbook: [DEPLOYMENT_HOME.md](DEPLOYMENT_HOME.md));
+> F2 completed 2026-08-19 (decisions #91–#97). **Every still-open item
+> from F1's residue and F3–F6 now lives in [BACKLOG.md](BACKLOG.md)** —
+> the one list — and is maintained there, not here. This file stays as
+> the era's record of what was planned and why.
+
 > Era I (Phases 0–11 in [PROJECT_PLAN.md](PROJECT_PLAN.md)) built the
 > machine. Era II ([PLAN_ERA_2.md](PLAN_ERA_2.md), E1–E10) built the store
 > the design drew. **Era III is everything between "the code is done" and
@@ -45,7 +53,7 @@ surfaced them:
       page, and §1.1's rule that *every price is placeholder* still stands.
       Real contact details and the family's real per-market prices are
       launch gates (F3) — the shop currently promises to answer an email
-      address that does not exist.
+      address that does not exist. *→ open in [BACKLOG.md](BACKLOG.md) §2.*
 - [x] ~~**Two small promised-and-forgotten reviews:**~~ E1.5's "revisit the
       footer placement of the LanguageSwitcher" — **closed 2026-08-18
       (decision log #90):** the footer switchers were REMOVED; the account
@@ -82,29 +90,26 @@ PROJECT_PLAN.md with the same cross-references):
 **Goal:** the store is on the internet, over HTTPS, deploying itself from
 green master. Everything else in this era presumes it.
 
-**The blocker, restated:** hosting on own hardware is frozen on the ISP's
-locked FiberHome terminal (no port forwarding; call pending since
-2026-07-30). Every artifact is ready (`deploy/Caddyfile`, the dormant
-`deploy` CI job, `backup.sh`, docs/DEPLOYMENT.md).
+✅ **SHIPPED 2026-09-02 — by a different road than planned** (decisions
+#100/#101, runbook [DEPLOYMENT_HOME.md](DEPLOYMENT_HOME.md)): the ISP
+blocker turned out to be CGNAT (unfixable by any router setting), so the
+"ISP opens 80/443 vs VPS" decision resolved as *neither* — a home laptop
++ owned domain (`mountainbreath.net`) + **Cloudflare named tunnel**,
+HTTPS at the edge, zero inbound ports, CD push over Tailscale (ephemeral
+`tag:ci` runner nodes). Hardening done; `DEPLOY_ENABLED=true`; first
+automated deploy green after a five-failure debugging arc (log
+2026-09-02). The observability trio moved into prod, loopback-bound
+(#101).
 
-- [ ] **Decide the unblock**: either the ISP opens 80/443, or fall back to
-      the original recommendation (cheap VPS — Hetzner/DO) rather than
-      waiting indefinitely. *(User decision; the artifacts serve both.)*
-- [ ] Harden the server (runbook §2), domain + DNS + Caddy TLS, flip
-      `DEPLOY_ENABLED=true`, first CD deploy.
-- [ ] Backups on cron **and a tested restore** — a backup that has never
-      been restored is a hope, not a backup.
-- [ ] The go-live config sweep the code already anticipates:
-      `MB_PUBLIC_URL` to the real origin; the Google OAuth client gains the
-      production redirect URI and the consent screen leaves Testing mode
-      (E8's checklist); a real SMTP relay replaces Mailpit for production
-      (`MB_SMTP_*` — the Mailer interface means zero code); `MB_ENV=prod`
-      for Secure cookies.
-- [ ] Prometheus alerting gains its notification channel (Telegram —
-      parked in Phase 10 explicitly "for when it runs on the real server").
+- [x] ~~Decide the unblock~~ — decided: tunnel (reverses #12).
+- [x] ~~Harden, domain + DNS + TLS, flip `DEPLOY_ENABLED`, first CD
+      deploy~~ — all live (TLS at Cloudflare's edge, not Caddy).
+- [x] `MB_PUBLIC_URL`/`MB_ENV=prod` — derived from `DOMAIN` in the prod
+      compose; Secure cookies on.
 
-**Done when:** merging a PR updates the live site over HTTPS, a restore
-drill has actually run, and an alert reaches a phone.
+**Residue — open in [BACKLOG.md](BACKLOG.md) §1:** backups cron + tested
+restore drill, real SMTP relay, Google OAuth prod redirect + consent
+screen, the Telegram alert channel.
 
 ---
 
@@ -176,33 +181,11 @@ category management, role management, and the privacy promises all exist.
 
 **Goal:** the shop stops being a beautifully-typeset placeholder.
 
-- [ ] **Photography.** The single biggest visible gap: every image slot on
-      every screen is a designed placeholder. A jar, a comb, the meadow,
-      the family — the mock's own shot list. *(Business task; everything
-      below waits on it.)* *Progress 2026-08-19: the home hero carries its
-      first real image (`src/assets/hero-honey-jar.jpg`, resized 1536→1024
-      / 424→140 KB, translated alt ×3) — honestly noted as AI-generated,
-      a stand-in with the placeholder look gone; the item stays open for
-      the family's real shot list, and swapping the file re-fingerprints
-      itself through the Vite import.*
-- [ ] **The E10-deferred image pipeline**, built against real files:
-      server-side thumbnails/resizing on upload (Phase 11 line), `srcset`
-      + AVIF/WebP, explicit dimensions everywhere an `<img>` renders.
-      S3-compatible storage (Phase 11) joins here if the volume-on-VPS
-      model chafes.
-- [ ] **Real prices** in both markets (replacing §1.1's placeholders) and
-      real shipping rates/threshold — the tables exist precisely so this
-      is data entry, not a deploy.
-- [ ] **Real contact details** on the Contact page + `MB_MAIL_FROM` on a
-      real domain (§1).
-- [ ] **Native review of the Armenian and Russian copy** — accumulated
-      across E1.5→E9 and flagged every time: UI catalogues, auth screens,
-      the three email templates, ~4,500 words of content pages. The legal
-      pages and the reset email (it lands in strangers' inboxes) first.
-- [ ] **The newsletter SENDER** (E9's deliberate other half): compose an
-      issue, send to `confirmed AND NOT unsubscribed`, unsubscribe links
-      carrying the permanent tokens the schema already promised. Start as
-      an admin-triggered send; scheduling can wait.
+*All six items (photography, image pipeline, real prices, real contacts,
+native hy/ru review, newsletter sender) → moved to
+[BACKLOG.md](BACKLOG.md) §2 on 2026-09-03. Progress note kept: the home
+hero carries its first real image since 2026-08-19 (an honestly-labelled
+AI stand-in; the family's shot list still gates the rest).*
 
 **Done when:** a stranger could not tell which parts of the shop began as
 placeholders.
@@ -215,13 +198,10 @@ placeholders.
 from the start: **Idram / Ameriabank vPOS** (the mock's own ArCa hint), or
 Stripe if the local rails disappoint.
 
-- [ ] Research + pick the provider; sandbox account.
-- [ ] Integration the way E6's stub anticipated: the provider hosts the
-      card entry (the API never touches PANs — the PCI line E6 drew),
-      webhook/callback flips `payment_status` through F2's new write path.
-- [ ] Refunds wired to the same path; the `refunded` status finally
-      reachable by a real flow.
-- [ ] The checkout's decorative card fields become the provider redirect.
+*All four items (provider research, hosted-entry integration via F2's
+write path, refunds, checkout swap) → moved to [BACKLOG.md](BACKLOG.md)
+§3 on 2026-09-03, plus the webhook-recording design question the F2 work
+raised.*
 
 **Done when:** a real dram moves in a sandbox end to end, and the order
 record shows paid-by-card without a human flipping anything.
@@ -233,22 +213,18 @@ record shows paid-by-card without a human flipping anything.
 Deliberately after launch: each of these was cut with a reason, and real
 traffic should confirm the reason wrong before it is built.
 
-- [ ] **Anonymous carts** (+ merge into the account cart on login) and
-      anonymous wishlists — Phase 11 + E8's backlog notes; the largest
-      funnel-friction item on the list.
-- [ ] **Checkout address picker** (`address_id`) over the E8 address book —
-      today the default prefills; picking among several is the noted
-      leftover.
-- [ ] **Apple sign-in** — if the family approves $99/yr once a domain
-      exists; the adapter work is scoped in E8's notes (form_post
-      callback, JWT client secret, email-absent re-auth).
-- [ ] **Smarter upsell** in the free-shipping banner (benefit-overlap
-      ranking, E7's one-query note) and the `stackable` promo flag — each
-      only when the current behaviour demonstrably misses.
+*All open items (anonymous carts/wishlists, address picker, Apple
+sign-in, smarter upsell + stackable) → moved to
+[BACKLOG.md](BACKLOG.md) §4 on 2026-09-03, joined there by
+PLAN_ACCOUNT's four deferrals (back-in-stock, apiary pickup, SMS
+notices, wishlist price-drop sender).*
+
 - [x] ~~The LanguageSwitcher placement review~~ — settled 2026-08-18 the
       other way (decision #90): removed from the footer entirely, the
-      account settings screen is the one home. Re-open only if anonymous
-      traffic demonstrably suffers.
+      account settings screen is the one home. *(And re-reversed by #98
+      on 2026-08-19: the footer switchers returned — the settings screen
+      is sign-in-only, anonymous visitors had no control. Closed both
+      ways; the log tells the story.)*
 
 ---
 
@@ -256,35 +232,25 @@ traffic should confirm the reason wrong before it is built.
 
 The consciously-carried debts, each with its written tripwire:
 
-- [ ] **Drop `products.image_url`** — E3's follow-up that lost its
-      migration number to reviews: move the list read to `product_images`,
-      stop double-writing on upload, then the drop (the add-backfill-drop
-      pattern's last step, still owed).
-- [ ] **Auth hardening batch** (Phase 11): security headers (CSP et al. at
-      Caddy/nginx), an expired-`sessions` cleanup job (they accumulate —
-      verified live), same sweep for spent reset tokens.
-- [ ] **Rate limiter to shared storage** — tripwire written at the type:
-      the day the API runs more than one replica.
-- [ ] **OpenAPI spec + generated TS client** (Phase 11) — retiring
-      hand-maintained `types.ts`; the Postman collection is the seed of
-      truth to formalize.
-- [ ] **Prerender/SSR for meta** — E10's honesty note: JS-managed tags
-      reach only crawlers that render; behind hosting.
-- [ ] **DB-backed pages/journal** — decision #77's tripwire: the day the
-      family needs to edit copy without a commit. Also repairs the known
-      hole of journal posts missing from the backend sitemap.
-- [ ] **Observability round two** (Phase 10): log aggregation, OpenTelemetry
-      tracing; k6 re-run on the real host — tighten the 200ms SLO the
-      11.6ms p95 now mocks, then find the true breaking point there.
-- [ ] **Only-if-measured shelf**: Redis caching, CDN, catalog cache
-      headers (E10: "an invalidation bug on layaway"), Terraform/Ansible,
-      Kubernetes ("only after Compose feels limiting") — each stays here
-      until a measurement or a real pain names it.
-- [ ] Watch the unasserted `agentic-browsing` Lighthouse category (E10).
+- [x] ~~**Drop `products.image_url`**~~ — closed 2026-08-20 by the
+      product-media work (decision #99, migration 000027) — the
+      add-backfill-drop pattern's last step finally paid.
+- *Everything else (auth hardening, rate-limiter tripwire, OpenAPI,
+  prerender/SSR — now unblocked by hosting, DB-backed pages tripwire,
+  observability round two + the k6 re-run on the real laptop, the
+  only-if-measured shelf, the agentic-browsing watch) → moved to
+  [BACKLOG.md](BACKLOG.md) §5 on 2026-09-03, joined there by the
+  post-audit additions: dead i18n keys, admin code-split, CI hygiene,
+  and the tripwire table (§6).*
 
 ---
 
 ## 4. Suggested order
+
+*(Historical — both nominated phases are done: F2 closed 2026-08-19, F1
+shipped 2026-09-02. Sequencing of what remains is
+[BACKLOG.md](BACKLOG.md)'s job now; its §1 "go-live residue" — backups
+drill first — is the successor of this section's advice.)*
 
 F1 unblocks everything and needs mostly non-coding work (ISP or VPS call,
 DNS, drills) — start it immediately and let it run in the background.

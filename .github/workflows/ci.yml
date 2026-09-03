@@ -118,6 +118,22 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      # The Chromium build is ~150 MB and identical for every run on the same
+      # Playwright version, so it is cached by that version — read from the
+      # lockfile, so a Playwright bump invalidates the cache and nothing else
+      # does. `playwright install` finds the cached build and skips the
+      # download; only the OS packages behind --with-deps are installed each
+      # run.
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('./frontend/package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Playwright browser
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
       - name: Install Playwright browser
         working-directory: frontend
         run: npx playwright install --with-deps chromium
@@ -259,7 +275,7 @@ jobs:
     steps:
       # 1. Checkout the code on the GitHub Runner
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # 1b. Home-server deployment (decision #100): the server sits behind
       # CGNAT with no inbound ports at all. The runner joins the private
@@ -300,7 +316,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "deploy/docker-compose.prod.yml,deploy/observability,backend/migrations"
+          source: "deploy/docker-compose.prod.yml,deploy/observability,deploy/backup.sh,deploy/restore.sh,deploy/alert.sh,deploy/systemd,backend/migrations"
           target: ${{ vars.TARGET_DIR }}
           # The laptop is reachable only via Tailscale's DERP relay (double
           # NAT + CGNAT leaves no direct path), and relayed connection setup
@@ -329,6 +345,16 @@ jobs:
             export POSTGRES_PASSWORD=$POSTGRES_PASSWORD
             export DOMAIN=$DOMAIN
             
+            # Decision #105: compose only WARNS about a missing secret file and
+            # mounts an empty directory in its place, so check for the alert
+            # bot's token here and fail the deploy with a readable message —
+            # the running containers stay as they were. (The chat id needs no
+            # check: its `:?` makes compose refuse to render without it.)
+            if ! [ -f deploy/observability/telegram.token ] || ! [ -s deploy/observability/telegram.token ]; then
+              echo "deploy/observability/telegram.token is missing or empty on the server - DEPLOYMENT_HOME.md step 12"
+              exit 1
+            fi
+
             # Login to GHCR on the VPS
             echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             

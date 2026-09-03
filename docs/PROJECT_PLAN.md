@@ -136,7 +136,7 @@ configuration, Docker Compose for dev dependencies.
 Tailwind, TanStack Query, CORS (and why it exists), talking to your own API.
 
 **Tasks:**
-- [ ] TypeScript fundamentals (official handbook) + React quick start
+- [ ] TypeScript fundamentals (official handbook) + React quick start *→ carried as [BACKLOG.md](BACKLOG.md) §7's learning-shelf line (absorbed in practice across Eras II–III; the deliberate handbook pass stays wanted)*
 - [x] Scaffold `frontend/` with Vite (react-ts template), lint + Prettier, Tailwind v4
 - [x] Pages: product list (grid with categories filter), product detail with variant picker (react-router v7, URL param routing, SPA deep links)
 - [x] Fetch data with TanStack Query; typed API client mirroring backend JSON (`src/api/`)
@@ -251,16 +251,22 @@ proxy and static file server, environment/secret handling, health checks.
 HTTPS/TLS with Let's Encrypt, zero-ish-downtime deploys, database backups,
 deploy automation from CI.
 
-**Status: ⏸️ FROZEN 2026-07-30** — hosting on own hardware (second laptop) chosen; blocked on port forwarding through the ISP's locked FiberHome HG6245D terminal (local admin disabled; ISP call pending). Cloudflare Tunnel considered and declined — classic port-forwarding path preferred. All artifacts ready; resumes the day 80/443 reach the LAN.
+**Status: ✅ SHIPPED 2026-09-02** — and the 07-30 freeze note aged
+instructively: the ISP block turned out to be CGNAT (no router setting
+could ever fix it), so the "Cloudflare Tunnel considered and declined"
+line was reversed by decision #100 — the live deployment is a home
+laptop + `mountainbreath.net` + Cloudflare named tunnel (HTTPS at the
+edge, zero inbound ports), CD over Tailscale, observability in prod
+(#101). Runbook: [DEPLOYMENT_HOME.md](../docs/DEPLOYMENT_HOME.md).
 
-**Tasks:** *(all artifacts prepared 2026-07-30 — see docs/DEPLOYMENT.md)*
-- [ ] Choose hosting (recommendation: cheap VPS — Hetzner/DigitalOcean — for maximum learning) ← **user decision pending**
-- [ ] Harden the server: non-root user, SSH keys, firewall, fail2ban (runbook §2)
-- [ ] Domain + DNS + TLS — Caddy chosen for auto-Let's Encrypt (`deploy/Caddyfile`, runbook §1/§6)
-- [ ] CD: on merge to `master`, CI deploys over SSH (`deploy` job written, dormant until `DEPLOY_ENABLED=true`)
-- [ ] Automated Postgres backups + tested restore (`deploy/backup.sh` + cron, runbook §7)
+**Tasks:**
+- [x] Choose hosting — home laptop + tunnel (decision #100, reversing #12)
+- [x] Harden the server: non-root user, SSH keys, ufw (SSH-only — the tunnel needs no open ports), fail2ban
+- [x] Domain + DNS + TLS — `mountainbreath.net` on Cloudflare; TLS terminates at the edge (Caddyfile kept for a VPS someday)
+- [x] CD: merge to `master` → CI → GHCR images → runner joins the tailnet → laptop pulls and restarts (first green deploy 2026-09-02)
+- [x] Automated Postgres backups + tested restore — systemd timer + `restore.sh --drill` + off-machine copy to R2 (decision #103, 2026-09-03; the laptop-side install is BACKLOG §1)
 
-**Done when:** merging a PR automatically updates the live site over HTTPS.
+**Done when:** merging a PR automatically updates the live site over HTTPS. ✅ *(verified live)*
 
 ---
 
@@ -271,13 +277,13 @@ deploy automation from CI.
 - **Observability:** ⏳ in progress —
   - [x] Prometheus metrics from the API: RED middleware (rate/errors/duration by route pattern), Go runtime, custom pgx pool collector, `mb_orders_created_total` business metric (2026-07-30)
   - [x] Prometheus + Grafana in the compose stack; provisioned datasource + dashboard (6 panels)
-  - [x] Alerting: 4 rules (APIDown, HighErrorRate, SlowRequests, DBPoolSaturated) + Alertmanager in the stack; full pending→firing→resolved cycle verified by killing the api (2026-07-31). Notification channel (Telegram) left for when it runs on the real server
-  - [ ] Structured logs aggregation; request tracing (OpenTelemetry)
+  - [x] Alerting: 4 rules (APIDown, HighErrorRate, SlowRequests, DBPoolSaturated) + Alertmanager in the stack; full pending→firing→resolved cycle verified by killing the api (2026-07-31). *The trio runs in prod since #101; the Telegram channel is [BACKLOG.md](BACKLOG.md) §1*
+  - [ ] Structured logs aggregation; request tracing (OpenTelemetry) → **[BACKLOG.md](BACKLOG.md) §5**
 - **Payments:** integrate a real payment provider (Stripe or a local one)
 - **Performance:** ⏳ started —
   - [x] k6 load test (`load/catalog-test.js`): browse + full purchase scenarios, SLO thresholds as code; baseline 2026-07-31: ~40 req/s, p95 19ms client / 8.5ms server, 0 errors, zero pool contention (12 conns) → no bottleneck at this scale
-  - [ ] Find the actual breaking point (crank VUs until thresholds fail), then optimize what breaks
-  - [ ] Caching (Redis) — only if measurements ever justify it; CDN with real hosting
+  - [ ] Find the actual breaking point (crank VUs until thresholds fail), then optimize what breaks → **[BACKLOG.md](BACKLOG.md) §5** (the re-run on the real laptop)
+  - [ ] Caching (Redis) — only if measurements ever justify it; CDN with real hosting → **[BACKLOG.md](BACKLOG.md) §5's only-if-measured shelf**
 - **Email:** transactional emails (order confirmation)
 - **Complete the shop:** ⏳ started —
   - [x] Backend admin product management: create product+variants (transactional, constraint-name error mapping), update product (slug immutable), variant price/stock PATCH, admin list incl. inactive (2026-07-31)
@@ -292,34 +298,21 @@ deploy automation from CI.
 
 ### Phase 11 — Idea Backlog (living)
 
-A permanent parking lot for future plans. **Anyone adds ideas here anytime**
-(a line is enough); when one is picked for work, it moves into a real phase
-section with tasks and a definition of done. Nothing here is committed-to —
-it exists so ideas survive.
-
-*(Audited 2026-08-15 against Era II — closed lines ticked with the phase
-that closed them; every open line now also lives in a structured phase of
-[PLAN_ERA_3.md](PLAN_ERA_3.md), which is where it gets scoped.)*
+**📌 Retired 2026-09-03 — the parking-lot role moved to
+[BACKLOG.md](BACKLOG.md).** New ideas go there (same rule: a line is
+enough, nothing is committed-to until scoped). This section stays as the
+record of the ideas Era I parked and where each ended up.
 
 **Product / business:**
 - [x] ~~Search v2~~ — done 2026-07-31 (promoted to the Search track); ~~multilingual content in FTS~~ — done in E1.5 (per-locale generated tsvector, built-in armenian/russian configs)
-- [ ] Payments: real provider integration (research Armenian options: Idram, Ameriabank vPOS, …) → **Era III F4**
-- [x] ~~Order e-mail confirmation~~ — done in E8 (trilingual, via the Mailer); status-change emails still open → **Era III F2**
-- [ ] Anonymous carts (buy without registering first) → **Era III F5**
-- [x] ~~Product image galleries~~ — done in E3; server-side thumbnails/resizing still open, behind photography → **Era III F3**
-- [ ] Customer-facing order cancellation (while pending) → **Era III F2**
-- [ ] Back-in-stock "Notify me" subscriptions — design drawn on the wishlist canvas (08); deferred per PLAN_ACCOUNT.md §2 #6
-- [ ] Apiary pickup as a delivery method (canvas 09; touches checkout pricing) — PLAN_ACCOUNT.md §2 #6
-- [ ] SMS delivery-day notices (+374; canvas 10's fourth toggle) — PLAN_ACCOUNT.md §2 #6
-- [ ] Wishlist price-drop / member-offer emails, the sender half (canvas 08's rail card) — PLAN_ACCOUNT.md §2 #6
+- [x] ~~Order e-mail confirmation~~ — done in E8; ~~status-change emails~~ — done in F2 (decision #92)
+- [x] ~~Product image galleries~~ — done in E3, grown to 3-photos+video in #99; server-side thumbnails/resizing still open → BACKLOG §2
+- [x] ~~Customer-facing order cancellation~~ — done in F2 (decision #93)
+- Payments (Idram/Ameria vPOS research) → **BACKLOG §3**; anonymous carts → **§4**; back-in-stock, apiary pickup, SMS notices, wishlist price-drop sender (the PLAN_ACCOUNT §2 #6 four) → **§4**
 
 **Engineering:**
-- [x] ~~Login rate limiting~~ — done in E8 (per IP+email, also guards forgot-password and newsletter); auth hardening batch (security headers, session cleanup job) still open → **Era III F6**
-- [ ] OpenAPI spec + generated TS client (replace hand-maintained types.ts) → **Era III F6**
-- [x] ~~k6 breaking-point, first pass~~ — E10 found the real bottleneck (Postgres JIT; p95 3,090ms → 11.6ms); the re-run on real hardware → **Era III F6**
-- [ ] S3-compatible object storage for uploads (when hosting matures) → **Era III F3**
-- [ ] Log aggregation + OpenTelemetry tracing → **Era III F6**
-- [ ] Category management: edit/delete/reorder in admin UI → **Era III F2**
+- [x] ~~Login rate limiting~~ — done in E8; ~~k6 breaking-point first pass~~ — done in E10 (Postgres JIT, p95 3,090→11.6ms); ~~category management~~ — done in F2 (decision #95)
+- Auth hardening batch → **BACKLOG §5**; OpenAPI + generated client → **§5**; S3 storage → **§2**; log aggregation + OTel + the k6 re-run on real hardware → **§5**
 
 ## 5. Milestone Summary
 

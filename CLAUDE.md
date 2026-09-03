@@ -31,10 +31,14 @@ start of a session. The parts that change how you work here:
   draws (focus/error/loading/empty/disabled/hover) are yours to design, and
   post-mock requirements like the three languages have no guidance in it.
   Departures from the canvas get a line saying why.
-- **One phase at a time** — follow the roadmap in
-  [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) (Era I, phases 0–11) and
-  [docs/PLAN_ERA_2.md](docs/PLAN_ERA_2.md) (Era II, phases E1–E10: building the
-  designed storefront). Finish a phase's definition of done before moving on.
+- **One phase at a time** — the era plans
+  ([docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) Era I,
+  [docs/PLAN_ERA_2.md](docs/PLAN_ERA_2.md) Era II,
+  [docs/PLAN_ERA_3.md](docs/PLAN_ERA_3.md) Era III) are historical records;
+  **since 2026-09-03 all open work lives in
+  [docs/BACKLOG.md](docs/BACKLOG.md)** — pick an item there, scope it into a
+  session with a definition of done, finish before moving on. New ideas are
+  added to BACKLOG.md as one-liners.
 - After a significant session, append an entry to
   [docs/LEARNING_LOG.md](docs/LEARNING_LOG.md) (newest first, dated).
 - Significant technical choices get a row in the Decisions Log in

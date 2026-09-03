@@ -180,7 +180,7 @@ Create a tunnel → type **Cloudflared** → name it `mountain-breath`.
    `deploy/.env` in step 8.
 2. **Public hostname** tab → Add:
    - Hostname: your domain, e.g. `mountainbreath.com` (subdomain empty
-     for the apex; add a second entry for `www` later if wanted)
+     for the apex; `www` is a redirect, step 14 — never a second entry)
    - Service: **HTTP** → `web:80`
 
    `web:80` works because cloudflared runs *inside the compose network*,
@@ -237,7 +237,14 @@ stack itself (loopback smoke port, no internet involved); then 💻 open
 Zero Trust tunnels list the tunnel shows **HEALTHY**.
 
 Seed + admin promotion: exactly DEPLOYMENT.md step 6 (copy the seed file
-in with `compose cp`, never pipe it).
+in with `compose cp`, never pipe it). One line tells you whether both
+happened — a live shop wants a catalog and at least one admin:
+
+```bash
+docker compose -f deploy/docker-compose.prod.yml exec -T postgres psql -U mb -d mountain_breath -Atc \
+  "select (select count(*) from products) || ' products, ' || (select count(*) from users where role='admin') || ' admins'"
+# expect something like: 8 products, 1 admins
+```
 
 ## 9. Turn on continuous deployment
 
@@ -265,13 +272,234 @@ a tiny change and `gh run watch`.
 
 ## 10. Backups
 
-DEPLOYMENT.md step 7 unchanged (cron + `backup.sh`, test the restore
-once). Home-specific addition: the laptop is a single point of failure
-*in your house* — copy `/opt/backups` somewhere that isn't the same
-machine now and then. Over the tailnet that's one command from 💻:
+[DEPLOYMENT.md](DEPLOYMENT.md) step 7 applies unchanged — the systemd
+timer, the restore drill, disaster recovery — and step 7b (the R2 copy)
+is not optional here: the laptop is a single point of failure *in your
+house* (theft, a power surge, a spilled tea), and a copy on the PC beside
+it shares every one of those fates. R2 is in another building by
+construction. Until 7b is configured, the manual escape hatch over the
+tailnet is one command from 💻:
 
 ```powershell
-scp deploy@mb-server:/opt/backups/mb_*.sql.gz D:\Backups\mountain-breath\
+scp deploy@mb-server:/opt/backups/mb_*.dump D:\Backups\mountain-breath\
+```
+
+## 11. Outgoing mail (decision #104)
+
+Until this step, reset links and order confirmations land in the api log
+(`docker compose … logs api`), because `MB_SMTP_ADDR` is unset. A home
+connection cannot deliver mail itself: residential IP ranges sit on every
+blocklist, most ISPs block outbound port 25, and sender reputation is
+earned per address over months. So the api hands each message to a
+**relay** that has that reputation — the same SMTP conversation it has
+with Mailpit in dev, aimed at a different host, with a password.
+
+**Concepts, briefly.** A receiving server asks three questions before it
+trusts a message claiming to come from `mountainbreath.net`:
+
+- **SPF** — a TXT record naming the servers allowed to send for the
+  domain (the relay's, here).
+- **DKIM** — the relay signs every message; a TXT record publishes the
+  public key so receivers can check the signature. A signed package:
+  anyone can verify, only the key holder can sign.
+- **DMARC** — a TXT record saying what to do when both checks fail
+  (`p=none` = deliver and report; tighten later once reports look clean).
+
+Resend puts its SPF on a `send` subdomain and DKIM under
+`resend._domainkey`, so nothing collides with the apex records Cloudflare
+Email Routing adds for inbound mail.
+
+**Provider:** Resend, over SMTP. Free tier: 3,000 messages a month, 100 a
+day, no branding — Brevo's free plan stamps "Sent with Brevo" on every
+message, which is not what a password reset should look like. The api's
+one-method mailer stays exactly what dev exercises against Mailpit; only
+the address and the credentials change.
+
+💻 In the browser:
+
+1. resend.com → sign up → **Domains → Add domain** `mountainbreath.net`.
+   Resend shows three records; add them in Cloudflare → DNS, Proxy status
+   **DNS only**, pasting names without the domain suffix: an MX on `send`
+   (priority 10), a TXT SPF on `send`, a TXT DKIM on `resend._domainkey`.
+   Click **Verify** — minutes, usually.
+2. **API Keys → Create**: permission *Sending access*, restricted to the
+   domain. Copy it now; it is shown once.
+3. Cloudflare → **Email → Email Routing → Enable**, then a rule
+   `hive@mountainbreath.net` → the family's real mailbox (confirm the
+   destination when Cloudflare mails it). Replies to order mails now
+   reach a human; the shop still sends nothing through Cloudflare, which
+   only receives.
+4. DMARC, once the first messages have gone out: Cloudflare → DNS → TXT
+   `_dmarc` with `v=DMARC1; p=none; rua=mailto:hive@mountainbreath.net`.
+
+🖥️ On the laptop:
+
+```bash
+cd /opt/mountain-breath/deploy
+cat >> .env <<'EOF'
+MB_SMTP_ADDR=smtp.resend.com:587
+MB_SMTP_USERNAME=resend
+MB_SMTP_PASSWORD=re_…the API key…
+MB_MAIL_FROM=Mountain Breath <hive@mountainbreath.net>
+EOF
+cd .. && docker compose -f deploy/docker-compose.prod.yml up -d api   # recreates api with the new env
+docker compose -f deploy/docker-compose.prod.yml logs api | grep "mail via SMTP"
+```
+
+**Test it the way a customer would:** 💻 on the live site's sign-in page,
+follow *Forgot password* for your own account and watch the message
+arrive (check the spam folder the first time; Resend's **Logs** page shows
+the relay's side of every message for 30 days). A failure is a
+`sending reset mail` line in the api log — the endpoint answers 204
+either way, by design, so the caller learns nothing about which emails
+exist.
+
+Limits worth knowing: 100 messages a day on the free plan — a launch
+week of resets and confirmations fits, a newsletter to hundreds of
+subscribers does not (the §2 newsletter sender will need the paid tier
+or batching). The api waits at most 10 seconds for the relay before
+logging a failure and answering the customer anyway: a relay outage
+slows a checkout, it never breaks one.
+
+## 12. Alerts to your phone (decision #105)
+
+Prometheus evaluates the rules in `deploy/observability/alerts.yml` (the
+API down, a 5xx spike, slow requests, a saturated DB pool) and hands
+firing alerts to Alertmanager; until this step Alertmanager only showed
+them in its own UI, which nobody watches at 03:00. This wires a Telegram
+receiver. A backup failure takes the same road: `backup.sh` fires a
+`BackupFailed` alert through Alertmanager's API and resolves it on the
+next success — one channel, one token holder, one place to silence
+things during maintenance. `deploy/alert.sh` is that API call as a
+script, for anything else that should page and for testing.
+
+The two values live in two places on purpose. The **chat id** is not a
+secret and goes in `deploy/.env`, where compose interpolates it into
+Alertmanager's config (Alertmanager reads no environment variables
+itself). The **bot token** is a secret and rides as a *file*, mounted by
+compose's `secrets:` at `/run/secrets/telegram_token`. Both are
+required, and each is guarded differently: compose refuses to render
+the config without the chat id (`:?`), while the token is checked by
+the container itself at start and by the CI deploy before `up` —
+compose alone only *warns* about a missing secret file and mounts an
+empty directory in its place, which would leave the channel quietly
+dead.
+
+💻 In Telegram:
+
+1. Message **@BotFather** → `/newbot` → pick a name and a username ending
+   in `bot`. It answers with the token (`123456:ABC-…`).
+2. Open a chat with your new bot and send it anything — a bot cannot
+   write to you first.
+3. Get the chat id: open
+   `https://api.telegram.org/bot<TOKEN>/getUpdates` in the browser and
+   read `"chat":{"id":123456789,…}` from the reply. (For a family group:
+   add the bot to the group, post once, same URL — group ids are
+   negative.)
+
+🖥️ On the laptop:
+
+```bash
+cd /opt/mountain-breath/deploy
+printf '%s' '123456:ABC-the-token' > observability/telegram.token
+chmod 600 observability/telegram.token          # git-ignored via *.token
+echo 'TELEGRAM_CHAT_ID=123456789' >> .env
+cd .. && docker compose -f deploy/docker-compose.prod.yml up -d alertmanager
+docker compose -f deploy/docker-compose.prod.yml logs alertmanager | tail -5   # no "error" lines
+
+# Test the whole path without an outage: fire a synthetic alert, watch
+# the phone buzz within group_wait (30 s), then send the all-clear.
+bash deploy/alert.sh fire TestAlert "hello from the laptop"
+bash deploy/alert.sh resolve TestAlert
+```
+
+Deploy ordering: the compose change that carries this arrives with the
+next master deploy, whose script checks for the token file (and compose
+for the chat id) before touching the stack — a missing one fails the
+job with a readable message and leaves the running containers as they
+were. Do this step before merging, or expect one red deploy that turns
+green on re-run.
+
+What pages, and when:
+
+| Alert | Fires when | Source |
+|---|---|---|
+| APIDown | Prometheus cannot scrape the API for 1 min | alerts.yml |
+| HighErrorRate | more than 0.5 server errors/s for 5 min | alerts.yml |
+| SlowRequests | p95 latency above 500 ms for 10 min | alerts.yml |
+| DBPoolSaturated | handlers wait over 100 ms/s for pool connections, 5 min | alerts.yml |
+| BackupFailed | the nightly backup exits non-zero; resolves on the next success | backup.sh |
+
+A firing alert repeats every 4 h until it resolves. Silence one during
+planned work from Alertmanager's UI over the tailnet (Observability,
+below).
+
+## 13. Google sign-in in production (E8's button, decision #5)
+
+The code has been ready since E8: with `MB_GOOGLE_CLIENT_ID` and
+`MB_GOOGLE_CLIENT_SECRET` set, *Continue with Google* works; unset, the
+button explains itself. What production needs is a client that trusts
+the real callback URL, and a consent screen the public may use.
+
+💻 console.cloud.google.com → the project from E8 (or a new one):
+
+1. **APIs & Services → Credentials** → the OAuth client (type *Web
+   application*) → **Authorized redirect URIs** → add
+   `https://mountainbreath.net/api/v1/auth/oauth/google/callback`
+   (keep the localhost one for dev). Save; copy the Client ID and the
+   Client secret.
+2. **OAuth consent screen** (newer consoles: *Google Auth Platform →
+   Audience*): move from **Testing** to **In production** (*Publish
+   app*). Testing mode caps sign-in at 100 listed test users and expires
+   their tokens after a week. The basic scopes this app asks for (email,
+   profile) need no verification review, so publishing is one click.
+   Branding: app name "Mountain Breath", a support email, the home page.
+
+🖥️ On the laptop:
+
+```bash
+cd /opt/mountain-breath/deploy
+cat >> .env <<'EOF'
+MB_GOOGLE_CLIENT_ID=…apps.googleusercontent.com
+MB_GOOGLE_CLIENT_SECRET=GOCSPX-…
+EOF
+cd .. && docker compose -f deploy/docker-compose.prod.yml up -d api
+```
+
+**Test:** 💻 sign out of the live site, click *Continue with Google*,
+pick an account that has no Mountain Breath password — you land signed
+in, and the account page shows the Google-linked identity. A
+`redirect_uri_mismatch` page from Google means step 1's URI differs from
+`MB_PUBLIC_URL` + the callback path, character for character (scheme,
+host, no trailing slash).
+
+## 14. `www.mountainbreath.net` → the apex
+
+Not a second tunnel hostname. The site's `rel=canonical` and `hreflang`
+tags are built from `window.location.origin`, so serving the same pages
+at two hosts would publish two canonical URLs for every page — the
+duplicate-content problem E10's tags exist to prevent. The answer is
+one hostname and a redirect for the other, answered at Cloudflare's
+edge without ever reaching the laptop.
+
+💻 Cloudflare dashboard → the domain:
+
+1. **DNS → Add record**: type `CNAME`, name `www`, target
+   `mountainbreath.net`, Proxy status **Proxied** (orange cloud). The
+   record only has to exist so Cloudflare answers for the name; the
+   proxy is what lets a rule intercept it.
+2. **Rules → Redirect Rules → Create rule** → template **Redirect from
+   WWW to Root** (by hand: when hostname equals
+   `www.mountainbreath.net`, dynamic redirect to
+   `concat("https://mountainbreath.net", http.request.uri.path)`, status
+   301, preserve query string). Deploy.
+
+**Test** from anywhere:
+
+```powershell
+curl.exe -sI https://www.mountainbreath.net/shop | Select-String "HTTP|location"
+# HTTP/1.1 301 Moved Permanently
+# location: https://mountainbreath.net/shop
 ```
 
 ## Observability (decision #101)
@@ -287,17 +515,21 @@ You reach them over the tailnet from anywhere — the SSH `-L` flag makes
 your browser's localhost port travel to the laptop's:
 
 ```powershell
-ssh -L 3000:localhost:3000 -L 9090:localhost:9090 capybara@homeserver
+# The LEFT port is on your own machine and is a free choice — 3300/9390
+# here because the local dev stack usually already occupies 3000/9090
+# (forwarding onto a taken port either fails to bind or, worse, shows
+# you the LOCAL Grafana while you believe you're looking at prod).
+ssh -L 3300:localhost:3000 -L 9390:localhost:9090 capybara@homeserver
 # then in the browser, while that ssh stays open:
-#   http://localhost:3000  → Grafana (admin / GRAFANA_PASSWORD from deploy/.env)
-#   http://localhost:9090  → Prometheus's own query UI
+#   http://localhost:3300  → prod Grafana (admin / GRAFANA_PASSWORD from deploy/.env)
+#   http://localhost:9390  → prod Prometheus's query UI
 ```
 
 The dashboards and alert rules are provisioned from
 `deploy/observability/` (the CI deploy copies that directory alongside
-the compose file). Alerts currently land only in Alertmanager's UI —
-wiring a real channel (Telegram) is a follow-up; the recipe is commented
-in `observability/alertmanager.yml`.
+the compose file). Alerts reach the family's phone through the Telegram
+receiver of step 12; this UI is where one gets silenced during planned
+work.
 
 ## Limits to know about
 

@@ -1,0 +1,14 @@
+{{/* The Telegram message (parse_mode: HTML). Every value that came from a
+     rule's annotation is piped through html — Telegram rejects a message
+     with a raw < or & outside a tag, and DBPoolSaturated's text has one. */}}
+{{ define "telegram.mb.message" -}}
+{{ range .Alerts.Firing -}}
+🔥 <b>{{ .Labels.alertname }}</b> ({{ .Labels.severity }})
+{{ .Annotations.summary | html }}
+{{ if .Annotations.description }}{{ .Annotations.description | html }}
+{{ end -}}
+{{ end -}}
+{{ range .Alerts.Resolved -}}
+✅ <b>{{ .Labels.alertname }}</b> resolved
+{{ end -}}
+{{ end }}

@@ -1,0 +1,24 @@
+# Nightly backup — the unit that mb-backup.timer fires (docs/DEPLOYMENT.md step 7).
+# Install once:
+#   sudo cp /opt/mountain-breath/deploy/systemd/mb-backup.{service,timer} /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now mb-backup.timer
+# The unit is deliberately thin — a pointer at the script. The script is
+# what CI keeps current on the server; this copy in /etc rarely changes.
+[Unit]
+Description=Mountain Breath nightly backup (database + uploads)
+# The dump runs inside the postgres container, so Docker must be up first.
+Requires=docker.service
+After=docker.service
+
+[Service]
+# oneshot: the service is "active" while the script runs, then done —
+# no daemon to keep alive, no restart policy.
+Type=oneshot
+User=deploy
+Group=deploy
+# Optional settings such as MB_BACKUP_REMOTE. The leading '-' means a
+# missing file is fine; the defaults in the script then apply.
+EnvironmentFile=-/opt/mountain-breath/deploy/backup.env
+# Invoked through bash, so the file's executable bit — which checkout and
+# scp do not always preserve — does not matter.
+ExecStart=/usr/bin/bash /opt/mountain-breath/deploy/backup.sh

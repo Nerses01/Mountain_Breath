@@ -17,6 +17,345 @@ Template for an entry:
 
 ---
 
+## 2026-09-03 — Backlog §1 closes on Claude's side: Google prod sign-in, www, CI hygiene
+
+**Worked on:** the three §1 lines that were runbook or CI work rather
+than features. Runbook step 13 (Google sign-in in production: the exact
+redirect URI `MB_PUBLIC_URL` + `/api/v1/auth/oauth/google/callback`,
+the consent screen leaving Testing mode, the `.env` lines, the test and
+its one failure signature). Step 14: `www` becomes a Cloudflare redirect
+rule to the apex (decision #106) instead of the second tunnel hostname
+the backlog had assumed. A one-line seed-and-admin check under step 8.
+CI: the deploy job's checkout on v5 like the rest, and the Playwright
+browser cached by the lockfile's Playwright version. BACKLOG §1
+restructured: shipped lines on top, then an ordered operator checklist
+of everything only the developer can do.
+
+**Learned:**
+- *Read the app before adding a hostname* — the plan said "add www in
+  the tunnel, 30 seconds"; the canonical tags read
+  `window.location.origin`, so that would have published two canonical
+  URLs per page. A redirect at the edge is the right shape, and it never
+  touches the laptop. The 30-second task was 30 seconds of the wrong
+  thing.
+- *Cache keys name the thing that invalidates them* — keying the
+  browser cache by the Playwright version from the lockfile means a
+  Playwright bump misses once and nothing else ever does; hashing the
+  whole lockfile would throw the cache away on every unrelated bump.
+- *`playwright install` is idempotent* — with the build already in
+  `~/.cache/ms-playwright` it downloads nothing, so the cache step needs
+  no conditional around the install step.
+- *An operator checklist is a deliverable* — the residue of a go-live is
+  mostly dashboard clicks and files no commit can create; writing them
+  as an ordered list with a proof step each ("a reset mail to yourself",
+  "curl shows 301") is what turns "done on Claude's side" into done.
+
+**Questions / to revisit:**
+- Google's console keeps renaming the consent-screen pages; step 13
+  names both the old and the new path, and will need a refresh when the
+  next rename lands.
+- The www redirect leaves the tunnel with one hostname; if a `shop.` or
+  `admin.` name ever appears, decide then whether it is a redirect or a
+  route.
+
+---
+
+## 2026-09-03 — Backlog §1: alerts reach a phone (decision #105)
+
+**Worked on:** the Telegram receiver, and the design question it
+raised: how does a deployment-specific value get into a config file
+whose program expands no environment variables? Answer: compose renders
+it — `configs: content:` in the prod compose is interpolated like the
+rest of the file, so `TELEGRAM_CHAT_ID` from `.env` lands in
+Alertmanager's config with no second templating layer. The bot token is
+a compose `secrets:` file (git-ignored), referenced by path. An HTML
+message template (`telegram.tmpl`) pipes annotations through `html`.
+New `deploy/alert.sh` fires or resolves an alert through Alertmanager's
+v2 API; `backup.sh` uses it — the ERR trap fires `BackupFailed`, a good
+run resolves it. Runbook step 12 (BotFather → token → chat id → `.env`
+→ a synthetic alert as the test), decision #105, the CI deploy carries
+`alert.sh` and checks for the token before `up`.
+
+**Rehearsed:** compose rendered the config with dummy values and refused
+without the chat id; `amtool check-config` accepted the rendered file; a
+throwaway Alertmanager with the template and a dummy token received a
+synthetic DBPoolSaturated (its description contains a `>`), executed
+the template and reached Telegram's API (404 for the dummy token — the
+expected failure, one step past the template). `alert.sh` fire/resolve
+round-tripped against the local stack's Alertmanager; `backup.sh` with a
+wrong volume fired `BackupFailed`, a good run resolved it, an empty URL
+skipped, an unreachable one warned with the exit code untouched. The
+token guard, run through `docker compose run`: absent file → exit 1
+with the message, empty file → exit 1, real file → Alertmanager up.
+
+**Found:** my first draft claimed a missing secret file "fails `up`
+loudly". A probe showed the opposite — compose logs one warning, mounts
+an empty *directory* at the secret's path, and carries on; Alertmanager
+reads `bot_token_file` only at its first notification. The channel
+would have been silently dead, the failure mode #103 had just named
+"the bug that matters". The guard now lives in the container's
+entrypoint and in the deploy job, and the docs say what is true.
+
+**Learned:**
+- *Where a value is rendered is an architecture choice* — Alertmanager
+  and Prometheus refuse env expansion on purpose (a config should be
+  inspectable, not dependent on a process environment), so the renderer
+  must live one level up. Compose already is that level; an init
+  container would have been a second one.
+- *Secrets as files, not env vars* — an env var leaks into `docker
+  inspect`, `/proc/<pid>/environ` and every child process; a 0600 file
+  leaks to nobody but its reader. Compose `secrets:` gives the file a
+  name and a fixed mount path.
+- *But verify the claimed failure mode* — "compose secrets fail loudly
+  when missing" sounded right and was false; a five-line probe compose
+  file settled it in a minute. The same directory-instead-of-file trap
+  as `docker run -v` with a missing path (#103), wearing a nicer name.
+- *One road for everything that pages* — pushing the backup's failure
+  INTO Alertmanager (an alert is a labelled time span: `startsAt`,
+  `endsAt`) rather than posting to Telegram directly buys grouping,
+  silences, `repeat_interval` and the resolved message for free, and
+  keeps one token holder. The store layer for SQL, again.
+- *An alert is a span, a notification is an event* — fire = open a
+  24-hour span, resolve = close it now, same labels = same alert. A
+  failing backup wants the span: it nags every 4 h until the next
+  success, where one message is read once and forgotten.
+- *`sh -c 'script' -- ARGS`, second appearance* — `--` becomes `$0` and
+  the arguments arrive as `"$@"` for the `exec`; in compose the dollar
+  is written `$$` so interpolation leaves it alone. Same idiom as
+  `restore.sh`'s `pgtool`, now guarding an entrypoint.
+- *`test -s` is true for a directory* — a directory has a size, so the
+  guard needs `-f` too. The kind of detail a probe finds and a review
+  does not.
+- *Parse modes bite* — Telegram's MarkdownV2 rejects unescaped `-`,
+  `.` and `>`; HTML with `| html` on every annotation is the honest
+  choice, because DBPoolSaturated's description already contains a `>`.
+- *Verify the rendering, not the source* — `docker compose config` →
+  extract the block → `amtool check-config` → a throwaway Alertmanager
+  executing the real template against the real API. Each layer could
+  lie alone.
+
+**Questions / to revisit:**
+- A backup that never RUNS (timer disabled, script killed before its
+  trap) pages nobody: a "backup too old" rule needs a metric —
+  node_exporter's textfile collector with a last-success timestamp
+  written by `backup.sh`, when host metrics arrive (§5, observability
+  round two).
+- `alert.sh` builds its JSON by string; a summary containing a double
+  quote would break it. Fine for our own callers — `jq` the day it
+  carries user text.
+- The dev stack's `alertmanager.yml` and the prod inline config
+  duplicate four route lines; tolerable, and one drifts silently if it
+  grows.
+
+---
+
+## 2026-09-03 — Backlog §1: production mail through a real relay (decision #104)
+
+**Worked on:** the SMTP-relay line. Reading the mailer before touching
+config showed the config-only reading was wrong: `smtp.SendMail` has no
+timeout, and every handler sends synchronously before answering the
+browser, so a stalled internet relay would hold a checkout open with no
+limit; it also cannot do implicit TLS on port 465. `mail.SMTP.Send` now
+drives `net/smtp`'s Client by hand — a 10 s deadline on the connection
+covering dial, TLS, AUTH and DATA; implicit TLS when the port says 465,
+STARTTLS whenever the relay offers it; credentials refused over
+plaintext with no localhost exemption. Ten tests against a scripted
+relay on 127.0.0.1 (a self-signed authority handed in through unexported
+hooks) pin the plaintext path Mailpit covers daily and the TLS/AUTH/
+deadline paths it never does. Provider chosen after checking the facts:
+Resend over SMTP (3,000/month, 100/day, no branding; Brevo's free plan
+stamps a sticker on every message). Inbound for `hive@mountainbreath.net`
+via Cloudflare Email Routing. Runbook step 11 with the SPF/DKIM/DMARC
+walk-through; env examples updated. Operator half in BACKLOG §1.
+
+**Learned:**
+- *"Config-only" is a hypothesis to test against the code* — the mailer
+  comment itself had deferred the timeout question to "when a slow
+  provider exists"; the provider arriving is the trigger, and reading
+  the call sites (all synchronous, all non-fatal) made the risk concrete.
+- *Drop one level below the convenience wrapper* — `smtp.SendMail` is a
+  thirty-line function over `smtp.Client`; re-doing its seven steps by
+  hand costs little and buys a deadline and a TLS mode it lacks. The
+  same move as replacing `std::async` with a `std::thread` you can join
+  on your own terms.
+- *One absolute deadline beats many timeouts* — `conn.SetDeadline` is an
+  instant, inherited by every later Read and Write, so the handshake,
+  AUTH and the body all share it with no per-step plumbing. A
+  `steady_clock::time_point` checked by every blocking call, rather than
+  a duration threaded through each function.
+- *Transport security follows the port* — 465 is TLS from the first
+  byte; everything else negotiates with STARTTLS. Mail clients have
+  encoded this convention for twenty years; encoding it once in
+  `wantsImplicitTLS` makes the config a plain host:port.
+- *Refuse, don't accommodate* — a relay that wants a password but
+  offers no TLS is an error, not a fallback. `net/smtp` agrees but
+  exempts localhost; dropping the exemption makes the rule uniform and,
+  usefully, testable on 127.0.0.1.
+- *The relay's verdict arrives at `Close`* — the DATA writer's Write
+  succeeding means nothing; the 250 or 554 comes back when the
+  end-of-data marker is sent. Errors have addresses in a protocol.
+- *Test what dev cannot exercise* — Mailpit proves plaintext SMTP every
+  day; STARTTLS, implicit TLS, AUTH and a stalled relay needed a
+  scripted server and a minted certificate. Sixty lines of fake relay
+  is cheap next to a first-real-relay surprise (the E8 subject-encoding
+  bug was exactly that class).
+- *Unexported test hooks over exported knobs* — `rootCAs` and
+  `implicitTLS` are fields a test in the same package can set and
+  production cannot see; the public surface stays host:port and
+  credentials.
+- *Deliverability is three DNS records* — SPF names who may send, DKIM
+  lets receivers verify a signature, DMARC says what to do on failure.
+  Resend keeps SPF on a `send` subdomain so the apex stays free for
+  Cloudflare's inbound routing.
+- *Verify vendor facts before writing a runbook* — ports, free-tier
+  limits and the branding rule came from the providers' own pages, not
+  memory; the Brevo sticker alone would have been an embarrassing
+  password-reset email.
+
+**Questions / to revisit:**
+- 100 messages a day is fine for transactional mail and wrong for the
+  §2 newsletter sender; that item inherits a batching-or-paid-tier
+  decision.
+- A relay outage still costs each affected request up to 10 s. If that
+  ever shows in the latency dashboard, sending from a goroutine (or a
+  tiny outbox table) is the next step — and an outbox would also
+  survive a restart mid-send.
+- Bounce and complaint handling: Resend reports them in its dashboard;
+  nothing in the shop reads them yet.
+
+---
+
+## 2026-09-03 — Backlog §1: backups you can restore (decision #103)
+
+**Worked on:** the backlog's first two lines, scoped as one session.
+`deploy/backup.sh` grew from a `pg_dump | gzip` one-liner into the
+shop's actual backup: a custom-format dump taken inside the container
+and parse-checked with `pg_restore --list`; an archive of the uploads
+volume, written only when a fingerprint of its file list changes; an
+optional rclone copy to Cloudflare R2 (remote dumps aged out only after
+a successful upload); count-based local retention. New
+`deploy/restore.sh`: `--drill` restores into a scratch database inside
+the running Postgres, compares row counts with live, reads the uploads
+archive back, and drops the scratch database from an EXIT trap;
+`--real` is the typed-confirmation disaster path (stop api → drop and
+recreate from the dump → replace the volume → `up -d`, which lets the
+migrate job carry the schema forward). A systemd timer replaces the
+cron line. Runbooks rewritten (DEPLOYMENT.md step 7 + 7b,
+DEPLOYMENT_HOME.md §10); the CI deploy's scp now carries the scripts and
+units to the server. Laptop-side install and the first real drill are
+the operator's, listed in BACKLOG §1.
+
+**Rehearsed** on the Windows dev machine against the dev stack: backup
+in under ten seconds (112 KB dump, 2.5 MB uploads archive from a
+read-only volume); the drill restored 214 archive entries and reported
+8 products / 340 orders / 43 users / schema 27 on both sides and 4
+files in the archive; a second run skipped the unchanged uploads; a
+dump truncated mid-data failed the restore with the scratch database
+gone afterwards; a truncated uploads archive failed the drill; a
+misspelled volume name failed the backup at the guard.
+
+**Learned:**
+- *A backup is defined by what the restore needs, not by what is easy
+  to dump* — the old script covered Postgres only; product photos and
+  videos live in a volume, so its restore would have yielded a catalog
+  of broken images. Enumerate the state before choosing tools.
+- *Verify at write time what you can* — `pg_restore --list` proves the
+  archive parses tonight; a corrupt file becomes a failed backup run,
+  not a discovery on the worst day. Same instinct as testing a
+  migration's down path while nothing depends on it.
+- *Custom format vs plain SQL* — a plain script can only be replayed
+  whole through psql; the custom archive has a table of contents,
+  restores in part or in a different order, and gives a drill
+  `--exit-on-error`. Roughly an object file with a symbol table vs
+  source you can only recompile from the top.
+- *Write-then-rename is the file system's transaction* — dump to
+  `.part`, `mv` on success: a run killed halfway never leaves a
+  plausible-looking truncated file. A compiler writing `foo.o.tmp` and
+  renaming does the same.
+- *Age-based pruning has a failure mode; count-based cannot* — "delete
+  older than 14 days", run by anything independent of a successful
+  backup (a separate cron, a bucket lifecycle rule), keeps deleting
+  after backups silently stop, until nothing is left. Keeping the newest
+  N can never empty the directory. The remote prune IS age-based, but
+  `set -e` ordering puts it strictly behind a successful upload — the
+  same guarantee spelled differently.
+- *`trap … EXIT` is bash's destructor* — the scratch database is dropped
+  whether the drill passes, fails, or is interrupted; the C++ reflex
+  (RAII, `scope_exit`) has a shell spelling.
+- *`docker run -v name:/path` creates a missing volume silently* — a
+  typo would have archived an empty directory nightly and reported
+  success. `docker volume inspect` first turns the typo into a loud
+  failure. Silent success is the backup bug that matters.
+- *Change detection by fingerprint* — hashing the sorted (path, size,
+  mtime) list decides whether the volume needs a new archive; the reward
+  is fourteen nights of dumps beside one or two uploads tarballs. It is
+  `make`'s mtime check generalised to a whole directory.
+- *systemd timers over cron for a machine that sleeps* —
+  `Persistent=true` runs the missed 03:30 job at next boot; cron skips
+  the night. journald logging and `list-timers` come free.
+- *Environment defaults make one script serve prod and rehearsal* —
+  every path and name is `${MB_X:-prod default}`, so the dev-stack drill
+  runs the same code path, not a mock of it. Two Windows detours: GNU
+  tar parses `C:/…` as "host C" (the old remote-tape syntax), so the
+  archive is fed on stdin instead of by path; and `MSYS_NO_PATHCONV=1`
+  stops Git Bash rewriting `/src` into a Program Files path before
+  docker sees it.
+- *A swallowed error is a passing test that lies* — the first drill
+  printed PASSED with "0 files" because `|| true` had hidden tar's
+  failure. Decide per command whether failure is acceptable; a blanket
+  `|| true` on a verification step defeats the verification.
+- *`sh -c '… "$@"' sh ARGS`* — the idiom for handing arguments into a
+  container command without a second layer of quoting: the word after
+  the script is `$0`, the rest arrive as `"$@"`, and `$POSTGRES_USER`
+  expands inside the container, where it is defined.
+
+**Questions / to revisit:**
+- A failed timer run is visible only in `journalctl` / `systemctl
+  --failed` until the Telegram receiver exists (§1's alerts item);
+  `OnFailure=` on the service is the hook for it.
+- The uploads tarball is not transactional with the dump: a photo
+  uploaded during the tar could be captured half-written. At 03:30 on a
+  family shop that is theoretical; the fix, if ever needed, is archiving
+  only files older than the dump's start time.
+- Remote uploads archives are never pruned. Bounded by "written only on
+  change", but a year of weekly photo sessions is worth an `rclone ls`
+  now and then.
+
+---
+
+## 2026-09-03 — Post-launch consolidation: one backlog (decision #102)
+
+**Worked on:** the day-after-launch paperwork. A full re-read of every
+plan (PROJECT_PLAN 9–11, PLAN_ERA_2's open decision, PLAN_ERA_3 F1–F6,
+PLAN_ACCOUNT deferrals) plus every "Questions / to revisit" since the
+08-15 audit → **docs/BACKLOG.md**, the single home of open work (7
+sections: go-live residue, launch content, payments, UX-by-evidence,
+engineering debts, a tripwire table with named firing events, a learning
+shelf). The era plans were cleared of open items — each keeps its
+history, goals and done-whens, with per-item pointers into the backlog;
+Phase 9's two-era-stale FROZEN note replaced by what actually shipped;
+Phase 11 retired as parking lot; CLAUDE.md now steers to BACKLOG.md.
+
+**Learned:**
+- *Plans drift in two directions* — the 08-15 audit found gaps no doc
+  recorded (under-documentation), and three weeks later its own F1
+  described a road not taken (over-specification aged into fiction:
+  "Cloudflare Tunnel considered and declined" was the live
+  architecture's exact opposite). Consolidation is re-basing the plan
+  onto reality, like a rebase onto a moved main.
+- *A backlog needs an exit rule to stay trustworthy* — leave by
+  shipping (tick + decision number) or rejection (strike + reason);
+  anything else and the list rots back into folklore.
+- *Tripwires ≠ tasks* — "do X" and "decide X when event Y fires" rot
+  differently; giving the latter their own table with named firing
+  events keeps them from masquerading as work or being deleted as
+  stale.
+- *The reconciliation section (§0) is the audit's receipt* — recording
+  what closed differently than planned (#99, #100/#101) is what makes
+  the next audit cheap.
+
+---
+
 ## 2026-09-02 — Phase 9: home server behind CGNAT → Cloudflare tunnel (decision #100, reversing #12)
 
 **Worked on:** the hosting decision that unblocks Phase 9, twice. Plan A

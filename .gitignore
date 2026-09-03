@@ -27,6 +27,7 @@ playwright-report/
 .env.*
 !.env.example
 *.token
+deploy/backup.env
 
 # --- Docker ---
 # local DB volumes if bind-mounted

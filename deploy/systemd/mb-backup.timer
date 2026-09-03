@@ -1,0 +1,19 @@
+# Fires mb-backup.service every night. systemd timer instead of cron for
+# one property a home laptop needs: Persistent=true (below).
+#   systemctl list-timers mb-backup.timer     # NEXT and LAST run
+#   journalctl -u mb-backup --since yesterday # what the runs said
+[Unit]
+Description=Nightly Mountain Breath backup at 03:30
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+# A laptop may be off at 03:30 (a power cut outlasting the battery). With
+# Persistent=true systemd remembers the missed run and fires it as soon as
+# the timer is next loaded — cron would simply skip the night.
+Persistent=true
+# Spread the start a little so a boot at exactly 03:30 does not race
+# Docker's own start-up.
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target
