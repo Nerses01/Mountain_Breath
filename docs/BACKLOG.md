@@ -54,9 +54,15 @@ The gap between "deploys itself" and "operated like you mean it":
       fill `deploy/backup.env` (DEPLOYMENT.md steps 7 and 7b).
 - [ ] Verify prod is **seeded and an admin exists** (runbook first-boot
       tail) — confirm the live DB isn't running on manual fumes.
-- [ ] **Real SMTP relay** for production mail (`MB_SMTP_*`,
-      `MB_MAIL_FROM` on `mountainbreath.net`) — today reset links and
-      order mails land in the api log (F1 sweep line).
+- [x] **Real SMTP relay** for production mail — decision #104,
+      2026-09-03: Resend over SMTP; the mailer gained a conversation
+      deadline, port-465 TLS, STARTTLS and a plaintext-credentials
+      refusal, all pinned against a scripted relay in tests. Runbook
+      step 11.
+- [ ] **Operator hands**: Resend account + the three DNS records in
+      Cloudflare, API key into `deploy/.env`, Email Routing for
+      `hive@mountainbreath.net`, a reset mail as the first test, then the
+      `_dmarc` record (DEPLOYMENT_HOME.md step 11).
 - [ ] **Google sign-in on prod**: OAuth client gains the
       `https://mountainbreath.net` redirect URI; consent screen leaves
       Testing mode (E8's checklist; F1 sweep line).

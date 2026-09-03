@@ -277,6 +277,83 @@ tailnet is one command from 💻:
 scp deploy@mb-server:/opt/backups/mb_*.dump D:\Backups\mountain-breath\
 ```
 
+## 11. Outgoing mail (decision #104)
+
+Until this step, reset links and order confirmations land in the api log
+(`docker compose … logs api`), because `MB_SMTP_ADDR` is unset. A home
+connection cannot deliver mail itself: residential IP ranges sit on every
+blocklist, most ISPs block outbound port 25, and sender reputation is
+earned per address over months. So the api hands each message to a
+**relay** that has that reputation — the same SMTP conversation it has
+with Mailpit in dev, aimed at a different host, with a password.
+
+**Concepts, briefly.** A receiving server asks three questions before it
+trusts a message claiming to come from `mountainbreath.net`:
+
+- **SPF** — a TXT record naming the servers allowed to send for the
+  domain (the relay's, here).
+- **DKIM** — the relay signs every message; a TXT record publishes the
+  public key so receivers can check the signature. A signed package:
+  anyone can verify, only the key holder can sign.
+- **DMARC** — a TXT record saying what to do when both checks fail
+  (`p=none` = deliver and report; tighten later once reports look clean).
+
+Resend puts its SPF on a `send` subdomain and DKIM under
+`resend._domainkey`, so nothing collides with the apex records Cloudflare
+Email Routing adds for inbound mail.
+
+**Provider:** Resend, over SMTP. Free tier: 3,000 messages a month, 100 a
+day, no branding — Brevo's free plan stamps "Sent with Brevo" on every
+message, which is not what a password reset should look like. The api's
+one-method mailer stays exactly what dev exercises against Mailpit; only
+the address and the credentials change.
+
+💻 In the browser:
+
+1. resend.com → sign up → **Domains → Add domain** `mountainbreath.net`.
+   Resend shows three records; add them in Cloudflare → DNS, Proxy status
+   **DNS only**, pasting names without the domain suffix: an MX on `send`
+   (priority 10), a TXT SPF on `send`, a TXT DKIM on `resend._domainkey`.
+   Click **Verify** — minutes, usually.
+2. **API Keys → Create**: permission *Sending access*, restricted to the
+   domain. Copy it now; it is shown once.
+3. Cloudflare → **Email → Email Routing → Enable**, then a rule
+   `hive@mountainbreath.net` → the family's real mailbox (confirm the
+   destination when Cloudflare mails it). Replies to order mails now
+   reach a human; the shop still sends nothing through Cloudflare, which
+   only receives.
+4. DMARC, once the first messages have gone out: Cloudflare → DNS → TXT
+   `_dmarc` with `v=DMARC1; p=none; rua=mailto:hive@mountainbreath.net`.
+
+🖥️ On the laptop:
+
+```bash
+cd /opt/mountain-breath/deploy
+cat >> .env <<'EOF'
+MB_SMTP_ADDR=smtp.resend.com:587
+MB_SMTP_USERNAME=resend
+MB_SMTP_PASSWORD=re_…the API key…
+MB_MAIL_FROM=Mountain Breath <hive@mountainbreath.net>
+EOF
+cd .. && docker compose -f deploy/docker-compose.prod.yml up -d api   # recreates api with the new env
+docker compose -f deploy/docker-compose.prod.yml logs api | grep "mail via SMTP"
+```
+
+**Test it the way a customer would:** 💻 on the live site's sign-in page,
+follow *Forgot password* for your own account and watch the message
+arrive (check the spam folder the first time; Resend's **Logs** page shows
+the relay's side of every message for 30 days). A failure is a
+`sending reset mail` line in the api log — the endpoint answers 204
+either way, by design, so the caller learns nothing about which emails
+exist.
+
+Limits worth knowing: 100 messages a day on the free plan — a launch
+week of resets and confirmations fits, a newsletter to hundreds of
+subscribers does not (the §2 newsletter sender will need the paid tier
+or batching). The api waits at most 10 seconds for the relay before
+logging a failure and answering the customer anyway: a relay outage
+slows a checkout, it never breaks one.
+
 ## Observability (decision #101)
 
 The prod stack carries the same Prometheus + Alertmanager + Grafana trio

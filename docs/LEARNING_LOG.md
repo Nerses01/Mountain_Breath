@@ -17,6 +17,82 @@ Template for an entry:
 
 ---
 
+## 2026-09-03 — Backlog §1: production mail through a real relay (decision #104)
+
+**Worked on:** the SMTP-relay line. Reading the mailer before touching
+config showed the config-only reading was wrong: `smtp.SendMail` has no
+timeout, and every handler sends synchronously before answering the
+browser, so a stalled internet relay would hold a checkout open with no
+limit; it also cannot do implicit TLS on port 465. `mail.SMTP.Send` now
+drives `net/smtp`'s Client by hand — a 10 s deadline on the connection
+covering dial, TLS, AUTH and DATA; implicit TLS when the port says 465,
+STARTTLS whenever the relay offers it; credentials refused over
+plaintext with no localhost exemption. Ten tests against a scripted
+relay on 127.0.0.1 (a self-signed authority handed in through unexported
+hooks) pin the plaintext path Mailpit covers daily and the TLS/AUTH/
+deadline paths it never does. Provider chosen after checking the facts:
+Resend over SMTP (3,000/month, 100/day, no branding; Brevo's free plan
+stamps a sticker on every message). Inbound for `hive@mountainbreath.net`
+via Cloudflare Email Routing. Runbook step 11 with the SPF/DKIM/DMARC
+walk-through; env examples updated. Operator half in BACKLOG §1.
+
+**Learned:**
+- *"Config-only" is a hypothesis to test against the code* — the mailer
+  comment itself had deferred the timeout question to "when a slow
+  provider exists"; the provider arriving is the trigger, and reading
+  the call sites (all synchronous, all non-fatal) made the risk concrete.
+- *Drop one level below the convenience wrapper* — `smtp.SendMail` is a
+  thirty-line function over `smtp.Client`; re-doing its seven steps by
+  hand costs little and buys a deadline and a TLS mode it lacks. The
+  same move as replacing `std::async` with a `std::thread` you can join
+  on your own terms.
+- *One absolute deadline beats many timeouts* — `conn.SetDeadline` is an
+  instant, inherited by every later Read and Write, so the handshake,
+  AUTH and the body all share it with no per-step plumbing. A
+  `steady_clock::time_point` checked by every blocking call, rather than
+  a duration threaded through each function.
+- *Transport security follows the port* — 465 is TLS from the first
+  byte; everything else negotiates with STARTTLS. Mail clients have
+  encoded this convention for twenty years; encoding it once in
+  `wantsImplicitTLS` makes the config a plain host:port.
+- *Refuse, don't accommodate* — a relay that wants a password but
+  offers no TLS is an error, not a fallback. `net/smtp` agrees but
+  exempts localhost; dropping the exemption makes the rule uniform and,
+  usefully, testable on 127.0.0.1.
+- *The relay's verdict arrives at `Close`* — the DATA writer's Write
+  succeeding means nothing; the 250 or 554 comes back when the
+  end-of-data marker is sent. Errors have addresses in a protocol.
+- *Test what dev cannot exercise* — Mailpit proves plaintext SMTP every
+  day; STARTTLS, implicit TLS, AUTH and a stalled relay needed a
+  scripted server and a minted certificate. Sixty lines of fake relay
+  is cheap next to a first-real-relay surprise (the E8 subject-encoding
+  bug was exactly that class).
+- *Unexported test hooks over exported knobs* — `rootCAs` and
+  `implicitTLS` are fields a test in the same package can set and
+  production cannot see; the public surface stays host:port and
+  credentials.
+- *Deliverability is three DNS records* — SPF names who may send, DKIM
+  lets receivers verify a signature, DMARC says what to do on failure.
+  Resend keeps SPF on a `send` subdomain so the apex stays free for
+  Cloudflare's inbound routing.
+- *Verify vendor facts before writing a runbook* — ports, free-tier
+  limits and the branding rule came from the providers' own pages, not
+  memory; the Brevo sticker alone would have been an embarrassing
+  password-reset email.
+
+**Questions / to revisit:**
+- 100 messages a day is fine for transactional mail and wrong for the
+  §2 newsletter sender; that item inherits a batching-or-paid-tier
+  decision.
+- A relay outage still costs each affected request up to 10 s. If that
+  ever shows in the latency dashboard, sending from a goroutine (or a
+  tiny outbox table) is the next step — and an outbox would also
+  survive a restart mid-send.
+- Bounce and complaint handling: Resend reports them in its dashboard;
+  nothing in the shop reads them yet.
+
+---
+
 ## 2026-09-03 — Backlog §1: backups you can restore (decision #103)
 
 **Worked on:** the backlog's first two lines, scoped as one session.
