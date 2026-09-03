@@ -346,12 +346,17 @@ jobs:
             export DOMAIN=$DOMAIN
             
             # Decision #105: compose only WARNS about a missing secret file and
-            # mounts an empty directory in its place, so check for the alert
-            # bot's token here and fail the deploy with a readable message —
-            # the running containers stay as they were. (The chat id needs no
-            # check: its `:?` makes compose refuse to render without it.)
+            # mounts an empty directory in its place, and the compose file
+            # renders a placeholder chat id rather than failing (a `:?` there
+            # blocked every compose command on the server, backups included).
+            # So check both here and fail the deploy with a readable message —
+            # the running containers stay as they were.
             if ! [ -f deploy/observability/telegram.token ] || ! [ -s deploy/observability/telegram.token ]; then
               echo "deploy/observability/telegram.token is missing or empty on the server - DEPLOYMENT_HOME.md step 12"
+              exit 1
+            fi
+            if ! grep -q '^TELEGRAM_CHAT_ID=.' deploy/.env; then
+              echo "TELEGRAM_CHAT_ID is missing from deploy/.env on the server - DEPLOYMENT_HOME.md step 12"
               exit 1
             fi
 

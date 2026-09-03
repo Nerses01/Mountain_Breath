@@ -59,7 +59,10 @@ Rufus, boot the laptop from it. Through the installer:
 
 - **Wired ethernet if at all possible** — Wi-Fi works, but it's one more
   thing to debug on a headless box.
-- User: `deploy` (matches the CI secrets).
+- User: any name — this laptop's is `capybara`; the VPS runbook's
+  examples say `deploy`. Whatever you pick, the `DEPLOY_USER` secret in
+  step 9 must name the same user, and every 🖥️ command in this runbook
+  runs as that user.
 - ☑ **Install OpenSSH server** when offered.
 
 After first boot, note the LAN address: 🖥️ `ip -4 addr` (something like
@@ -378,12 +381,13 @@ secret and goes in `deploy/.env`, where compose interpolates it into
 Alertmanager's config (Alertmanager reads no environment variables
 itself). The **bot token** is a secret and rides as a *file*, mounted by
 compose's `secrets:` at `/run/secrets/telegram_token`. Both are
-required, and each is guarded differently: compose refuses to render
-the config without the chat id (`:?`), while the token is checked by
-the container itself at start and by the CI deploy before `up` —
-compose alone only *warns* about a missing secret file and mounts an
-empty directory in its place, which would leave the channel quietly
-dead.
+required, and both are checked in the same two places: the Alertmanager
+container refuses to start without them and says which one is missing
+in its log, and the CI deploy checks both before touching the stack.
+Compose itself is deliberately *not* the check: it only warns about a
+missing secret file and mounts an empty directory in its place, and a
+hard `:?` on the chat id turned out to block every compose command on
+the laptop, backups included, until the value existed.
 
 💻 In Telegram:
 
@@ -393,29 +397,49 @@ dead.
    write to you first.
 3. Get the chat id: open
    `https://api.telegram.org/bot<TOKEN>/getUpdates` in the browser and
-   read `"chat":{"id":123456789,…}` from the reply. (For a family group:
-   add the bot to the group, post once, same URL — group ids are
-   negative.)
+   read `"chat":{"id":123456789,"first_name":"…","type":"private"}` from
+   the reply — the `chat` object inside your message. Two traps: the
+   number before the colon in the token is the *bot's* id, and using it
+   ends in `the bot can't send messages to the bot (403)`; and an empty
+   `"result":[]` means the bot has no message from you yet (send one and
+   reload). For a family group: add the bot to the group, post once,
+   same URL — group ids are negative.
 
 🖥️ On the laptop:
 
 ```bash
 cd /opt/mountain-breath/deploy
-printf '%s' '123456:ABC-the-token' > observability/telegram.token
-chmod 600 observability/telegram.token          # git-ignored via *.token
+printf '%s' '123456:ABC-the-token' > observability/telegram.token   # git-ignored via *.token
+# The image runs Alertmanager as `nobody` (uid 65534), and a bind-mounted
+# file keeps its host owner and mode: a 600 file owned by you exists and
+# is non-empty inside the container, and is still unreadable there. Hand
+# it to that uid, read-only. (Replacing the token later: `sudo tee`.)
+sudo chown 65534:65534 observability/telegram.token
+sudo chmod 400 observability/telegram.token
 echo 'TELEGRAM_CHAT_ID=123456789' >> .env
-cd .. && docker compose -f deploy/docker-compose.prod.yml up -d alertmanager
+# --force-recreate, not a plain up: compose renders the inline config
+# when it CREATES the container and does not count that text in its
+# "did the service change?" hash — a corrected chat id would otherwise be
+# ignored with a cheerful "Running".
+cd .. && docker compose -f deploy/docker-compose.prod.yml up -d --force-recreate alertmanager
+docker compose -f deploy/docker-compose.prod.yml exec -T alertmanager grep chat_id /etc/alertmanager/alertmanager.yml   # your id
 docker compose -f deploy/docker-compose.prod.yml logs alertmanager | tail -5   # no "error" lines
 
-# Test the whole path without an outage: fire a synthetic alert, watch
-# the phone buzz within group_wait (30 s), then send the all-clear.
+# Test the whole path without an outage: fire a synthetic alert, WAIT
+# for the phone to buzz, then send the all-clear. The wait is not
+# optional: Alertmanager holds a new alert for group_wait (30 s) before
+# its first message, and an alert resolved inside that window sends
+# nothing at all — not even "resolved", since nothing was ever sent as
+# firing.
 bash deploy/alert.sh fire TestAlert "hello from the laptop"
-bash deploy/alert.sh resolve TestAlert
+sleep 45                                   # phone buzzes during this
+bash deploy/alert.sh resolve TestAlert     # a second message: resolved
+docker compose -f deploy/docker-compose.prod.yml logs --tail 20 alertmanager   # no "Notify attempt failed" = healthy
 ```
 
 Deploy ordering: the compose change that carries this arrives with the
-next master deploy, whose script checks for the token file (and compose
-for the chat id) before touching the stack — a missing one fails the
+next master deploy, whose script checks for the token file and the chat
+id before touching the stack — a missing one fails the
 job with a readable message and leaves the running containers as they
 were. Do this step before merging, or expect one red deploy that turns
 green on re-run.

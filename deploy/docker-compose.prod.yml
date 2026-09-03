@@ -125,22 +125,34 @@ services:
 
   alertmanager:
     image: prom/alertmanager:v0.28.1
-    # The token guard. Compose does NOT fail when a secret's file is
-    # missing: it warns and mounts an empty DIRECTORY in its place
-    # (verified), and Alertmanager reads bot_token_file only when it first
-    # tries to notify — the channel would be silently dead. So the container
-    # refuses to start without a real, non-empty token file, and says why.
+    # The guard. Compose does NOT fail when a secret's file is missing: it
+    # warns and mounts an empty DIRECTORY in its place (verified), and
+    # Alertmanager reads bot_token_file only when it first tries to notify
+    # — the channel would be silently dead. And the chat id must not be a
+    # `:?` here: compose re-reads this file for EVERY command, so a hard
+    # requirement made backups, logs and restores fail on the laptop until
+    # the value existed (found 2026-09-03). So this container refuses to
+    # start without a real token file and a chat id, and says which one.
+    # `-r` matters: the image runs as `nobody` (uid 65534) and a bind mount
+    # keeps the host's owner and mode, so a 600 file owned by the deploy
+    # user exists, is non-empty, and is still unreadable in here (found
+    # the same day, from the notify error). The runbook chowns it to 65534.
     # `sh -c 'script' -- ARGS`: "--" becomes $0 and the command's arguments
     # arrive as "$@" for the exec; `$$` is how compose is told to leave a
     # dollar sign alone.
     entrypoint:
       - /bin/sh
       - -c
-      - '[ -f /run/secrets/telegram_token ] && [ -s /run/secrets/telegram_token ] || { echo "telegram token file missing or empty: deploy/observability/telegram.token (runbook step 12)" >&2; exit 1; }; exec /bin/alertmanager "$$@"'
+      - '[ -f /run/secrets/telegram_token ] && [ -s /run/secrets/telegram_token ] && [ -r /run/secrets/telegram_token ] || { echo "telegram token file missing, empty, or not readable by uid 65534: deploy/observability/telegram.token (runbook step 12)" >&2; exit 1; }; [ -n "$$TELEGRAM_CHAT_ID" ] || { echo "TELEGRAM_CHAT_ID missing from deploy/.env (runbook step 12)" >&2; exit 1; }; exec /bin/alertmanager "$$@"'
       - "--"
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
+    environment:
+      # Not a secret; present only so the entrypoint above can refuse to
+      # start without it. The rendered config (bottom of this file) gets a
+      # placeholder 0 when it is unset, instead of failing every command.
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     configs:
       # Unlike the local stack, the config is not a mounted file: compose
       # renders it (see `configs:` at the bottom) so the Telegram chat id
@@ -185,11 +197,15 @@ volumes:
 # The bot token is a secret and rides as a FILE, never in an env var or in
 # this text: compose mounts deploy/observability/telegram.token
 # (git-ignored via *.token) at /run/secrets/telegram_token, and the config
-# refers to it by path. Both are REQUIRED, each in its own way: `:?` makes
-# compose refuse to render without the chat id; the token is checked by
-# the container's entrypoint (above) and by the CI deploy before `up`,
-# because compose itself only WARNS about a missing secret file. Create
-# both before the deploy that carries this (runbook step 12).
+# refers to it by path. Both are REQUIRED — but not through `:?`: a `:?`
+# on the chat id made EVERY compose command on the laptop fail until the
+# value existed, the backup's `compose exec` included (found 2026-09-03).
+# So the config renders a placeholder 0 when the variable is unset, and
+# the alertmanager container's entrypoint (above) refuses to start without
+# the real value or the token file; the CI deploy checks both before `up`.
+# Unrelated commands — backups, logs, a restore on a new machine — never
+# depend on the alert channel being configured. Create both before the
+# deploy that carries this (runbook step 12).
 configs:
   alertmanager:
     content: |
@@ -204,7 +220,7 @@ configs:
         - name: telegram
           telegram_configs:
             - bot_token_file: /run/secrets/telegram_token
-              chat_id: ${TELEGRAM_CHAT_ID:?the family chat's numeric id, runbook step 12}
+              chat_id: ${TELEGRAM_CHAT_ID:-0}
               parse_mode: HTML
               message: '{{ template "telegram.mb.message" . }}'
       templates:

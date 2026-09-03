@@ -96,6 +96,27 @@ would have been silently dead, the failure mode #103 had just named
 "the bug that matters". The guard now lives in the container's
 entrypoint and in the deploy job, and the docs say what is true.
 
+**Found, an hour later, on the laptop:** the `:?` on `TELEGRAM_CHAT_ID`
+made *every* compose command against the prod file fail until the value
+existed — the first `bash deploy/backup.sh` died at its `compose exec`
+with the alerting error. Mandatory-by-`:?` is right for values the
+stack cannot run without (the database password) and wrong for a side
+feature: it coupled backups, logs and a restore on a fresh machine to
+the alert channel. Replaced by a rendered placeholder plus the same two
+guards the token has (container entrypoint, deploy job). The rule:
+`:?` is a statement about the whole stack, not about one service.
+
+**Found, at the first real alert:** `Notify attempt failed … permission
+denied` on the token file. The image runs Alertmanager as `nobody` (uid
+65534); a bind mount carries the host's owner and mode into the
+container, so the runbook's `chmod 600` file owned by `capybara` was
+present, non-empty — and unreadable. The guard's `-f`/`-s` tests need
+no read permission (they stat), so it had let the container start;
+`-r`, which asks "can *this* user read it", is the test that matches
+the question. Runbook: `chown 65534:65534` + `chmod 400`. Three findings
+in one feature, each from running it for real: the probe, the laptop,
+the first notification. Nothing replaces the real path.
+
 **Learned:**
 - *Where a value is rendered is an architecture choice* — Alertmanager
   and Prometheus refuse env expansion on purpose (a config should be
