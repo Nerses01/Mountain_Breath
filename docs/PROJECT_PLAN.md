@@ -264,7 +264,7 @@ edge, zero inbound ports), CD over Tailscale, observability in prod
 - [x] Harden the server: non-root user, SSH keys, ufw (SSH-only — the tunnel needs no open ports), fail2ban
 - [x] Domain + DNS + TLS — `mountainbreath.net` on Cloudflare; TLS terminates at the edge (Caddyfile kept for a VPS someday)
 - [x] CD: merge to `master` → CI → GHCR images → runner joins the tailnet → laptop pulls and restarts (first green deploy 2026-09-02)
-- [ ] Automated Postgres backups + tested restore → **open in [BACKLOG.md](BACKLOG.md) §1** (the do-next item)
+- [x] Automated Postgres backups + tested restore — systemd timer + `restore.sh --drill` + off-machine copy to R2 (decision #103, 2026-09-03; the laptop-side install is BACKLOG §1)
 
 **Done when:** merging a PR automatically updates the live site over HTTPS. ✅ *(verified live)*
 

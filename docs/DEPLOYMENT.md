@@ -170,19 +170,113 @@ docker compose -f deploy/docker-compose.prod.yml exec postgres \
 
 ## 7. Backups
 
-🖥️:
+The shop keeps state in two places, so a backup has two parts:
+
+| State | Lives in | Backed up as |
+|---|---|---|
+| Catalog, users, orders, sessions — everything relational | Postgres (`pgdata_prod` volume) | `mb_<stamp>.dump`, a `pg_dump --format=custom` archive taken inside the container |
+| Product photos and videos | the `uploads_data` volume | `uploads_<stamp>.tar.gz`, written only when the volume's contents changed |
+
+A dump without the files restores a catalog of broken images; the files
+without the dump are anonymous JPEGs. `deploy/backup.sh` writes both to
+`/opt/backups`, verifies the dump parses, keeps the newest 14 of each,
+and — once 7b is configured — copies them off the machine.
+
+🖥️ Install the schedule. A systemd timer rather than cron, for one
+property: `Persistent=true` runs a missed 03:30 backup after the machine
+was off, where cron would skip the night.
 
 ```bash
-chmod +x /opt/mountain-breath/deploy/backup.sh
-crontab -e     # add:  0 3 * * * /opt/mountain-breath/deploy/backup.sh
+sudo install -d -o deploy -g deploy /opt/backups
+sudo cp /opt/mountain-breath/deploy/systemd/mb-backup.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now mb-backup.timer
+systemctl list-timers mb-backup.timer        # NEXT / LAST columns
 ```
 
-**Test the restore once now** — an untested backup is a hope, not a backup:
+**Run one now, then prove it restores** — an untested backup is a hope,
+not a backup. The drill restores the dump into a scratch database
+(`mb_restore_drill`) inside the running Postgres, compares row counts
+with the live database, reads the uploads archive back, and drops the
+scratch database whatever happens:
 
 ```bash
-/opt/mountain-breath/deploy/backup.sh
-zcat /opt/backups/mb_*.sql.gz | head   # looks like SQL? good.
+cd /opt/mountain-breath
+bash deploy/backup.sh
+bash deploy/restore.sh --drill latest        # ends with "DRILL PASSED"
+journalctl -u mb-backup --since yesterday    # what the timer's runs said
 ```
+
+Repeat the drill after any Postgres major-version change and once a
+quarter regardless: the point is that the restore path gets exercised by
+someone who is not panicking. The same two commands run on a dev machine
+against the dev stack (Git Bash included), which is how the scripts were
+first proven:
+
+```bash
+export MB_BACKUP_DIR=/tmp/mb-backups \
+       MB_COMPOSE_FILE=deploy/docker-compose.dev.yml \
+       MB_UPLOADS_VOLUME=<any uploads volume; it is mounted read-only>
+bash deploy/backup.sh && bash deploy/restore.sh --drill latest
+```
+
+**Disaster recovery** — the only time `--real` is typed. It stops the
+api, drops and recreates the database from the dump, replaces the
+uploads volume, and starts the stack; the migrate job then carries the
+schema forward if the images are newer than the archive:
+
+```bash
+bash deploy/restore.sh --real /opt/backups/mb_<stamp>.dump   # asks you to type the database name
+```
+
+### 7b. Off-machine copies (Cloudflare R2)
+
+Two copies on one disk are one copy. R2 is S3-compatible object storage
+on the Cloudflare account the tunnel already uses; the free tier (10 GB,
+no egress fees) holds years of this shop's dumps. `rclone` does the
+copying — it speaks S3 and dozens of other backends, so the remote can
+change later without touching the script.
+
+💻 Cloudflare dashboard → **R2 Object Storage**:
+
+1. Create bucket `mountain-breath-backups` (any location hint).
+2. **Manage R2 API Tokens → Create**: permission *Object Read & Write*,
+   scoped to that one bucket. Note the **Access Key ID**, the **Secret
+   Access Key**, and the account's S3 endpoint shown on the same page
+   (`https://<account-id>.r2.cloudflarestorage.com`).
+
+🖥️ On the server, as `deploy`:
+
+```bash
+sudo apt install -y rclone
+mkdir -p ~/.config/rclone && chmod 700 ~/.config/rclone
+cat > ~/.config/rclone/rclone.conf <<'EOF'
+[r2]
+type = s3
+provider = Cloudflare
+access_key_id = <Access Key ID>
+secret_access_key = <Secret Access Key>
+endpoint = https://<account-id>.r2.cloudflarestorage.com
+acl = private
+# a bucket-scoped token may neither list nor create buckets — don't try
+no_check_bucket = true
+EOF
+chmod 600 ~/.config/rclone/rclone.conf
+rclone ls r2:mountain-breath-backups        # empty listing, no error = credentials work
+
+cp deploy/backup.env.example deploy/backup.env   # then uncomment MB_BACKUP_REMOTE
+bash deploy/backup.sh && rclone ls r2:mountain-breath-backups
+```
+
+Retention on the remote: dumps older than `MB_REMOTE_KEEP_DAYS` (60) are
+deleted by the script — only after a successful upload in the same run,
+never by a bucket lifecycle rule (the script's comment on age-based
+pruning says why). Uploads archives are kept: each is a distinct state
+of the volume, and they only appear when something changed.
+
+Restoring on a new machine starts by pulling the files back —
+`rclone copy r2:mountain-breath-backups /opt/backups` — then `--real` as
+above.
 
 ## 8. Turn on continuous deployment
 
@@ -219,4 +313,7 @@ docker compose -f deploy/docker-compose.prod.yml up -d \
 | See status | `docker compose -f deploy/docker-compose.prod.yml ps` |
 | Tail API logs | `docker compose -f deploy/docker-compose.prod.yml logs -f api` |
 | Manual deploy | `git pull && docker compose -f deploy/docker-compose.prod.yml pull && docker compose -f deploy/docker-compose.prod.yml up -d` |
-| Restore backup | `zcat /opt/backups/mb_<stamp>.sql.gz \| docker compose -f deploy/docker-compose.prod.yml exec -T postgres psql -U mb -d mountain_breath` |
+| Backup now | `bash deploy/backup.sh` (the timer does this nightly at 03:30) |
+| Backup status | `systemctl list-timers mb-backup.timer` · `journalctl -u mb-backup --since yesterday` |
+| Prove a backup restores | `bash deploy/restore.sh --drill latest` |
+| Restore for real (disaster) | `bash deploy/restore.sh --real /opt/backups/mb_<stamp>.dump` — step 7 |

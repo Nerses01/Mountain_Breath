@@ -265,13 +265,16 @@ a tiny change and `gh run watch`.
 
 ## 10. Backups
 
-DEPLOYMENT.md step 7 unchanged (cron + `backup.sh`, test the restore
-once). Home-specific addition: the laptop is a single point of failure
-*in your house* — copy `/opt/backups` somewhere that isn't the same
-machine now and then. Over the tailnet that's one command from 💻:
+[DEPLOYMENT.md](DEPLOYMENT.md) step 7 applies unchanged — the systemd
+timer, the restore drill, disaster recovery — and step 7b (the R2 copy)
+is not optional here: the laptop is a single point of failure *in your
+house* (theft, a power surge, a spilled tea), and a copy on the PC beside
+it shares every one of those fates. R2 is in another building by
+construction. Until 7b is configured, the manual escape hatch over the
+tailnet is one command from 💻:
 
 ```powershell
-scp deploy@mb-server:/opt/backups/mb_*.sql.gz D:\Backups\mountain-breath\
+scp deploy@mb-server:/opt/backups/mb_*.dump D:\Backups\mountain-breath\
 ```
 
 ## Observability (decision #101)

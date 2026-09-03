@@ -17,6 +17,104 @@ Template for an entry:
 
 ---
 
+## 2026-09-03 — Backlog §1: backups you can restore (decision #103)
+
+**Worked on:** the backlog's first two lines, scoped as one session.
+`deploy/backup.sh` grew from a `pg_dump | gzip` one-liner into the
+shop's actual backup: a custom-format dump taken inside the container
+and parse-checked with `pg_restore --list`; an archive of the uploads
+volume, written only when a fingerprint of its file list changes; an
+optional rclone copy to Cloudflare R2 (remote dumps aged out only after
+a successful upload); count-based local retention. New
+`deploy/restore.sh`: `--drill` restores into a scratch database inside
+the running Postgres, compares row counts with live, reads the uploads
+archive back, and drops the scratch database from an EXIT trap;
+`--real` is the typed-confirmation disaster path (stop api → drop and
+recreate from the dump → replace the volume → `up -d`, which lets the
+migrate job carry the schema forward). A systemd timer replaces the
+cron line. Runbooks rewritten (DEPLOYMENT.md step 7 + 7b,
+DEPLOYMENT_HOME.md §10); the CI deploy's scp now carries the scripts and
+units to the server. Laptop-side install and the first real drill are
+the operator's, listed in BACKLOG §1.
+
+**Rehearsed** on the Windows dev machine against the dev stack: backup
+in under ten seconds (112 KB dump, 2.5 MB uploads archive from a
+read-only volume); the drill restored 214 archive entries and reported
+8 products / 340 orders / 43 users / schema 27 on both sides and 4
+files in the archive; a second run skipped the unchanged uploads; a
+dump truncated mid-data failed the restore with the scratch database
+gone afterwards; a truncated uploads archive failed the drill; a
+misspelled volume name failed the backup at the guard.
+
+**Learned:**
+- *A backup is defined by what the restore needs, not by what is easy
+  to dump* — the old script covered Postgres only; product photos and
+  videos live in a volume, so its restore would have yielded a catalog
+  of broken images. Enumerate the state before choosing tools.
+- *Verify at write time what you can* — `pg_restore --list` proves the
+  archive parses tonight; a corrupt file becomes a failed backup run,
+  not a discovery on the worst day. Same instinct as testing a
+  migration's down path while nothing depends on it.
+- *Custom format vs plain SQL* — a plain script can only be replayed
+  whole through psql; the custom archive has a table of contents,
+  restores in part or in a different order, and gives a drill
+  `--exit-on-error`. Roughly an object file with a symbol table vs
+  source you can only recompile from the top.
+- *Write-then-rename is the file system's transaction* — dump to
+  `.part`, `mv` on success: a run killed halfway never leaves a
+  plausible-looking truncated file. A compiler writing `foo.o.tmp` and
+  renaming does the same.
+- *Age-based pruning has a failure mode; count-based cannot* — "delete
+  older than 14 days", run by anything independent of a successful
+  backup (a separate cron, a bucket lifecycle rule), keeps deleting
+  after backups silently stop, until nothing is left. Keeping the newest
+  N can never empty the directory. The remote prune IS age-based, but
+  `set -e` ordering puts it strictly behind a successful upload — the
+  same guarantee spelled differently.
+- *`trap … EXIT` is bash's destructor* — the scratch database is dropped
+  whether the drill passes, fails, or is interrupted; the C++ reflex
+  (RAII, `scope_exit`) has a shell spelling.
+- *`docker run -v name:/path` creates a missing volume silently* — a
+  typo would have archived an empty directory nightly and reported
+  success. `docker volume inspect` first turns the typo into a loud
+  failure. Silent success is the backup bug that matters.
+- *Change detection by fingerprint* — hashing the sorted (path, size,
+  mtime) list decides whether the volume needs a new archive; the reward
+  is fourteen nights of dumps beside one or two uploads tarballs. It is
+  `make`'s mtime check generalised to a whole directory.
+- *systemd timers over cron for a machine that sleeps* —
+  `Persistent=true` runs the missed 03:30 job at next boot; cron skips
+  the night. journald logging and `list-timers` come free.
+- *Environment defaults make one script serve prod and rehearsal* —
+  every path and name is `${MB_X:-prod default}`, so the dev-stack drill
+  runs the same code path, not a mock of it. Two Windows detours: GNU
+  tar parses `C:/…` as "host C" (the old remote-tape syntax), so the
+  archive is fed on stdin instead of by path; and `MSYS_NO_PATHCONV=1`
+  stops Git Bash rewriting `/src` into a Program Files path before
+  docker sees it.
+- *A swallowed error is a passing test that lies* — the first drill
+  printed PASSED with "0 files" because `|| true` had hidden tar's
+  failure. Decide per command whether failure is acceptable; a blanket
+  `|| true` on a verification step defeats the verification.
+- *`sh -c '… "$@"' sh ARGS`* — the idiom for handing arguments into a
+  container command without a second layer of quoting: the word after
+  the script is `$0`, the rest arrive as `"$@"`, and `$POSTGRES_USER`
+  expands inside the container, where it is defined.
+
+**Questions / to revisit:**
+- A failed timer run is visible only in `journalctl` / `systemctl
+  --failed` until the Telegram receiver exists (§1's alerts item);
+  `OnFailure=` on the service is the hook for it.
+- The uploads tarball is not transactional with the dump: a photo
+  uploaded during the tar could be captured half-written. At 03:30 on a
+  family shop that is theoretical; the fix, if ever needed, is archiving
+  only files older than the dump's start time.
+- Remote uploads archives are never pruned. Bounded by "written only on
+  change", but a year of weekly photo sessions is worth an `rclone ls`
+  now and then.
+
+---
+
 ## 2026-09-03 — Post-launch consolidation: one backlog (decision #102)
 
 **Worked on:** the day-after-launch paperwork. A full re-read of every

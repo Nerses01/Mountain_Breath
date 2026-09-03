@@ -40,12 +40,18 @@
 
 The gap between "deploys itself" and "operated like you mean it":
 
-- [ ] **Backups: cron + a tested restore drill** (runbook §Backups;
-      F1's line) — *the* open gate. An untested backup is a hope; do
-      the drill before real customers exist.
-- [ ] Off-machine backup copies — automate the `scp` over tailnet to
-      the working PC (or rclone to any free object storage); the laptop
-      is a single point of failure *in the house* (log 09-02).
+- [x] **Backups: cron + a tested restore drill** — shipped 2026-09-03
+      as decision #103: `deploy/backup.sh` (custom-format dump +
+      change-detected uploads archive, parse-verified), `restore.sh
+      --drill` (scratch-database restore, row counts against live,
+      dropped by an EXIT trap), `mb-backup.timer` with `Persistent=true`
+      instead of cron. Rehearsed end to end against the dev stack.
+- [x] Off-machine backup copies — #103: rclone → Cloudflare R2 inside
+      `backup.sh`; remote dumps age out only after a successful copy
+      (runbook 7b; the ad-hoc tailnet `scp` stays the escape hatch).
+- [ ] **Operator hands, on the laptop**: install `mb-backup.timer`, run
+      the first `restore.sh --drill`, create the R2 bucket + token and
+      fill `deploy/backup.env` (DEPLOYMENT.md steps 7 and 7b).
 - [ ] Verify prod is **seeded and an admin exists** (runbook first-boot
       tail) — confirm the live DB isn't running on manual fumes.
 - [ ] **Real SMTP relay** for production mail (`MB_SMTP_*`,

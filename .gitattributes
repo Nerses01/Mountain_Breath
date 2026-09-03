@@ -1,0 +1,5 @@
+# Shell scripts and systemd units run on Linux (and under Git Bash for a
+# rehearsal): always LF in the working copy, whatever core.autocrlf says —
+# a stray \r at the end of `set -euo pipefail` or `ExecStart=` breaks them.
+*.sh              text eol=lf
+deploy/systemd/*  text eol=lf
