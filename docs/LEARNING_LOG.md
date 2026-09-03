@@ -17,6 +17,95 @@ Template for an entry:
 
 ---
 
+## 2026-09-03 — Backlog §1: alerts reach a phone (decision #105)
+
+**Worked on:** the Telegram receiver, and the design question it
+raised: how does a deployment-specific value get into a config file
+whose program expands no environment variables? Answer: compose renders
+it — `configs: content:` in the prod compose is interpolated like the
+rest of the file, so `TELEGRAM_CHAT_ID` from `.env` lands in
+Alertmanager's config with no second templating layer. The bot token is
+a compose `secrets:` file (git-ignored), referenced by path. An HTML
+message template (`telegram.tmpl`) pipes annotations through `html`.
+New `deploy/alert.sh` fires or resolves an alert through Alertmanager's
+v2 API; `backup.sh` uses it — the ERR trap fires `BackupFailed`, a good
+run resolves it. Runbook step 12 (BotFather → token → chat id → `.env`
+→ a synthetic alert as the test), decision #105, the CI deploy carries
+`alert.sh` and checks for the token before `up`.
+
+**Rehearsed:** compose rendered the config with dummy values and refused
+without the chat id; `amtool check-config` accepted the rendered file; a
+throwaway Alertmanager with the template and a dummy token received a
+synthetic DBPoolSaturated (its description contains a `>`), executed
+the template and reached Telegram's API (404 for the dummy token — the
+expected failure, one step past the template). `alert.sh` fire/resolve
+round-tripped against the local stack's Alertmanager; `backup.sh` with a
+wrong volume fired `BackupFailed`, a good run resolved it, an empty URL
+skipped, an unreachable one warned with the exit code untouched. The
+token guard, run through `docker compose run`: absent file → exit 1
+with the message, empty file → exit 1, real file → Alertmanager up.
+
+**Found:** my first draft claimed a missing secret file "fails `up`
+loudly". A probe showed the opposite — compose logs one warning, mounts
+an empty *directory* at the secret's path, and carries on; Alertmanager
+reads `bot_token_file` only at its first notification. The channel
+would have been silently dead, the failure mode #103 had just named
+"the bug that matters". The guard now lives in the container's
+entrypoint and in the deploy job, and the docs say what is true.
+
+**Learned:**
+- *Where a value is rendered is an architecture choice* — Alertmanager
+  and Prometheus refuse env expansion on purpose (a config should be
+  inspectable, not dependent on a process environment), so the renderer
+  must live one level up. Compose already is that level; an init
+  container would have been a second one.
+- *Secrets as files, not env vars* — an env var leaks into `docker
+  inspect`, `/proc/<pid>/environ` and every child process; a 0600 file
+  leaks to nobody but its reader. Compose `secrets:` gives the file a
+  name and a fixed mount path.
+- *But verify the claimed failure mode* — "compose secrets fail loudly
+  when missing" sounded right and was false; a five-line probe compose
+  file settled it in a minute. The same directory-instead-of-file trap
+  as `docker run -v` with a missing path (#103), wearing a nicer name.
+- *One road for everything that pages* — pushing the backup's failure
+  INTO Alertmanager (an alert is a labelled time span: `startsAt`,
+  `endsAt`) rather than posting to Telegram directly buys grouping,
+  silences, `repeat_interval` and the resolved message for free, and
+  keeps one token holder. The store layer for SQL, again.
+- *An alert is a span, a notification is an event* — fire = open a
+  24-hour span, resolve = close it now, same labels = same alert. A
+  failing backup wants the span: it nags every 4 h until the next
+  success, where one message is read once and forgotten.
+- *`sh -c 'script' -- ARGS`, second appearance* — `--` becomes `$0` and
+  the arguments arrive as `"$@"` for the `exec`; in compose the dollar
+  is written `$$` so interpolation leaves it alone. Same idiom as
+  `restore.sh`'s `pgtool`, now guarding an entrypoint.
+- *`test -s` is true for a directory* — a directory has a size, so the
+  guard needs `-f` too. The kind of detail a probe finds and a review
+  does not.
+- *Parse modes bite* — Telegram's MarkdownV2 rejects unescaped `-`,
+  `.` and `>`; HTML with `| html` on every annotation is the honest
+  choice, because DBPoolSaturated's description already contains a `>`.
+- *Verify the rendering, not the source* — `docker compose config` →
+  extract the block → `amtool check-config` → a throwaway Alertmanager
+  executing the real template against the real API. Each layer could
+  lie alone.
+
+**Questions / to revisit:**
+- A backup that never RUNS (timer disabled, script killed before its
+  trap) pages nobody: a "backup too old" rule needs a metric —
+  node_exporter's textfile collector with a last-success timestamp
+  written by `backup.sh`, when host metrics arrive (§5, observability
+  round two).
+- `alert.sh` builds its JSON by string; a summary containing a double
+  quote would break it. Fine for our own callers — `jq` the day it
+  carries user text.
+- The dev stack's `alertmanager.yml` and the prod inline config
+  duplicate four route lines; tolerable, and one drifts silently if it
+  grows.
+
+---
+
 ## 2026-09-03 — Backlog §1: production mail through a real relay (decision #104)
 
 **Worked on:** the SMTP-relay line. Reading the mailer before touching

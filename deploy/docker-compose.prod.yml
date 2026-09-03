@@ -125,8 +125,33 @@ services:
 
   alertmanager:
     image: prom/alertmanager:v0.28.1
+    # The token guard. Compose does NOT fail when a secret's file is
+    # missing: it warns and mounts an empty DIRECTORY in its place
+    # (verified), and Alertmanager reads bot_token_file only when it first
+    # tries to notify — the channel would be silently dead. So the container
+    # refuses to start without a real, non-empty token file, and says why.
+    # `sh -c 'script' -- ARGS`: "--" becomes $0 and the command's arguments
+    # arrive as "$@" for the exec; `$$` is how compose is told to leave a
+    # dollar sign alone.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - '[ -f /run/secrets/telegram_token ] && [ -s /run/secrets/telegram_token ] || { echo "telegram token file missing or empty: deploy/observability/telegram.token (runbook step 12)" >&2; exit 1; }; exec /bin/alertmanager "$$@"'
+      - "--"
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    configs:
+      # Unlike the local stack, the config is not a mounted file: compose
+      # renders it (see `configs:` at the bottom) so the Telegram chat id
+      # can come from deploy/.env — Alertmanager expands no environment
+      # variables of its own.
+      - source: alertmanager
+        target: /etc/alertmanager/alertmanager.yml
+    secrets:
+      - telegram_token # becomes the file /run/secrets/telegram_token
     volumes:
-      - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./observability/telegram.tmpl:/etc/alertmanager/telegram.tmpl:ro
     ports:
       - "127.0.0.1:9093:9093"
     restart: unless-stopped
@@ -152,3 +177,39 @@ volumes:
   uploads_data:
   prom_data:
   grafana_data:
+
+# ── Alerts to a phone (decision #105) ────────────────────────────────────
+# Alertmanager reads no environment variables, so the one deployment-
+# specific value in its config — the Telegram chat id — is put there by
+# compose: `content:` is interpolated exactly like the rest of this file.
+# The bot token is a secret and rides as a FILE, never in an env var or in
+# this text: compose mounts deploy/observability/telegram.token
+# (git-ignored via *.token) at /run/secrets/telegram_token, and the config
+# refers to it by path. Both are REQUIRED, each in its own way: `:?` makes
+# compose refuse to render without the chat id; the token is checked by
+# the container's entrypoint (above) and by the CI deploy before `up`,
+# because compose itself only WARNS about a missing secret file. Create
+# both before the deploy that carries this (runbook step 12).
+configs:
+  alertmanager:
+    content: |
+      route:
+        receiver: telegram
+        group_by: [alertname]
+        # A new alert notifies quickly; repeats of the SAME alert are
+        # throttled — and repeat until it is resolved.
+        group_wait: 30s
+        repeat_interval: 4h
+      receivers:
+        - name: telegram
+          telegram_configs:
+            - bot_token_file: /run/secrets/telegram_token
+              chat_id: ${TELEGRAM_CHAT_ID:?the family chat's numeric id, runbook step 12}
+              parse_mode: HTML
+              message: '{{ template "telegram.mb.message" . }}'
+      templates:
+        - /etc/alertmanager/telegram.tmpl
+
+secrets:
+  telegram_token:
+    file: ./observability/telegram.token

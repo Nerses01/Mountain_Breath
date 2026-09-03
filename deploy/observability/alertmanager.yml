@@ -9,13 +9,9 @@ route:
 
 receivers:
   - name: default
-    # No channel configured yet — alerts are visible in the UI (localhost:9093).
-    # When ready for real notifications (Telegram):
-    #   1. Put the token from @BotFather into deploy/observability/telegram.token
-    #      (already git-ignored; mount it in compose next to this file)
-    #   2. Uncomment:
-    #   telegram_configs:
-    #     - bot_token_file: /etc/alertmanager/telegram.token
-    #       chat_id: <your numeric chat id — not a secret>
-    # This file stays committable: it references the secret by PATH,
-    # never contains it (same pattern as compose + .env).
+    # This is the LOCAL stack's config: no channel, alerts are visible in
+    # the UI (localhost:9093) and that is all. Production's config is not
+    # this file — it is rendered inline by deploy/docker-compose.prod.yml
+    # (decision #105): the same route, plus a Telegram receiver whose chat
+    # id compose interpolates from .env and whose bot token rides as a
+    # compose secret file. Keep the route settings above in step with it.

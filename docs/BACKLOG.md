@@ -68,10 +68,15 @@ The gap between "deploys itself" and "operated like you mean it":
       Testing mode (E8's checklist; F1 sweep line).
 - [ ] `www.mountainbreath.net` as a second tunnel public hostname
       (30 seconds in the Zero Trust dashboard; session 09-02).
-- [ ] **Alerts reach a phone**: Telegram receiver — the recipe is
-      commented in `deploy/observability/alertmanager.yml`; the token
-      mounts as a file, chat id is not a secret (Phase 10's parked
-      line; F1's last line).
+- [x] **Alerts reach a phone** — decision #105, 2026-09-03: Telegram
+      receiver in the prod compose (chat id interpolated from `.env`,
+      token as a compose secret file), an HTML message template,
+      `deploy/alert.sh` to fire/resolve by hand, and `backup.sh` paging
+      its own failures through the same road. Runbook step 12.
+- [ ] **Operator hands**: BotFather token into
+      `deploy/observability/telegram.token`, `TELEGRAM_CHAT_ID` into
+      `deploy/.env`, then `alert.sh fire TestAlert` as the proof —
+      before the next master deploy (DEPLOYMENT_HOME.md step 12).
 - [ ] Confirm the laptop's tailnet **key expiry is disabled** (console
       → Machines → homeserver badge) — silent CD death in ~180 days
       otherwise (session 09-02).

@@ -23,6 +23,11 @@ MB_BACKUP_KEEP="${MB_BACKUP_KEEP:-14}"
 # (docs/DEPLOYMENT.md step 7b). Empty = this machine only.
 MB_BACKUP_REMOTE="${MB_BACKUP_REMOTE:-}"
 MB_REMOTE_KEEP_DAYS="${MB_REMOTE_KEEP_DAYS:-60}"
+# Paging (decision #105): a failed run fires BackupFailed through
+# Alertmanager, which reaches the phone and repeats until the next
+# successful run resolves it. Empty = skip (a rehearsal with no
+# Alertmanager); unreachable = one warning line, never a failed backup.
+MB_ALERTMANAGER_URL="${MB_ALERTMANAGER_URL:-http://127.0.0.1:9093}"
 
 # Git Bash on Windows rewrites arguments that look like POSIX paths
 # ("/src" becomes "C:\Program Files\Git\src") before docker sees them.
@@ -31,8 +36,15 @@ export MSYS_NO_PATHCONV=1
 
 compose() { docker compose -f "$MB_COMPOSE_FILE" "$@"; }
 log() { printf '%s backup: %s\n' "$(date '+%F %T')" "$*"; }
-# set -e aborts silently; the ERR trap says where. journalctl shows this line.
-trap 'log "FAILED (exit $?) at line $LINENO"' ERR
+alert() { # fire | resolve — the same road every alert takes (alert.sh)
+    [[ -n "$MB_ALERTMANAGER_URL" ]] || return 0
+    MB_ALERTMANAGER_URL="$MB_ALERTMANAGER_URL" bash "$(dirname "$0")/alert.sh" "$1" BackupFailed \
+        "nightly backup failed on $(hostname): journalctl -u mb-backup" > /dev/null \
+        || log "WARNING: could not $1 BackupFailed at $MB_ALERTMANAGER_URL"
+}
+# set -e aborts silently; the ERR trap says where (journalctl shows this
+# line) and pages before the exit.
+trap 'log "FAILED (exit $?) at line $LINENO"; alert fire' ERR
 
 mkdir -p "$MB_BACKUP_DIR"
 rm -f "$MB_BACKUP_DIR"/*.part      # leftovers of a run that died halfway
@@ -120,4 +132,5 @@ fi
 prune() { ls -1t "$MB_BACKUP_DIR"/$1 2>/dev/null | tail -n +"$((MB_BACKUP_KEEP + 1))" | xargs -r rm -- ; }
 prune 'mb_*.dump'
 prune 'uploads_*.tar.gz'
+alert resolve # a BackupFailed still firing from an earlier night gets its all-clear
 log "done — newest $MB_BACKUP_KEEP of each kept in $MB_BACKUP_DIR"

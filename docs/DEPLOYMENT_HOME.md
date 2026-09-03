@@ -354,6 +354,79 @@ or batching). The api waits at most 10 seconds for the relay before
 logging a failure and answering the customer anyway: a relay outage
 slows a checkout, it never breaks one.
 
+## 12. Alerts to your phone (decision #105)
+
+Prometheus evaluates the rules in `deploy/observability/alerts.yml` (the
+API down, a 5xx spike, slow requests, a saturated DB pool) and hands
+firing alerts to Alertmanager; until this step Alertmanager only showed
+them in its own UI, which nobody watches at 03:00. This wires a Telegram
+receiver. A backup failure takes the same road: `backup.sh` fires a
+`BackupFailed` alert through Alertmanager's API and resolves it on the
+next success — one channel, one token holder, one place to silence
+things during maintenance. `deploy/alert.sh` is that API call as a
+script, for anything else that should page and for testing.
+
+The two values live in two places on purpose. The **chat id** is not a
+secret and goes in `deploy/.env`, where compose interpolates it into
+Alertmanager's config (Alertmanager reads no environment variables
+itself). The **bot token** is a secret and rides as a *file*, mounted by
+compose's `secrets:` at `/run/secrets/telegram_token`. Both are
+required, and each is guarded differently: compose refuses to render
+the config without the chat id (`:?`), while the token is checked by
+the container itself at start and by the CI deploy before `up` —
+compose alone only *warns* about a missing secret file and mounts an
+empty directory in its place, which would leave the channel quietly
+dead.
+
+💻 In Telegram:
+
+1. Message **@BotFather** → `/newbot` → pick a name and a username ending
+   in `bot`. It answers with the token (`123456:ABC-…`).
+2. Open a chat with your new bot and send it anything — a bot cannot
+   write to you first.
+3. Get the chat id: open
+   `https://api.telegram.org/bot<TOKEN>/getUpdates` in the browser and
+   read `"chat":{"id":123456789,…}` from the reply. (For a family group:
+   add the bot to the group, post once, same URL — group ids are
+   negative.)
+
+🖥️ On the laptop:
+
+```bash
+cd /opt/mountain-breath/deploy
+printf '%s' '123456:ABC-the-token' > observability/telegram.token
+chmod 600 observability/telegram.token          # git-ignored via *.token
+echo 'TELEGRAM_CHAT_ID=123456789' >> .env
+cd .. && docker compose -f deploy/docker-compose.prod.yml up -d alertmanager
+docker compose -f deploy/docker-compose.prod.yml logs alertmanager | tail -5   # no "error" lines
+
+# Test the whole path without an outage: fire a synthetic alert, watch
+# the phone buzz within group_wait (30 s), then send the all-clear.
+bash deploy/alert.sh fire TestAlert "hello from the laptop"
+bash deploy/alert.sh resolve TestAlert
+```
+
+Deploy ordering: the compose change that carries this arrives with the
+next master deploy, whose script checks for the token file (and compose
+for the chat id) before touching the stack — a missing one fails the
+job with a readable message and leaves the running containers as they
+were. Do this step before merging, or expect one red deploy that turns
+green on re-run.
+
+What pages, and when:
+
+| Alert | Fires when | Source |
+|---|---|---|
+| APIDown | Prometheus cannot scrape the API for 1 min | alerts.yml |
+| HighErrorRate | more than 0.5 server errors/s for 5 min | alerts.yml |
+| SlowRequests | p95 latency above 500 ms for 10 min | alerts.yml |
+| DBPoolSaturated | handlers wait over 100 ms/s for pool connections, 5 min | alerts.yml |
+| BackupFailed | the nightly backup exits non-zero; resolves on the next success | backup.sh |
+
+A firing alert repeats every 4 h until it resolves. Silence one during
+planned work from Alertmanager's UI over the tailnet (Observability,
+below).
+
 ## Observability (decision #101)
 
 The prod stack carries the same Prometheus + Alertmanager + Grafana trio
@@ -379,9 +452,9 @@ ssh -L 3300:localhost:3000 -L 9390:localhost:9090 capybara@homeserver
 
 The dashboards and alert rules are provisioned from
 `deploy/observability/` (the CI deploy copies that directory alongside
-the compose file). Alerts currently land only in Alertmanager's UI —
-wiring a real channel (Telegram) is a follow-up; the recipe is commented
-in `observability/alertmanager.yml`.
+the compose file). Alerts reach the family's phone through the Telegram
+receiver of step 12; this UI is where one gets silenced during planned
+work.
 
 ## Limits to know about
 

@@ -216,7 +216,8 @@ first proven:
 ```bash
 export MB_BACKUP_DIR=/tmp/mb-backups \
        MB_COMPOSE_FILE=deploy/docker-compose.dev.yml \
-       MB_UPLOADS_VOLUME=<any uploads volume; it is mounted read-only>
+       MB_UPLOADS_VOLUME=<any uploads volume; it is mounted read-only> \
+       MB_ALERTMANAGER_URL=        # empty: a rehearsal pages nobody
 bash deploy/backup.sh && bash deploy/restore.sh --drill latest
 ```
 

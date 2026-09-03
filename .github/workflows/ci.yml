@@ -300,7 +300,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "deploy/docker-compose.prod.yml,deploy/observability,deploy/backup.sh,deploy/restore.sh,deploy/systemd,backend/migrations"
+          source: "deploy/docker-compose.prod.yml,deploy/observability,deploy/backup.sh,deploy/restore.sh,deploy/alert.sh,deploy/systemd,backend/migrations"
           target: ${{ vars.TARGET_DIR }}
           # The laptop is reachable only via Tailscale's DERP relay (double
           # NAT + CGNAT leaves no direct path), and relayed connection setup
@@ -329,6 +329,16 @@ jobs:
             export POSTGRES_PASSWORD=$POSTGRES_PASSWORD
             export DOMAIN=$DOMAIN
             
+            # Decision #105: compose only WARNS about a missing secret file and
+            # mounts an empty directory in its place, so check for the alert
+            # bot's token here and fail the deploy with a readable message —
+            # the running containers stay as they were. (The chat id needs no
+            # check: its `:?` makes compose refuse to render without it.)
+            if ! [ -f deploy/observability/telegram.token ] || ! [ -s deploy/observability/telegram.token ]; then
+              echo "deploy/observability/telegram.token is missing or empty on the server - DEPLOYMENT_HOME.md step 12"
+              exit 1
+            fi
+
             # Login to GHCR on the VPS
             echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             
