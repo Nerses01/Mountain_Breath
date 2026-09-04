@@ -17,6 +17,54 @@ Template for an entry:
 
 ---
 
+## 2026-09-04 — Backlog §1 closes for real: the operator half
+
+**Worked on:** the operator checklist — backups + first restore drill,
+prod seed and admin, tailnet key expiry, Telegram, Resend mail, Google
+sign-in — done on the laptop and in dashboards. The last one, `www`,
+was done live: CNAME (proxied) + a Redirect Rule, then **Always Use
+HTTPS** to close the scheme hole. Verified from here with `curl`:
+`http://www/shop?lang=hy` → `https://www/…` → `https://mountainbreath.net/shop?lang=hy`
+→ `200`. Runbook step 14 rewritten to the dashboard that actually
+exists (the template opens a *wildcard* form, not the expression editor
+step 14 described), plus the Always Use HTTPS step and its loop
+warning. §1 is closed; the `dev` → `master` merge dropped from the list
+as ordinary practice rather than a tracked item.
+
+**Learned:**
+- *A redirect rule matches a string, not an intent.* `https://www.*`
+  reads as "redirect www" but literally means "redirect www, only when
+  the visitor already used https" — leaving `http://www.…` to be served
+  as a second hostname, the exact duplicate-content case decision #106
+  exists to prevent. The wildcard capture `${1}` and the separate
+  **Preserve query string** checkbox are the same lesson twice: the
+  matched string and the reconstructed string are two different things,
+  and everything not explicitly carried across is dropped.
+- *Proxied vs DNS-only is permission, not routing.* Grey and orange
+  cloud resolve to the same place; only the orange one gives Cloudflare
+  a chance to run a rule at all. No C++ analogue — the closest is that
+  a hook has to be installed before it can fire.
+- *A config warning is answered by a fact stored elsewhere.*
+  Cloudflare's `ERR_TOO_MANY_REDIRECTS` warning can only be resolved by
+  reading the origin, and the answer was `listen 80;` with no `return
+  301 https://` in nginx.conf. Same reflex as tracing an assertion to
+  whoever sets the value instead of reasoning about what it "should" be.
+- *"Always Use HTTPS" is a redirect, not encryption.* It adds no
+  safety by itself; it normalizes every request to one scheme before
+  your own rules look at it — boundary normalization, the same
+  discipline as validating at the API edge instead of in each handler.
+- *Tunnels make the SSL/TLS encryption mode moot.* Full (strict)
+  concerns how Cloudflare dials an origin; `cloudflared` dials
+  outward, so there is no inbound connection to secure and no origin
+  certificate to validate.
+
+**Questions / to revisit:**
+- The two-hop http path is edge-answered and cheap, but an HSTS header
+  would let browsers skip the first hop entirely. HSTS belongs with the
+  §5 security-headers item — and its `max-age` is a promise that is
+  painful to retract, so it wants its own session, not a dashboard
+  toggle in passing.
+
 ## 2026-09-03 — Backlog §1 closes on Claude's side: Google prod sign-in, www, CI hygiene
 
 **Worked on:** the three §1 lines that were runbook or CI work rather

@@ -513,18 +513,65 @@ edge without ever reaching the laptop.
    record only has to exist so Cloudflare answers for the name; the
    proxy is what lets a rule intercept it.
 2. **Rules → Redirect Rules → Create rule** → template **Redirect from
-   WWW to Root** (by hand: when hostname equals
-   `www.mountainbreath.net`, dynamic redirect to
-   `concat("https://mountainbreath.net", http.request.uri.path)`, status
-   301, preserve query string). Deploy.
+   WWW to Root**. The template opens the **wildcard pattern** form;
+   fill it in explicitly rather than keeping the prefilled
+   `https://www.*`:
 
-**Test** from anywhere:
+   | Field | Value |
+   |---|---|
+   | Request URL | `https://www.mountainbreath.net/*` |
+   | Target URL | `https://mountainbreath.net/${1}` |
+   | Status code | `301 - Permanent Redirect` |
+   | Preserve query string | **checked** |
+
+   `${1}` is whatever the `*` captured, so the path survives — without
+   it every deep link lands on the home page. The wildcard matches the
+   path only, which is why the query string needs its own checkbox:
+   unchecked, `?lang=hy` and every UTM parameter on a shared link is
+   dropped at the redirect. Deploy.
+
+   (Equivalent by hand, and scheme-independent, if you prefer the
+   **custom filter expression** radio: `http.host eq
+   "www.mountainbreath.net"` → dynamic redirect to
+   `concat("https://mountainbreath.net", http.request.uri.path)`.)
+
+3. **SSL/TLS → Edge Certificates → Always Use HTTPS: On.** The rule
+   above matches URLs beginning `https://`, so without this a request
+   to `http://www.…` never matches it and is served as a second
+   hostname — precisely the duplicate content the rule exists to
+   prevent. With it, http first 301s to https, then the rule fires.
+
+   That toggle warns about `ERR_TOO_MANY_REDIRECTS` "if your origin
+   also forces HTTPS redirects". Ours does not, and the proof is one
+   line of [nginx.conf](../frontend/nginx.conf): `listen 80;` with no
+   `return 301 https://` anywhere, and no scheme redirect in the API
+   either. The loop it warns about needs an origin that answers "use
+   https" to the plain-http request Cloudflare forwards; ours never
+   says that.
+
+   The **SSL/TLS encryption mode** (Full, Full (strict), …) is not a
+   gap here and the newer dashboard may not even show the picker —
+   that setting governs how Cloudflare *dials* an origin, and with a
+   named tunnel there is no inbound origin connection to dial:
+   `cloudflared` opens the connection outward and is authenticated by
+   its token. Leave whatever is there.
+
+**Test** from anywhere — both schemes, with a query string, because
+those are the two things that quietly break:
 
 ```powershell
-curl.exe -sI https://www.mountainbreath.net/shop | Select-String "HTTP|location"
-# HTTP/1.1 301 Moved Permanently
-# location: https://mountainbreath.net/shop
+curl.exe -sIL "http://www.mountainbreath.net/shop?lang=hy" | Select-String "HTTP/|location"
+# HTTP/1.1 301 Moved Permanently          ← Always Use HTTPS
+# location: https://www.mountainbreath.net/shop?lang=hy
+# HTTP/1.1 301 Moved Permanently          ← the redirect rule
+# location: https://mountainbreath.net/shop?lang=hy
+# HTTP/1.1 200 OK                         ← the apex, path and query intact
 ```
+
+Two hops for a plain-http visitor is expected and both are answered at
+the edge. A `200` on the *first* line instead of a `301` means the www
+CNAME is grey-clouded: Cloudflare is answering DNS but not proxying,
+so no rule ever sees the request.
 
 ## Observability (decision #101)
 
