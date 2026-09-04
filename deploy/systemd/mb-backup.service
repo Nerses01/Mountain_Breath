@@ -14,6 +14,9 @@ After=docker.service
 # oneshot: the service is "active" while the script runs, then done —
 # no daemon to keep alive, no restart policy.
 Type=oneshot
+# The user that owns /opt/mountain-breath and is in the docker group. The
+# runbook's install line rewrites these two to whoever runs it (the home
+# laptop's user is not `deploy`).
 User=deploy
 Group=deploy
 # Optional settings such as MB_BACKUP_REMOTE. The leading '-' means a

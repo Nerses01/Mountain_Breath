@@ -40,9 +40,10 @@
 
 The gap between "deploys itself" and "operated like you mean it".
 Claude's parts shipped on 2026-09-03 (decisions #103–#106 and one `ci:`
-chore); what is left is **the operator checklist at the end of this
-section** — dashboard clicks and laptop-side files that no commit can
-do.
+chore); the operator checklist at the end — dashboard clicks and
+laptop-side files that no commit can do — was worked through on
+2026-09-04. **§1 is closed.** Merging `dev` → `master` to carry it is
+ordinary practice, not a backlog line.
 
 - [x] **Backups: cron + a tested restore drill** — shipped 2026-09-03
       as decision #103: `deploy/backup.sh` (custom-format dump +
@@ -77,33 +78,30 @@ do.
       Playwright browser cached by the lockfile's Playwright version
       (2026-09-03, `ci:`).
 
-**Your part — in this order.** Each is a runbook step; tick as you go.
+**Your part — all done 2026-09-04.** Each was a runbook step.
 
-1. [ ] **Backups on the laptop**: install `mb-backup.timer`, run the
+1. [x] **Backups on the laptop**: install `mb-backup.timer`, run the
        first `restore.sh --drill`, then the R2 bucket + token +
        `deploy/backup.env` (DEPLOYMENT.md steps 7 and 7b).
-2. [ ] **Prod is seeded and has an admin** — the one-line check at the
+2. [x] **Prod is seeded and has an admin** — the one-line check at the
        end of DEPLOYMENT_HOME.md step 8.
-3. [ ] **Tailnet key expiry disabled** for the laptop (Tailscale console
+3. [x] **Tailnet key expiry disabled** for the laptop (Tailscale console
        → Machines → homeserver → ⋯ → Disable key expiry) — silent CD
        death in ~180 days otherwise.
-4. [ ] **Telegram**: BotFather token → `deploy/observability/
+4. [x] **Telegram**: BotFather token → `deploy/observability/
        telegram.token`, `TELEGRAM_CHAT_ID` → `deploy/.env`, restart
        alertmanager, `alert.sh fire TestAlert` as the proof — **before
        the next master merge**, or that deploy stops at the token check
        (step 12).
-5. [ ] **Mail**: Resend account, the three DNS records, API key →
+5. [x] **Mail**: Resend account, the three DNS records, API key →
        `deploy/.env`, Email Routing for `hive@mountainbreath.net`, a
        password-reset mail to yourself as the proof, then the `_dmarc`
        record (step 11).
-6. [ ] **Google sign-in**: redirect URI + consent screen published, keys
+6. [x] **Google sign-in**: redirect URI + consent screen published, keys
        → `deploy/.env`, sign in with Google on the live site as the
        proof (step 13).
-7. [ ] **www**: the CNAME + redirect rule in Cloudflare; `curl -I` shows
+7. [x] **www**: the CNAME + redirect rule in Cloudflare; `curl -I` shows
        301 to the apex (step 14).
-8. [ ] **Merge dev → master** and watch the deploy go green — it now
-       carries the backup scripts, the mail client, and the alert
-       receiver.
 
 ## 2. Launch content (was Era III F3)
 
@@ -177,7 +175,10 @@ reason wrong before it gets built.
 - [ ] **Auth hardening batch**: security headers — decide the home now
       that the edge is Cloudflare (edge rules vs nginx) — plus cleanup
       jobs for expired `sessions` rows (verified to accumulate) and
-      spent reset tokens (P11).
+      spent reset tokens (P11). **HSTS** belongs to this item, not to a
+      dashboard toggle in passing: it would save the extra hop plain
+      http costs since 09-04, but `max-age` is a promise that is
+      painful to retract.
 - [ ] **Rate limiter to shared storage** — tripwire unchanged: the day
       the API runs a second replica.
 - [ ] **OpenAPI spec + generated TS client** — retire hand-maintained

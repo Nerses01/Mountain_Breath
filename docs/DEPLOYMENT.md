@@ -187,8 +187,13 @@ property: `Persistent=true` runs a missed 03:30 backup after the machine
 was off, where cron would skip the night.
 
 ```bash
-sudo install -d -o deploy -g deploy /opt/backups
-sudo cp /opt/mountain-breath/deploy/systemd/mb-backup.{service,timer} /etc/systemd/system/
+# Run as the user that owns /opt/mountain-breath (the CI deploy user —
+# `deploy` on the VPS runbook, `capybara` on the home laptop). The unit
+# file says `deploy`; the sed rewrites it to whoever runs these lines.
+sudo install -d -o "$USER" -g "$(id -gn)" /opt/backups
+sed "s/^User=.*/User=$USER/; s/^Group=.*/Group=$(id -gn)/" /opt/mountain-breath/deploy/systemd/mb-backup.service \
+  | sudo tee /etc/systemd/system/mb-backup.service > /dev/null
+sudo cp /opt/mountain-breath/deploy/systemd/mb-backup.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now mb-backup.timer
 systemctl list-timers mb-backup.timer        # NEXT / LAST columns
