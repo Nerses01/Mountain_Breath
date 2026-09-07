@@ -49,6 +49,17 @@ say why; handler tests whose figures are dollar figures ask for dollars
 in the URL. One new test pins the point: cash is offered in the default
 market.
 
+**Found, on the laptop, first real order:** the checkout mail said "we
+will email you the account details" although `deploy/.env` held the
+three `MB_BANK_*` lines — `docker inspect` showed the api container had
+none of them. Compose feeds `.env` to the compose FILE's `${…}`, never
+to a container's process: a service receives exactly what its
+`environment:` block lists, and I had added the variables to the code
+and the examples but not to that block. Three pass-through lines in
+both compose files; a deploy carries them. The fallback sentence did
+its job — it said the truth instead of printing blanks — and the
+`inspect` command was the diagnosis in one line.
+
 **Learned:**
 - *A greyed-out option reads as a missing feature* — the rule was right
   (a courier collects dram), the DEFAULT was wrong: it put every new
