@@ -395,7 +395,8 @@ export interface PaymentInstructions {
   /** Bank transfer only: the purpose line to write on the transfer. */
   reference?: string
   /** Bank transfer only; absent until the family's account is configured. */
-  bank?: { recipient: string; bank: string; iban: string }
+  /** `account` is whatever the bank prints: a local number here, an IBAN abroad. */
+  bank?: { recipient: string; bank: string; account: string }
 }
 
 /**

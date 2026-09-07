@@ -69,7 +69,7 @@ its job — it said the truth instead of printing blanks — and the
   story about money, so the instructions are composed server-side from
   domain functions and both consumers read the same output. The same
   reasoning as F2's data export reusing the screens' reads.
-- *Deployment data is env, not source* — the family's IBAN is like
+- *Deployment data is env, not source* — the family's account number is like
   `MB_MAIL_FROM`: real, not secret, and different per deployment. And an
   unset value gets an honest fallback sentence, never blank fields.
 - *A settlement rule belongs in the transaction that makes it true* —
@@ -86,8 +86,12 @@ its job — it said the truth instead of printing blanks — and the
   in the market the fixture came from makes the assumption visible.
 
 **Questions / to revisit:**
-- Only the bank's IBAN is configured; a foreign customer paying in USD
-  would need SWIFT/BIC. Add `MB_BANK_SWIFT` when the first one asks.
+- The field was born as "IBAN" and renamed to "account" the same day:
+  Armenia is not in the IBAN registry, and the family's Ameriabank
+  account is a plain local number. Naming a field after one country's
+  format is a small lie that a form label repeats to every customer.
+  A foreign customer paying in USD would still need SWIFT/BIC; add
+  `MB_BANK_SWIFT` when the first one asks.
 - The status mails (confirmed/shipped) do not repeat the account for an
   unpaid transfer; if the family finds customers losing the first mail,
   the confirmed mail can carry the same paragraph.

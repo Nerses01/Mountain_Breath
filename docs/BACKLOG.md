@@ -169,7 +169,7 @@ recommendation, phases P0–P4). The lines below stay until each ships.
       account and the purpose line `MB-<id>` from `MB_BANK_*`); a cash
       order marked delivered settles to paid in the same transaction.
 - [ ] **Operator hands**: `MB_BANK_RECIPIENT`, `MB_BANK_NAME` and
-      `MB_BANK_IBAN` into `deploy/.env` on the laptop, then `up -d api` —
+      `MB_BANK_ACCOUNT` into `deploy/.env` on the laptop, then `up -d api` —
       until then the shop promises the account details by email.
 
 **Paperwork (the family's, not code) → [PAPERWORK_ARMENIA.md](PAPERWORK_ARMENIA.md)**

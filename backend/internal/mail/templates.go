@@ -63,7 +63,7 @@ type orderCopy struct {
 	total   string // %s = formatted total
 	link    string // %s = the order URL
 	// Decision #110: how to pay, per method.
-	payBank      string // %s ×5: total, recipient, bank, IBAN, reference
+	payBank      string // %s ×5: total, recipient, bank, account number, reference
 	payBankLater string // %s: total — the account is not configured yet
 	payCash      string // %s: total
 }
@@ -74,7 +74,7 @@ var orderCopies = map[domain.Locale]orderCopy{
 		intro:        "Thank you! Your order is in:",
 		total:        "Total: %s",
 		link:         "The full receipt, and the parcel's progress:\n%s",
-		payBank:      "How to pay: transfer %s to %s, %s, IBAN %s — purpose: %s. We ship as soon as it clears.",
+		payBank:      "How to pay: transfer %s to %s, %s, account %s — purpose: %s. We ship as soon as it clears.",
 		payBankLater: "How to pay: %s by bank transfer — we will email you the account details shortly.",
 		payCash:      "How to pay: have %s ready in cash for the courier — exact change if you can.",
 	},
@@ -83,7 +83,7 @@ var orderCopies = map[domain.Locale]orderCopy{
 		intro:        "Շնորհակալություն։ Ձեր պատվերն ընդունված է․",
 		total:        "Ընդամենը՝ %s",
 		link:         "Ամբողջական անդորրագիրը և ծանրոցի ընթացքը․\n%s",
-		payBank:      "Ինչպես վճարել․ փոխանցեք %s՝ %s, %s, IBAN %s, նպատակ՝ %s։ Կառաքենք փոխանցումը ստանալուն պես։",
+		payBank:      "Ինչպես վճարել․ փոխանցեք %s՝ %s, %s, հաշիվ %s, նպատակ՝ %s։ Կառաքենք փոխանցումը ստանալուն պես։",
 		payBankLater: "Ինչպես վճարել․ %s բանկային փոխանցումով — հաշվի տվյալները շուտով կուղարկենք էլ. փոստով։",
 		payCash:      "Ինչպես վճարել․ պատրաստ պահեք %s կանխիկ առաքիչի համար — հնարավորության դեպքում առանց մանրի։",
 	},
@@ -92,7 +92,7 @@ var orderCopies = map[domain.Locale]orderCopy{
 		intro:        "Спасибо! Ваш заказ принят:",
 		total:        "Итого: %s",
 		link:         "Полный чек и путь посылки:\n%s",
-		payBank:      "Как оплатить: переведите %s на %s, %s, IBAN %s, назначение: %s. Отправим, как только деньги поступят.",
+		payBank:      "Как оплатить: переведите %s на %s, %s, счёт %s, назначение: %s. Отправим, как только деньги поступят.",
 		payBankLater: "Как оплатить: %s банковским переводом — реквизиты вышлем на почту в ближайшее время.",
 		payCash:      "Как оплатить: приготовьте %s наличными для курьера — по возможности без сдачи.",
 	},
@@ -222,7 +222,7 @@ func OrderConfirmation(locale domain.Locale, to string, o domain.Order, orderURL
 	switch o.PaymentMethod {
 	case domain.PayBankTransfer:
 		if bank.Configured() {
-			fmt.Fprintf(&b, c.payBank+"\n\n", total, bank.Recipient, bank.Bank, bank.IBAN, domain.TransferReference(o.ID))
+			fmt.Fprintf(&b, c.payBank+"\n\n", total, bank.Recipient, bank.Bank, bank.Account, domain.TransferReference(o.ID))
 		} else {
 			fmt.Fprintf(&b, c.payBankLater+"\n\n", total)
 		}

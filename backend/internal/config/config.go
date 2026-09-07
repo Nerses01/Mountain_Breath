@@ -33,7 +33,7 @@ type Config struct {
 	// blanks.
 	BankRecipient string
 	BankName      string
-	BankIBAN      string
+	BankAccount   string // a local account number, or an IBAN abroad
 }
 
 func Load() (Config, error) {
@@ -52,7 +52,7 @@ func Load() (Config, error) {
 		GoogleClientSecret: os.Getenv("MB_GOOGLE_CLIENT_SECRET"),
 		BankRecipient:      os.Getenv("MB_BANK_RECIPIENT"),
 		BankName:           os.Getenv("MB_BANK_NAME"),
-		BankIBAN:           os.Getenv("MB_BANK_IBAN"),
+		BankAccount:        os.Getenv("MB_BANK_ACCOUNT"),
 	}
 	// No default for the DSN: it contains credentials, which never belong
 	// in source code. Fail loudly instead (same idea as compose's ${VAR:?}).

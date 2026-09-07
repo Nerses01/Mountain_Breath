@@ -59,7 +59,7 @@ services:
       MB_GOOGLE_CLIENT_SECRET: ${MB_GOOGLE_CLIENT_SECRET:-}
       MB_BANK_RECIPIENT: ${MB_BANK_RECIPIENT:-}
       MB_BANK_NAME: ${MB_BANK_NAME:-}
-      MB_BANK_IBAN: ${MB_BANK_IBAN:-}
+      MB_BANK_ACCOUNT: ${MB_BANK_ACCOUNT:-}
     volumes:
       # images survive container rebuilds, like the database does
       - uploads_data:/uploads

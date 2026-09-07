@@ -13,7 +13,9 @@ import { formatMoney } from '../../lib/format'
  * bank transfer or cash on delivery" — so the design is ours (rule #16,
  * standing exception 2): inside the payment card, a definition list for
  * the account so a screen reader pairs each label with its value, and the
- * IBAN and purpose in a monospace face because they get copied by hand.
+ * account number and purpose in a monospace face because they get copied
+ * by hand. "Account", not "IBAN": Armenia is not in the IBAN registry, and
+ * the field holds whatever the bank prints.
  */
 export function PaymentInstructions({ instructions }: { instructions?: Instructions }) {
   const { t } = useTranslation()
@@ -36,8 +38,8 @@ export function PaymentInstructions({ instructions }: { instructions?: Instructi
         <dd>{instructions.bank.recipient}</dd>
         <dt className="text-xs text-ink-soft">{t('order:howToPay.bank')}</dt>
         <dd>{instructions.bank.bank}</dd>
-        <dt className="text-xs text-ink-soft">IBAN</dt>
-        <dd className="font-mono">{instructions.bank.iban}</dd>
+        <dt className="text-xs text-ink-soft">{t('order:howToPay.account')}</dt>
+        <dd className="font-mono">{instructions.bank.account}</dd>
         <dt className="text-xs text-ink-soft">{t('order:howToPay.reference')}</dt>
         <dd className="font-mono">{instructions.reference}</dd>
       </dl>

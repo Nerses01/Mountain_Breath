@@ -10,12 +10,14 @@ import type { PaymentInstructions as Instructions } from '../../api/types'
  * nothing at all when there are no instructions (a paid order).
  */
 describe('PaymentInstructions', () => {
+  // A local Armenian account number: the country is not in the IBAN
+  // registry, and the field holds whatever the bank prints.
   const transfer: Instructions = {
     method: 'bank_transfer',
     amount_minor: 6400,
     currency: 'AMD',
     reference: 'MB-42',
-    bank: { recipient: 'Mountain Breath', bank: 'Ameriabank', iban: 'AM00 0000 0000 0000 0000' },
+    bank: { recipient: 'Mountain Breath', bank: 'Ameriabank', account: '1570001234567890' },
   }
 
   it('cash: the amount to have ready, in the order’s currency', () => {
@@ -29,7 +31,8 @@ describe('PaymentInstructions', () => {
     render(<PaymentInstructions instructions={transfer} />)
     expect(screen.getByText(/Transfer 6,400 ֏ to:/)).toBeInTheDocument()
     expect(screen.getByText('Ameriabank')).toBeInTheDocument()
-    expect(screen.getByText('AM00 0000 0000 0000 0000')).toBeInTheDocument()
+    expect(screen.getByText('Account')).toBeInTheDocument()
+    expect(screen.getByText('1570001234567890')).toBeInTheDocument()
     expect(screen.getByText('MB-42')).toBeInTheDocument()
     expect(screen.getByText('We ship as soon as it clears.')).toBeInTheDocument()
   })
@@ -37,7 +40,7 @@ describe('PaymentInstructions', () => {
   it('transfer without a configured account: a promise, no blanks', () => {
     render(<PaymentInstructions instructions={{ ...transfer, bank: undefined }} />)
     expect(screen.getByText(/email you the account details/)).toBeInTheDocument()
-    expect(screen.queryByText('IBAN')).not.toBeInTheDocument()
+    expect(screen.queryByText('Account')).not.toBeInTheDocument()
   })
 
   it('nothing to draw when the server sent no instructions', () => {

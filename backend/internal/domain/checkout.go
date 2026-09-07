@@ -115,11 +115,15 @@ func PaymentSettlesOnDelivery(method string) bool { return method == PayCashOnDe
 type BankDetails struct {
 	Recipient string
 	Bank      string
-	IBAN      string
+	// Account is whatever the bank prints for the transfer form: Armenia is
+	// not in the IBAN registry, so here it is a plain local account number;
+	// a bank abroad would put an IBAN in the same field. Free text, never
+	// validated — the family copies it from their own statement.
+	Account string
 }
 
-// Configured: an IBAN is the one thing that makes the details usable.
-func (b BankDetails) Configured() bool { return b.IBAN != "" }
+// Configured: the account number is the one thing that makes the details usable.
+func (b BankDetails) Configured() bool { return b.Account != "" }
 
 // TransferReference is what the customer writes in the transfer's purpose
 // field so the family can match money to an order. One function, used by

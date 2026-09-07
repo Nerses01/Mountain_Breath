@@ -20,11 +20,14 @@ func TestOrderConfirmation_HowToPay(t *testing.T) {
 			PaymentMethod: method, PaymentStatus: domain.PaymentUnpaid,
 		}
 	}
-	bank := domain.BankDetails{Recipient: "Mountain Breath", Bank: "Ameriabank", IBAN: "AM00 0000 0000 0000 0000"}
+	// A local Armenian account number — the country is not in the IBAN
+	// registry, and the field takes whatever the bank prints.
+	const account = "1570001234567890"
+	bank := domain.BankDetails{Recipient: "Mountain Breath", Bank: "Ameriabank", Account: account}
 
 	t.Run("a transfer names the account and the purpose line", func(t *testing.T) {
 		msg := mail.OrderConfirmation(domain.LocaleEN, "a@test.local", order(domain.PayBankTransfer), "https://x/orders/42", bank)
-		for _, want := range []string{"AM00 0000 0000 0000 0000", "Ameriabank", "Mountain Breath", "MB-42"} {
+		for _, want := range []string{account, "Ameriabank", "Mountain Breath", "MB-42"} {
 			if !strings.Contains(msg.Text, want) {
 				t.Errorf("mail lacks %q:\n%s", want, msg.Text)
 			}
@@ -33,14 +36,14 @@ func TestOrderConfirmation_HowToPay(t *testing.T) {
 
 	t.Run("an unconfigured account promises the details and prints no blanks", func(t *testing.T) {
 		msg := mail.OrderConfirmation(domain.LocaleEN, "a@test.local", order(domain.PayBankTransfer), "u", domain.BankDetails{})
-		if !strings.Contains(msg.Text, "email you the account details") || strings.Contains(msg.Text, "IBAN") {
+		if !strings.Contains(msg.Text, "email you the account details") || strings.Contains(msg.Text, "account  ") {
 			t.Errorf("unexpected text:\n%s", msg.Text)
 		}
 	})
 
 	t.Run("cash says the amount to have ready, and nothing about accounts", func(t *testing.T) {
 		msg := mail.OrderConfirmation(domain.LocaleEN, "a@test.local", order(domain.PayCashOnDelivery), "u", bank)
-		if !strings.Contains(msg.Text, "in cash") || strings.Contains(msg.Text, "IBAN") {
+		if !strings.Contains(msg.Text, "in cash") || strings.Contains(msg.Text, account) {
 			t.Errorf("unexpected text:\n%s", msg.Text)
 		}
 	})
@@ -50,7 +53,7 @@ func TestOrderConfirmation_HowToPay(t *testing.T) {
 			o := order(domain.PayBankTransfer)
 			o.Locale = l
 			msg := mail.OrderConfirmation(l, "a@test.local", o, "u", bank)
-			if !strings.Contains(msg.Text, "MB-42") || !strings.Contains(msg.Text, "IBAN") {
+			if !strings.Contains(msg.Text, "MB-42") || !strings.Contains(msg.Text, account) {
 				t.Errorf("%s: no how-to-pay in\n%s", l, msg.Text)
 			}
 		}
