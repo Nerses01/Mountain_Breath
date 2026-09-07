@@ -104,7 +104,7 @@ export function setApiLocale(locale: string) {
  * gets a correctly-shaped answer to the wrong question. And on POST /orders
  * it decides what the customer is charged in.
  */
-let apiCurrency = 'USD'
+let apiCurrency = 'AMD' // mirrors DEFAULT_CURRENCY; the provider overrides it during render
 
 export function setApiCurrency(currency: string) {
   apiCurrency = currency

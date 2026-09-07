@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
+import { CurrencyProvider } from '../../lib/CurrencyProvider'
 import { OrderSummary } from './OrderSummary'
 import { PromoBox } from './PromoBox'
 import { FreeShippingBanner } from './FreeShippingBanner'
@@ -54,10 +55,16 @@ function preview(overrides: Partial<Preview> = {}): Preview {
 }
 
 function wrap(ui: React.ReactElement) {
+  // The fixtures are DOLLAR reads (`currency: 'USD'`), so the components
+  // render inside a dollar market — said explicitly, since decision #110
+  // made dram the default a bare component would otherwise fall back to.
+  localStorage.setItem('mb_currency', 'USD')
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <MemoryRouter>
-      <QueryClientProvider client={qc}>{ui}</QueryClientProvider>
+      <QueryClientProvider client={qc}>
+        <CurrencyProvider>{ui}</CurrencyProvider>
+      </QueryClientProvider>
     </MemoryRouter>,
   )
 }

@@ -27,6 +27,13 @@ type Config struct {
 	// page's button explains itself.
 	GoogleClientID     string
 	GoogleClientSecret string
+	// Decision #110: where a bank transfer goes — the family's account,
+	// deployment data like MB_MAIL_FROM. All empty = the order page and the
+	// confirmation mail promise the details by email instead of printing
+	// blanks.
+	BankRecipient string
+	BankName      string
+	BankIBAN      string
 }
 
 func Load() (Config, error) {
@@ -43,6 +50,9 @@ func Load() (Config, error) {
 		MailFrom:           getEnv("MB_MAIL_FROM", "Mountain Breath <hive@mountain-breath.local>"),
 		GoogleClientID:     os.Getenv("MB_GOOGLE_CLIENT_ID"),
 		GoogleClientSecret: os.Getenv("MB_GOOGLE_CLIENT_SECRET"),
+		BankRecipient:      os.Getenv("MB_BANK_RECIPIENT"),
+		BankName:           os.Getenv("MB_BANK_NAME"),
+		BankIBAN:           os.Getenv("MB_BANK_IBAN"),
 	}
 	// No default for the DSN: it contains credentials, which never belong
 	// in source code. Fail loudly instead (same idea as compose's ${VAR:?}).

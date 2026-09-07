@@ -21,7 +21,7 @@ func testCheckout() domain.CheckoutInput {
 			Street: "14 Abovyan St, apt 6", City: "Yerevan",
 			PostalCode: "0009", Country: "AM",
 		},
-		PaymentMethod: domain.PayCard,
+		PaymentMethod: domain.PayBankTransfer,
 	}
 }
 
@@ -407,6 +407,63 @@ func TestUpdateOrderPaymentStatus(t *testing.T) {
 	_, err = s.UpdateOrderPaymentStatus(ctx, 99999, domain.PaymentPaid)
 	if !errors.Is(err, domain.ErrNotFound) {
 		t.Errorf("unknown id: err = %v, want ErrNotFound", err)
+	}
+}
+
+// Decision #110: cash settles on delivery — the courier's hand is the
+// payment — inside the delivery's own transaction, and nothing else does.
+func TestUpdateOrderStatus_CashSettlesOnDelivery(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test (needs Docker)")
+	}
+	resetDB(t)
+	s := store.New(testPool)
+	ctx := context.Background()
+
+	// Drive an order down the whole machine and hand back the last answer.
+	deliver := func(t *testing.T, id int64) domain.Order {
+		t.Helper()
+		var last domain.Order
+		for _, to := range []string{domain.OrderConfirmed, domain.OrderShipped, domain.OrderDelivered} {
+			o, err := s.UpdateOrderStatus(ctx, id, to)
+			if err != nil {
+				t.Fatalf("→ %s: %v", to, err)
+			}
+			last = o
+		}
+		return last
+	}
+
+	variantID := seedCatalog(t, 10)
+
+	cashUser := seedUserWithCart(t, "cash@test.local", variantID, 1)
+	cashCheckout := testCheckout()
+	cashCheckout.PaymentMethod = domain.PayCashOnDelivery
+	cash, err := s.CreateOrder(ctx, cashUser, domain.View{Currency: domain.CurrencyAMD}, cashCheckout)
+	if err != nil {
+		t.Fatalf("CreateOrder (cash): %v", err)
+	}
+	// The returned order already says paid — no second read needed…
+	if got := deliver(t, cash.ID); got.PaymentStatus != domain.PaymentPaid {
+		t.Errorf("returned cash order after delivery: payment = %q, want paid", got.PaymentStatus)
+	}
+	// …and the database agrees.
+	stored, err := s.GetOrder(ctx, cash.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Status != domain.OrderDelivered || stored.PaymentStatus != domain.PaymentPaid {
+		t.Errorf("stored cash order = %s / %s, want delivered / paid", stored.Status, stored.PaymentStatus)
+	}
+
+	// A transfer is never assumed to have cleared: same road, payment untouched.
+	transferUser := seedUserWithCart(t, "transfer@test.local", variantID, 1)
+	transfer, err := s.CreateOrder(ctx, transferUser, domain.View{Currency: domain.CurrencyAMD}, testCheckout())
+	if err != nil {
+		t.Fatalf("CreateOrder (transfer): %v", err)
+	}
+	if got := deliver(t, transfer.ID); got.PaymentStatus != domain.PaymentUnpaid {
+		t.Errorf("transfer order after delivery: payment = %q, want unpaid", got.PaymentStatus)
 	}
 }
 

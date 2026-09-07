@@ -62,26 +62,39 @@ type orderCopy struct {
 	intro   string
 	total   string // %s = formatted total
 	link    string // %s = the order URL
+	// Decision #110: how to pay, per method.
+	payBank      string // %s ×5: total, recipient, bank, IBAN, reference
+	payBankLater string // %s: total — the account is not configured yet
+	payCash      string // %s: total
 }
 
 var orderCopies = map[domain.Locale]orderCopy{
 	domain.LocaleEN: {
-		subject: "Order #%d — the hive is packing it",
-		intro:   "Thank you! Your order is in:",
-		total:   "Total: %s",
-		link:    "The full receipt, and the parcel's progress:\n%s",
+		subject:      "Order #%d — the hive is packing it",
+		intro:        "Thank you! Your order is in:",
+		total:        "Total: %s",
+		link:         "The full receipt, and the parcel's progress:\n%s",
+		payBank:      "How to pay: transfer %s to %s, %s, IBAN %s — purpose: %s. We ship as soon as it clears.",
+		payBankLater: "How to pay: %s by bank transfer — we will email you the account details shortly.",
+		payCash:      "How to pay: have %s ready in cash for the courier — exact change if you can.",
 	},
 	domain.LocaleHY: {
-		subject: "Պատվեր #%d — փեթակն արդեն փաթեթավորում է",
-		intro:   "Շնորհակալություն։ Ձեր պատվերն ընդունված է․",
-		total:   "Ընդամենը՝ %s",
-		link:    "Ամբողջական անդորրագիրը և ծանրոցի ընթացքը․\n%s",
+		subject:      "Պատվեր #%d — փեթակն արդեն փաթեթավորում է",
+		intro:        "Շնորհակալություն։ Ձեր պատվերն ընդունված է․",
+		total:        "Ընդամենը՝ %s",
+		link:         "Ամբողջական անդորրագիրը և ծանրոցի ընթացքը․\n%s",
+		payBank:      "Ինչպես վճարել․ փոխանցեք %s՝ %s, %s, IBAN %s, նպատակ՝ %s։ Կառաքենք փոխանցումը ստանալուն պես։",
+		payBankLater: "Ինչպես վճարել․ %s բանկային փոխանցումով — հաշվի տվյալները շուտով կուղարկենք էլ. փոստով։",
+		payCash:      "Ինչպես վճարել․ պատրաստ պահեք %s կանխիկ առաքիչի համար — հնարավորության դեպքում առանց մանրի։",
 	},
 	domain.LocaleRU: {
-		subject: "Заказ #%d — улей уже собирает посылку",
-		intro:   "Спасибо! Ваш заказ принят:",
-		total:   "Итого: %s",
-		link:    "Полный чек и путь посылки:\n%s",
+		subject:      "Заказ #%d — улей уже собирает посылку",
+		intro:        "Спасибо! Ваш заказ принят:",
+		total:        "Итого: %s",
+		link:         "Полный чек и путь посылки:\n%s",
+		payBank:      "Как оплатить: переведите %s на %s, %s, IBAN %s, назначение: %s. Отправим, как только деньги поступят.",
+		payBankLater: "Как оплатить: %s банковским переводом — реквизиты вышлем на почту в ближайшее время.",
+		payCash:      "Как оплатить: приготовьте %s наличными для курьера — по возможности без сдачи.",
 	},
 }
 
@@ -188,7 +201,7 @@ func OrderStatusUpdate(to string, o domain.Order, orderURL string) (Message, boo
 // OrderConfirmation builds the receipt mail from an order's SNAPSHOTS — the
 // same rule as the order page: names and prices as charged, one currency,
 // no re-resolution against today's catalog.
-func OrderConfirmation(locale domain.Locale, to string, o domain.Order, orderURL string) Message {
+func OrderConfirmation(locale domain.Locale, to string, o domain.Order, orderURL string, bank domain.BankDetails) Message {
 	c, ok := orderCopies[locale]
 	if !ok {
 		c = orderCopies[domain.LocaleEN]
@@ -200,7 +213,23 @@ func OrderConfirmation(locale domain.Locale, to string, o domain.Order, orderURL
 		fmt.Fprintf(&b, "  %d × %s (%s) — %s\n",
 			it.Qty, it.Name, it.Label, domain.FormatMinor(it.PriceMinor*int64(it.Qty), o.Currency))
 	}
-	b.WriteString("\n" + fmt.Sprintf(c.total, domain.FormatMinor(o.TotalMinor, o.Currency)) + "\n\n")
+	total := domain.FormatMinor(o.TotalMinor, o.Currency)
+	b.WriteString("\n" + fmt.Sprintf(c.total, total) + "\n\n")
+
+	// Decision #110: the how-to-pay paragraph, from the same domain pieces
+	// the order page renders (TransferReference, BankDetails) — the mail
+	// and the page cannot tell the customer two different stories.
+	switch o.PaymentMethod {
+	case domain.PayBankTransfer:
+		if bank.Configured() {
+			fmt.Fprintf(&b, c.payBank+"\n\n", total, bank.Recipient, bank.Bank, bank.IBAN, domain.TransferReference(o.ID))
+		} else {
+			fmt.Fprintf(&b, c.payBankLater+"\n\n", total)
+		}
+	case domain.PayCashOnDelivery:
+		fmt.Fprintf(&b, c.payCash+"\n\n", total)
+	}
+
 	b.WriteString(fmt.Sprintf(c.link, orderURL) + "\n")
 
 	return Message{

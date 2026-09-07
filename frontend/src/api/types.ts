@@ -382,8 +382,21 @@ export interface Address {
   country: string
 }
 
+// Every value an order may CARRY. Checkout offers only the last two while
+// card acquiring is frozen (decision #107); historic orders still read 'card'.
 export type PaymentMethod = 'card' | 'bank_transfer' | 'cash_on_delivery'
 export type PaymentStatus = 'unpaid' | 'paid' | 'refunded'
+
+/** The server's "how to pay" (decision #110); the mail says the same. */
+export interface PaymentInstructions {
+  method: PaymentMethod
+  amount_minor: number
+  currency: Currency
+  /** Bank transfer only: the purpose line to write on the transfer. */
+  reference?: string
+  /** Bank transfer only; absent until the family's account is configured. */
+  bank?: { recipient: string; bank: string; iban: string }
+}
 
 /**
  * Everything the client CONTRIBUTES to an order — note there is no money in
@@ -476,6 +489,12 @@ export interface Order {
 
   payment_method: PaymentMethod
   payment_status: PaymentStatus
+  /**
+   * Decision #110: "how to pay", composed by the server while the order is
+   * unpaid — absent once money has moved, absent on a historic card order,
+   * and absent from the list and admin reads, which never need it.
+   */
+  payment_instructions?: PaymentInstructions
 
   /** The frozen snapshot; absent on orders that predate checkout-with-address. */
   ship_to?: Address

@@ -66,7 +66,9 @@ export function CheckoutPage() {
   const checkout = useCheckout()
 
   const [address, setAddress] = useState<Address>(EMPTY_ADDRESS)
-  const [method, setMethod] = useState<PaymentMethod>('card')
+  // Bank transfer first: it works in both currencies, where cash is
+  // AMD-only — and card is not offered while decision #107's freeze holds.
+  const [method, setMethod] = useState<PaymentMethod>('bank_transfer')
   const [note, setNote] = useState('')
   const [neighbour, setNeighbour] = useState(false)
   // Presence errors found client-side, keyed exactly like the server's.
@@ -328,12 +330,12 @@ export function CheckoutPage() {
               aria-label={t('checkout:payment.title')}
               className="flex flex-col gap-3 sm:flex-row"
             >
-              <PaymentCard
-                selected={method === 'card'}
-                onSelect={() => setMethod('card')}
-                title={t('checkout:payment.card')}
-                blurb={t('checkout:payment.cardBlurb')}
-              />
+              {/* The canvas draws three cards, "Card — Visa, Mastercard,
+                  ArCa" first. Departure (rule #16): decision #107 froze
+                  card acquiring — no Armenian provider contracts with a
+                  natural person — so the option is not offered, and the
+                  API refuses it too (domain.OfferedPaymentMethods). Thaw
+                  = that PaymentCard returns here, first again. */}
               <PaymentCard
                 selected={method === 'bank_transfer'}
                 onSelect={() => setMethod('bank_transfer')}
@@ -355,21 +357,6 @@ export function CheckoutPage() {
               <p role="alert" className="text-xs text-danger">
                 {fieldError('payment_method')}
               </p>
-            )}
-            {method === 'card' && (
-              // The mock draws card fields; the API deliberately never
-              // accepts card data (the provider integration is Phase 11, and
-              // card numbers belong on the provider's servers, not this
-              // one). So the fields are decorative-disabled with the truth
-              // underneath — a state the mock never drew, ours to design.
-              <div aria-hidden="true" className="grid gap-3.5 opacity-50 sm:grid-cols-[2fr_1fr_1fr]">
-                <DisabledStub label={t('checkout:payment.cardNumber')} value="•••• •••• •••• ••••" />
-                <DisabledStub label={t('checkout:payment.expiry')} value="MM / YY" />
-                <DisabledStub label={t('checkout:payment.cvc')} value="•••" />
-              </div>
-            )}
-            {method === 'card' && (
-              <p className="text-xs text-ink-muted">{t('checkout:payment.cardStubNote')}</p>
             )}
           </CheckoutSection>
         </form>
@@ -524,19 +511,5 @@ function PaymentCard({
       <span className="font-display text-[0.9375rem] font-bold text-ink">{title}</span>
       <span className="text-xs text-ink-soft">{blurb}</span>
     </button>
-  )
-}
-
-// A decorative, inert "input" — the card stub. A real disabled <input> would
-// be announced to screen readers as a form control they cannot use; a styled
-// box inside an aria-hidden container is honestly just a picture.
-function DisabledStub({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <span className="text-xs font-semibold text-ink-soft">{label}</span>
-      <span className="rounded-xl border-[1.5px] border-line bg-panel px-4 py-3.5 text-[0.9375rem] text-ink-faint">
-        {value}
-      </span>
-    </div>
   )
 }

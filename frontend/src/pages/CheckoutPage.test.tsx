@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { CurrencyProvider } from '../lib/CurrencyProvider'
 import { CheckoutPage } from './CheckoutPage'
 import type { Cart, Preview } from '../api/types'
 
@@ -11,7 +12,9 @@ import type { Cart, Preview } from '../api/types'
  *  1. an empty form fails CLIENT-side — no request leaves the page;
  *  2. a filled form posts exactly the CheckoutInput shape, and no money;
  *  3. the design's "AMD only" cash rule renders as a disabled option, not
- *     as a surprise rejection after submit.
+ *     as a surprise rejection after submit;
+ *  4. while card acquiring is frozen (decision #107) the card option is
+ *     not offered at all, and bank transfer is the preselected method.
  *
  * fetch is stubbed at the network edge (the same seam locale.test.tsx uses)
  * so the whole real stack — client, hooks, provider — runs in between.
@@ -57,6 +60,9 @@ let requests: { url: string; body: unknown }[] = []
 beforeEach(() => {
   requests = []
   localStorage.clear()
+  // The fixtures are DOLLAR reads (`currency: 'USD'`), so the page shops
+  // in dollars — explicitly, since decision #110 made dram the default.
+  localStorage.setItem('mb_currency', 'USD')
   vi.stubGlobal(
     'fetch',
     vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -99,11 +105,13 @@ function renderCheckout() {
   return render(
     <MemoryRouter initialEntries={['/checkout']}>
       <QueryClientProvider client={qc}>
-        <Routes>
-          <Route path="/checkout" element={<CheckoutPage />} />
-          {/* A1 moved the confirmation page under the account shell. */}
-          <Route path="/account/orders/:id" element={<p>order page</p>} />
-        </Routes>
+        <CurrencyProvider>
+          <Routes>
+            <Route path="/checkout" element={<CheckoutPage />} />
+            {/* A1 moved the confirmation page under the account shell. */}
+            <Route path="/account/orders/:id" element={<p>order page</p>} />
+          </Routes>
+        </CurrencyProvider>
       </QueryClientProvider>
     </MemoryRouter>,
   )
@@ -143,6 +151,18 @@ describe('CheckoutPage', () => {
     // Testing Library normalizes the node's text (NBSP collapses to a
     // space) but compares the matcher string verbatim.
     expect(screen.getByText('15,300 ֏')).toBeInTheDocument()
+  })
+
+  it('offers only bank transfer and cash while card acquiring is frozen', async () => {
+    renderCheckout()
+    await settle()
+
+    // The canvas draws three payment cards; decision #107 takes the card
+    // one off the menu until the family holds an acquirer contract. Two
+    // radios, none of them "Card", and the first offered one preselected.
+    expect(screen.getAllByRole('radio')).toHaveLength(2)
+    expect(screen.queryByRole('radio', { name: /^Card/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /Bank transfer/ })).toHaveAttribute('aria-checked', 'true')
   })
 
   it('an empty submit fails client-side with the server’s field keys — and no request', async () => {
@@ -235,5 +255,16 @@ describe('CheckoutPage', () => {
 
     // The design's own words are the reason: "Cash — on delivery, AMD only".
     expect(screen.getByRole('radio', { name: /Cash/ })).toBeDisabled()
+  })
+
+  it('cash on delivery is offered in the default market, drams', async () => {
+    // Decision #110's point: a first visit lands where every offered
+    // method works. (The fixtures still answer in dollars — the fetch stub
+    // ignores the currency — which is fine: only the radio is under test.)
+    localStorage.setItem('mb_currency', 'AMD')
+    renderCheckout()
+    await settle()
+
+    expect(screen.getByRole('radio', { name: /Cash/ })).not.toBeDisabled()
   })
 })

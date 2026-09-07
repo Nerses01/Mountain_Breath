@@ -295,17 +295,12 @@ export const en = {
     },
     payment: {
       title: 'Payment',
-      card: 'Card',
-      cardBlurb: 'Visa, Mastercard, ArCa',
+      // The card option and its stub fields left with decision #107/#109;
+      // `order.method.card` below stays for historic orders.
       bank: 'Bank transfer',
       bankBlurb: 'Ships on clearing',
       cash: 'Cash',
       cashBlurb: 'On delivery, AMD only',
-      cardNumber: 'Card number',
-      expiry: 'Expiry',
-      cvc: 'CVC',
-      cardStubNote:
-        'Online card payment is coming; for now the order is recorded and the family confirms payment with you directly.',
     },
     summary: {
       label: 'Order summary',
@@ -339,6 +334,17 @@ export const en = {
     promo: 'Code {{code}}',
     includesVat: 'Includes VAT',
     allOrders: '← All your orders',
+    // Decision #110: "how to pay" — the amounts and account come from the
+    // server's payment_instructions; the mail says the same things.
+    howToPay: {
+      cash: 'Have {{amount}} ready in cash for the courier — exact change if you can.',
+      bankIntro: 'Transfer {{amount}} to:',
+      recipient: 'Recipient',
+      bank: 'Bank',
+      reference: 'Purpose',
+      bankShips: 'We ship as soon as it clears.',
+      bankLater: 'Pay {{amount}} by bank transfer — we will email you the account details shortly.',
+    },
     method: {
       card: 'Card',
       bank_transfer: 'Bank transfer',

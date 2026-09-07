@@ -1,6 +1,10 @@
 package domain
 
-import "strings"
+import (
+	"fmt"
+	"slices"
+	"strings"
+)
 
 // ── Address ───────────────────────────────────────────────────────────────
 
@@ -75,17 +79,53 @@ const (
 	PaymentRefunded = "refunded"
 )
 
-// PaymentMethods in the order the design's three cards show them.
+// PaymentMethods is every value an order may CARRY — the column's CHECK
+// constraint (migration 000017) spelled in Go, in the order the design's
+// three cards show them. Historic orders keep `card` for good.
 var PaymentMethods = []string{PayCard, PayBankTransfer, PayCashOnDelivery}
 
-func ValidPaymentMethod(m string) bool {
-	for _, pm := range PaymentMethods {
-		if pm == m {
-			return true
-		}
-	}
-	return false
+// OfferedPaymentMethods is what a NEW order may CHOOSE today. Decision #107
+// froze card acquiring — no Armenian provider contracts with a natural
+// person — so the shop sells on transfer and cash. Two lists, because
+// "valid to store" and "valid to pick" are different questions: an admin
+// still reads a 2026 card order, a customer can no longer place one. Thaw
+// = put PayCard back here; nothing else moves (decision #109).
+var OfferedPaymentMethods = []string{PayBankTransfer, PayCashOnDelivery}
+
+// ValidPaymentMethod answers "may an order carry this value?" — the
+// vocabulary. slices.Contains is the generic stand-in for the hand-written
+// loop: like std::find != end(), specialised at compile time per element type.
+func ValidPaymentMethod(m string) bool { return slices.Contains(PaymentMethods, m) }
+
+// OfferedPaymentMethod answers "may a customer choose it right now?" — the
+// menu. Checkout validation asks this one.
+func OfferedPaymentMethod(m string) bool { return slices.Contains(OfferedPaymentMethods, m) }
+
+// PaymentSettlesOnDelivery (decision #110): a cash order is delivered at
+// the exact moment it stops being unpaid — the courier's hand IS the
+// settlement, so the store flips payment_status in the same transaction as
+// the delivery. A transfer settles when the money clears, which only the
+// admin can see; nothing else settles by itself.
+func PaymentSettlesOnDelivery(method string) bool { return method == PayCashOnDelivery }
+
+// BankDetails is where a bank transfer goes — the family's account, which
+// is deployment data (MB_BANK_* in the server's .env), never source. The
+// zero value means "not configured yet": the instructions then promise the
+// details by mail rather than print blanks.
+type BankDetails struct {
+	Recipient string
+	Bank      string
+	IBAN      string
 }
+
+// Configured: an IBAN is the one thing that makes the details usable.
+func (b BankDetails) Configured() bool { return b.IBAN != "" }
+
+// TransferReference is what the customer writes in the transfer's purpose
+// field so the family can match money to an order. One function, used by
+// the order page (through the API) and by the confirmation mail, so the
+// two can never disagree about what the reference looks like.
+func TransferReference(orderID int64) string { return fmt.Sprintf("MB-%d", orderID) }
 
 // The payment lifecycle as data, the same shape as orderTransitions: money
 // arrives (unpaid → paid), and money already taken can go back (paid →
@@ -122,14 +162,18 @@ func ValidPaymentStatus(s string) bool {
 	return false
 }
 
-// ValidatePayment enforces the one cross-field rule the design states
-// outright: "Cash — on delivery, AMD only". A courier collecting dollars in
-// Yerevan is not a thing, so the rule lives HERE, in the domain, rather
-// than as an if-statement in a handler — it is a business fact, and E5 made
-// it expressible by giving every order a currency.
+// ValidatePayment enforces two rules. First, the method must be one on
+// offer — OfferedPaymentMethods, not the wider vocabulary — so a request
+// built by hand cannot create a card order while acquiring is frozen;
+// hiding the option in the page is not a rule, this is. Second, the one
+// cross-field rule the design states outright: "Cash — on delivery, AMD
+// only". A courier collecting dollars in Yerevan is not a thing, so the
+// rule lives HERE, in the domain, rather than as an if-statement in a
+// handler — it is a business fact, and E5 made it expressible by giving
+// every order a currency.
 func ValidatePayment(method string, currency Currency) map[string]string {
 	fields := make(map[string]string)
-	if !ValidPaymentMethod(method) {
+	if !OfferedPaymentMethod(method) {
 		fields["payment_method"] = ValidationInvalidPaymentMethod
 		return fields
 	}

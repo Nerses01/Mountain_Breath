@@ -17,6 +17,111 @@ Template for an entry:
 
 ---
 
+## 2026-09-07 — Cash and bank transfer as complete flows; dram becomes the default (decision #110)
+
+**Worked on:** "implement cash" turned out to be three gaps, found by
+mapping what cash on delivery already was. (1) The first-visit currency
+was USD, and cash is AMD-only by the design's rule, so a new visitor saw
+the Cash option greyed out — "not implemented" to anyone looking. Both
+defaults flip to dram: `domain.DefaultCurrency` and the frontend's
+`DEFAULT_CURRENCY`, the rule untouched. (2) After checkout nothing said
+HOW to pay, for either method. The API now composes
+`payment_instructions` on the customer's own order reads while unpaid —
+amount and currency; for a transfer the purpose line `MB-<id>`
+(`domain.TransferReference`) and the family's account from `MB_BANK_*`
+(`domain.BankDetails`, zero value = "details follow by email") — and the
+confirmation mail's new paragraph is built from the same pieces, in three
+languages. A `PaymentInstructions` panel renders it on the order page.
+(3) A cash order marked delivered stayed "payment pending" until a second
+admin click. `domain.PaymentSettlesOnDelivery(cash)` now flips
+`payment_status` inside `applyOrderStatusTx`, which takes the locked row
+by pointer and updates it as it writes. Tests at every layer: domain
+rules, the handler (instructions present/absent per method and status,
+the mail's text), the mail builder, the store's delivery transaction
+(cash settles, a transfer never does), the panel. The Postman checkout
+script asserts the instructions.
+
+**The fallout of a default:** sixteen tests across both sides had
+encoded "dollars unless said otherwise" without saying so. Request-URL
+tests now expect dram; component tests whose fixtures are dollar reads
+render inside a dollar market (`CurrencyProvider` + a stored choice) and
+say why; handler tests whose figures are dollar figures ask for dollars
+in the URL. One new test pins the point: cash is offered in the default
+market.
+
+**Learned:**
+- *A greyed-out option reads as a missing feature* — the rule was right
+  (a courier collects dram), the DEFAULT was wrong: it put every new
+  visitor in the one market where the rule bites. Defaults are product
+  decisions dressed as constants.
+- *Compose once, render twice* — the page and the mail must tell one
+  story about money, so the instructions are composed server-side from
+  domain functions and both consumers read the same output. The same
+  reasoning as F2's data export reusing the screens' reads.
+- *Deployment data is env, not source* — the family's IBAN is like
+  `MB_MAIL_FROM`: real, not secret, and different per deployment. And an
+  unset value gets an honest fallback sentence, never blank fields.
+- *A settlement rule belongs in the transaction that makes it true* —
+  cash is paid the moment it is delivered, so the money fact and the
+  parcel fact commit together, guarded by the current status. The
+  pointer-taking `applyOrderStatusTx` returns what the database now
+  holds without a second read — Go's `*T` doing what a C++ reference
+  parameter would.
+- *"Default" is a contract with a name* — tests that spelled the
+  fallback as `USD` broke; tests that spelled it `domain.DefaultCurrency`
+  did not. Assert the contract, not its current value.
+- *A fixture carries its market* — a `currency: 'USD'` fixture rendered
+  in a dram context is a lie the test tells itself; wrapping the render
+  in the market the fixture came from makes the assumption visible.
+
+**Questions / to revisit:**
+- Only the bank's IBAN is configured; a foreign customer paying in USD
+  would need SWIFT/BIC. Add `MB_BANK_SWIFT` when the first one asks.
+- The status mails (confirmed/shipped) do not repeat the account for an
+  unpaid transfer; if the family finds customers losing the first mail,
+  the confirmed mail can carry the same paragraph.
+- Operator step: `MB_BANK_*` into `deploy/.env` on the laptop, then
+  `up -d api` (BACKLOG §3).
+
+---
+
+## 2026-09-07 — §3 frozen, so the checkout stops offering what it cannot take (decision #109)
+
+**Worked on:** the one line #107 left open — the checkout still
+preselected `card`. The domain now has two lists: `PaymentMethods`
+(every value an order may carry, the CHECK constraint spelled in Go) and
+`OfferedPaymentMethods` (what a new order may choose: transfer and cash);
+`ValidatePayment` checks the second, so a hand-made request with `card`
+is a 400 like any unknown method. The page drops the third payment card
+and the decorative card-number stubs, preselects bank transfer, and the
+six locale keys the stub owned go with it in all three languages. A
+handler test pins the refusal; the checkout fixtures and the Postman 400
+example move to bank transfer. Historic card orders render everywhere
+they did.
+
+**Learned:**
+- *Valid-to-store and valid-to-choose are different sets* — one list
+  would have forced a choice between rejecting historic rows and offering
+  a method nobody can collect on. Two lists, the DB constraint untouched:
+  the vocabulary keeps the word, the menu drops it. The C++ shape: the
+  enum keeps its enumerator; a whitelist decides what is selectable.
+- *Refuse in the API, not just the UI* — hiding a button is not a rule;
+  a request built by hand still reaches the handler. The domain check is
+  the rule, the page merely agrees with it.
+- *Thaw cost is a design property* — one list entry and one JSX block.
+  Freezing a feature should be as cheap to undo as it was to do.
+- *A canvas departure gets its sentence* — the mock draws three payment
+  cards; rule #16 wants the reason where the departure happens, and #107
+  is the reason.
+
+**Questions / to revisit:**
+- `order:method.card` and `PayCard` stay for history; the dead-i18n sweep
+  in §5 must not remove them.
+- Should the admin's order list filter by method now that two are live?
+  Nothing has asked for it yet.
+
+---
+
 ## 2026-09-07 — Detour: the site icon (decision #108)
 
 **Worked on:** the browser tab and Google's result rows still showed

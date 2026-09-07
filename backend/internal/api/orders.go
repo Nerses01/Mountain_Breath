@@ -87,6 +87,10 @@ type orderResponse struct {
 
 	PaymentMethod string `json:"payment_method"`
 	PaymentStatus string `json:"payment_status"`
+	// Decision #110: "how to pay", present only while unpaid and only on the
+	// customer's own reads (POST /orders, GET /orders/{id}) — see
+	// paymentInstructions below.
+	PaymentInstructions *paymentInstructionsResponse `json:"payment_instructions,omitempty"`
 
 	// The frozen snapshot. A pointer so pre-E6 orders honestly send null
 	// rather than seven empty strings pretending to be an address.
@@ -105,6 +109,46 @@ type orderResponse struct {
 type orderEventResponse struct {
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// paymentInstructionsResponse is the "how to pay" the order page draws —
+// composed HERE from the same domain pieces the confirmation mail uses
+// (TransferReference, BankDetails), so what the page shows and what the
+// mail said can never disagree. Nil once money has moved (nothing left to
+// instruct) and nil for a historic card order (nothing a customer can do).
+type paymentInstructionsResponse struct {
+	Method      string          `json:"method"`
+	AmountMinor int64           `json:"amount_minor"`
+	Currency    domain.Currency `json:"currency"`
+	// Bank transfer only: the purpose line, and the account when configured.
+	Reference string               `json:"reference,omitempty"`
+	Bank      *bankDetailsResponse `json:"bank,omitempty"`
+}
+
+type bankDetailsResponse struct {
+	Recipient string `json:"recipient"`
+	Bank      string `json:"bank"`
+	IBAN      string `json:"iban"`
+}
+
+func (s *Server) paymentInstructions(o domain.Order) *paymentInstructionsResponse {
+	if o.PaymentStatus != domain.PaymentUnpaid {
+		return nil
+	}
+	switch o.PaymentMethod {
+	case domain.PayBankTransfer:
+		pi := &paymentInstructionsResponse{
+			Method: o.PaymentMethod, AmountMinor: o.TotalMinor, Currency: o.Currency,
+			Reference: domain.TransferReference(o.ID),
+		}
+		if s.bank.Configured() {
+			pi.Bank = &bankDetailsResponse{Recipient: s.bank.Recipient, Bank: s.bank.Bank, IBAN: s.bank.IBAN}
+		}
+		return pi
+	case domain.PayCashOnDelivery:
+		return &paymentInstructionsResponse{Method: o.PaymentMethod, AmountMinor: o.TotalMinor, Currency: o.Currency}
+	}
+	return nil
 }
 
 func toOrderResponse(o domain.Order) orderResponse {
@@ -129,7 +173,7 @@ func toOrderResponse(o domain.Order) orderResponse {
 		PromoDiscountMinor:  o.Totals.PromoDiscountMinor,
 		PromoCode:           o.PromoCode,
 		TotalMinor:          o.TotalMinor,
-		PaymentMethod: o.PaymentMethod, PaymentStatus: o.PaymentStatus,
+		PaymentMethod:       o.PaymentMethod, PaymentStatus: o.PaymentStatus,
 		DeliveryNote: o.DeliveryNote, LeaveWithNeighbour: o.LeaveWithNeighbour,
 	}
 	if o.ShipTo != nil {
@@ -240,11 +284,13 @@ func (s *Server) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 	// failed.
 	orderURL := fmt.Sprintf("%s%s/orders/%d", s.publicURL, localePathPrefix(order.Locale), order.ID)
 	if err := s.mailer.Send(r.Context(),
-		mail.OrderConfirmation(order.Locale, user.Email, order, orderURL)); err != nil {
+		mail.OrderConfirmation(order.Locale, user.Email, order, orderURL, s.bank)); err != nil {
 		s.log.Error("sending order confirmation", "order", order.ID, "error", err)
 	}
 
-	s.respondJSON(w, http.StatusCreated, toOrderResponse(order))
+	resp := toOrderResponse(order)
+	resp.PaymentInstructions = s.paymentInstructions(order)
+	s.respondJSON(w, http.StatusCreated, resp)
 }
 
 // GET /orders/{id} — the confirmation page's read. Owner or admin.
@@ -279,7 +325,9 @@ func (s *Server) handleGetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.respondJSON(w, http.StatusOK, toOrderResponse(order))
+	resp := toOrderResponse(order)
+	resp.PaymentInstructions = s.paymentInstructions(order)
+	s.respondJSON(w, http.StatusOK, resp)
 }
 
 // A2: what the reorder merge did, line by line. `issue` is a CODE the

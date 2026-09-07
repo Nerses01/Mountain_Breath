@@ -3,8 +3,10 @@ package api_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/Nerses01/Mountain_Breath/backend/internal/api"
 	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
 )
 
@@ -14,7 +16,7 @@ const validCheckoutBody = `{
 		"phone": "+374 91 000000", "street": "14 Abovyan St, apt 6",
 		"city": "Yerevan", "postal_code": "0009", "country": "AM"
 	},
-	"payment_method": "card",
+	"payment_method": "bank_transfer",
 	"delivery_note": "Ring twice",
 	"leave_with_neighbour": true
 }`
@@ -31,16 +33,72 @@ func TestCheckout(t *testing.T) {
 		fake := newFakeStore()
 		fake.cart = cartWithOneItem()
 		cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleCustomer})
+		mailer := &fakeMailer{}
+		bank := domain.BankDetails{Recipient: "Mountain Breath", Bank: "Ameriabank", IBAN: "AM00 0000 0000 0000 0000"}
 
-		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/orders", validCheckoutBody, cookie)
+		srv := newTestServerOpts(fake, api.Options{Mailer: mailer, BankDetails: bank})
+		rec := doRequest(srv, http.MethodPost, "/api/v1/orders", validCheckoutBody, cookie)
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("status = %d, want 201 (%s)", rec.Code, rec.Body.String())
 		}
 
 		in := fake.lastCheckout
-		if in.Address.City != "Yerevan" || in.PaymentMethod != domain.PayCard ||
+		if in.Address.City != "Yerevan" || in.PaymentMethod != domain.PayBankTransfer ||
 			in.DeliveryNote != "Ring twice" || !in.LeaveWithNeighbour {
 			t.Errorf("checkout input mangled in transit: %+v", in)
+		}
+
+		// Decision #110: the answer and the confirmation mail both say how
+		// to pay, from the same domain pieces — the purpose line MB-<id>
+		// and the configured account.
+		var got struct {
+			PaymentInstructions struct {
+				Method    string `json:"method"`
+				Reference string `json:"reference"`
+				Bank      struct {
+					IBAN string `json:"iban"`
+				} `json:"bank"`
+			} `json:"payment_instructions"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		pi := got.PaymentInstructions
+		if pi.Method != domain.PayBankTransfer || pi.Reference != "MB-1" || pi.Bank.IBAN != bank.IBAN {
+			t.Errorf("payment_instructions = %+v", pi)
+		}
+		if len(mailer.sent) != 1 || !strings.Contains(mailer.sent[0].Text, "MB-1") ||
+			!strings.Contains(mailer.sent[0].Text, bank.IBAN) {
+			t.Errorf("confirmation mail lacks the how-to-pay: %+v", mailer.sent)
+		}
+	})
+
+	// Decision #107 froze card acquiring. The page no longer offers card, and
+	// the API refuses it too — a request built by hand must not create a
+	// card order nobody can take money for. Hiding a button is not a rule.
+	t.Run("card is refused while payments are frozen", func(t *testing.T) {
+		fake := newFakeStore()
+		fake.cart = cartWithOneItem()
+		cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleCustomer})
+
+		body := strings.Replace(validCheckoutBody, `"bank_transfer"`, `"card"`, 1)
+		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/orders", body, cookie)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want 400 (%s)", rec.Code, rec.Body.String())
+		}
+		var envelope struct {
+			Error struct {
+				Fields map[string]string `json:"fields"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+			t.Fatal(err)
+		}
+		if envelope.Error.Fields["payment_method"] != domain.ValidationInvalidPaymentMethod {
+			t.Errorf("fields = %v, want payment_method: invalid_payment_method", envelope.Error.Fields)
+		}
+		if fake.lastCheckout.PaymentMethod != "" {
+			t.Error("the store was reached with a refused method")
 		}
 	})
 
@@ -89,7 +147,7 @@ func TestCheckout(t *testing.T) {
 		fake.cart = cartWithOneItem()
 		cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleCustomer})
 
-		body := `{"address": {"first_name": "A"}, "payment_method": "card"}`
+		body := `{"address": {"first_name": "A"}, "payment_method": "bank_transfer"}`
 		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/orders", body, cookie)
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400 (%s)", rec.Code, rec.Body.String())
@@ -131,7 +189,7 @@ func TestCheckout(t *testing.T) {
 				"phone": "+374 91 000000", "street": "14 Abovyan St",
 				"city": "Yerevan", "postal_code": "0009", "country": "AM"
 			},
-			"payment_method": "card",
+			"payment_method": "bank_transfer",
 			"total_minor": 1
 		}`
 		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/orders", body, cookie)
@@ -156,9 +214,10 @@ func TestCheckout(t *testing.T) {
 			},
 			"payment_method": "cash_on_delivery"
 		}`
-		// No ?currency= and no cookie: the request resolves to USD, and the
-		// design's own words apply — "Cash: on delivery, AMD only".
-		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/orders", body, cookie)
+		// Asked for in dollars explicitly — dram is the default since
+		// decision #110 — and the design's own words apply: "Cash: on
+		// delivery, AMD only".
+		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/orders?currency=USD", body, cookie)
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400 (%s)", rec.Code, rec.Body.String())
 		}
@@ -195,7 +254,49 @@ func TestGetOrder(t *testing.T) {
 		},
 		PaymentMethod: domain.PayCard, PaymentStatus: domain.PaymentUnpaid,
 		ShipTo: &domain.Address{FirstName: "Anahit", Street: "14 Abovyan St", City: "Yerevan"},
+	}, {
+		ID: 13, UserID: 1, Status: domain.OrderPending, Currency: domain.CurrencyAMD, TotalMinor: 6400,
+		PaymentMethod: domain.PayBankTransfer, PaymentStatus: domain.PaymentUnpaid,
+	}, {
+		ID: 14, UserID: 1, Status: domain.OrderPending, Currency: domain.CurrencyAMD, TotalMinor: 6400,
+		PaymentMethod: domain.PayCashOnDelivery, PaymentStatus: domain.PaymentUnpaid,
+	}, {
+		ID: 15, UserID: 1, Status: domain.OrderDelivered, Currency: domain.CurrencyAMD, TotalMinor: 6400,
+		PaymentMethod: domain.PayBankTransfer, PaymentStatus: domain.PaymentPaid,
 	}}
+
+	// Decision #110: how to pay rides on the customer's read while unpaid —
+	// and only then. No bank configured on this server: the purpose line
+	// still comes, the account does not.
+	t.Run("how to pay rides on the read while unpaid", func(t *testing.T) {
+		cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleCustomer})
+		read := func(id string) map[string]any {
+			t.Helper()
+			rec := doRequest(newTestServer(fake), http.MethodGet, "/api/v1/orders/"+id, "", cookie)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("GET %s: status = %d (%s)", id, rec.Code, rec.Body.String())
+			}
+			var got map[string]any
+			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+				t.Fatal(err)
+			}
+			return got
+		}
+		transfer, _ := read("13")["payment_instructions"].(map[string]any)
+		if transfer["reference"] != "MB-13" || transfer["bank"] != nil || transfer["amount_minor"] != float64(6400) {
+			t.Errorf("transfer instructions = %v", transfer)
+		}
+		cash, _ := read("14")["payment_instructions"].(map[string]any)
+		if cash["method"] != domain.PayCashOnDelivery || cash["currency"] != "AMD" || cash["reference"] != nil {
+			t.Errorf("cash instructions = %v", cash)
+		}
+		if _, present := read("15")["payment_instructions"]; present {
+			t.Error("a paid order still carries instructions")
+		}
+		if _, present := read("12")["payment_instructions"]; present {
+			t.Error("a historic card order carries instructions nobody can follow")
+		}
+	})
 
 	t.Run("the owner sees the full breakdown", func(t *testing.T) {
 		cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleCustomer})

@@ -538,14 +538,13 @@ func (s *Store) UpdateOrderStatus(ctx context.Context, orderID int64, to string)
 		return domain.Order{}, fmt.Errorf("%w: %s → %s", domain.ErrInvalidTransition, o.Status, to)
 	}
 
-	if err := applyOrderStatusTx(ctx, tx, orderID, to); err != nil {
+	if err := applyOrderStatusTx(ctx, tx, &o, to); err != nil {
 		return domain.Order{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return domain.Order{}, fmt.Errorf("committing status change: %w", err)
 	}
-	o.Status = to
 	return o, nil
 }
 
@@ -553,10 +552,13 @@ func (s *Store) UpdateOrderStatus(ctx context.Context, orderID int64, to string)
 // admin's UpdateOrderStatus and the customer's CancelOrderByCustomer (F2)
 // so the two doors can never drift: whoever opened the transaction has
 // already locked the row and decided the transition is allowed; this
-// applies it and its side effects, and the caller commits.
-func applyOrderStatusTx(ctx context.Context, tx pgx.Tx, orderID int64, to string) error {
+// applies it and its side effects, and the caller commits. It takes the
+// locked row by pointer and updates it as it writes, so the caller returns
+// exactly what the database now holds — status AND, for a cash delivery,
+// payment — without a second read.
+func applyOrderStatusTx(ctx context.Context, tx pgx.Tx, o *domain.Order, to string) error {
 	if _, err := tx.Exec(ctx,
-		`UPDATE orders SET status = $1 WHERE id = $2`, to, orderID); err != nil {
+		`UPDATE orders SET status = $1 WHERE id = $2`, to, o.ID); err != nil {
 		return fmt.Errorf("updating status: %w", err)
 	}
 
@@ -565,7 +567,7 @@ func applyOrderStatusTx(ctx context.Context, tx pgx.Tx, orderID int64, to string
 	// without the state change, nor the state change without its history.
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO order_status_events (order_id, status)
-		VALUES ($1, $2)`, orderID, to); err != nil {
+		VALUES ($1, $2)`, o.ID, to); err != nil {
 		return fmt.Errorf("recording status event: %w", err)
 	}
 
@@ -576,7 +578,7 @@ func applyOrderStatusTx(ctx context.Context, tx pgx.Tx, orderID int64, to string
 			SET stock_qty = v.stock_qty + oi.qty
 			FROM order_items oi
 			WHERE oi.order_id = $1 AND v.id = oi.variant_id`,
-			orderID); err != nil {
+			o.ID); err != nil {
 			return fmt.Errorf("restoring stock: %w", err)
 		}
 		// ...and the promo code, the same way: cancelling undoes the order's
@@ -586,10 +588,28 @@ func applyOrderStatusTx(ctx context.Context, tx pgx.Tx, orderID int64, to string
 		// global cap — is released. No-op for promo-less orders.
 		if _, err := tx.Exec(ctx, `
 			DELETE FROM promo_redemptions WHERE order_id = $1`,
-			orderID); err != nil {
+			o.ID); err != nil {
 			return fmt.Errorf("releasing promo redemption: %w", err)
 		}
 	}
+
+	// Decision #110: cash settles on delivery. The courier's hand is the
+	// payment, so the money fact flips in the same transaction as the
+	// parcel fact — no second admin click, no window in which a delivered
+	// cash order reads "payment pending". The domain owns the rule
+	// (PaymentSettlesOnDelivery); the status guard means an order the
+	// admin already marked paid is left alone, and a transfer is never
+	// assumed to have cleared.
+	if to == domain.OrderDelivered && domain.PaymentSettlesOnDelivery(o.PaymentMethod) &&
+		o.PaymentStatus == domain.PaymentUnpaid {
+		if _, err := tx.Exec(ctx,
+			`UPDATE orders SET payment_status = $1 WHERE id = $2`, domain.PaymentPaid, o.ID); err != nil {
+			return fmt.Errorf("settling cash on delivery: %w", err)
+		}
+		o.PaymentStatus = domain.PaymentPaid
+	}
+
+	o.Status = to
 	return nil
 }
 
@@ -628,14 +648,13 @@ func (s *Store) CancelOrderByCustomer(ctx context.Context, userID, orderID int64
 		return domain.Order{}, domain.ErrTooLateToCancel
 	}
 
-	if err := applyOrderStatusTx(ctx, tx, orderID, domain.OrderCancelled); err != nil {
+	if err := applyOrderStatusTx(ctx, tx, &o, domain.OrderCancelled); err != nil {
 		return domain.Order{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return domain.Order{}, fmt.Errorf("committing cancel: %w", err)
 	}
-	o.Status = domain.OrderCancelled
 	return o, nil
 }
 

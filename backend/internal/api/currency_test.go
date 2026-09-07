@@ -37,11 +37,11 @@ func TestCurrencyNegotiation(t *testing.T) {
 		want  domain.Currency
 	}{
 		{
-			name: "defaults to the base currency when nothing is offered",
+			name: "defaults to the default market when nothing is offered (dram since #110; the BASE currency stays USD)",
 			build: func() *http.Request {
 				return httptest.NewRequest(http.MethodGet, path, nil)
 			},
-			want: domain.CurrencyUSD,
+			want: domain.DefaultCurrency,
 		},
 		{
 			name: "query parameter wins",
@@ -101,14 +101,14 @@ func TestCurrencyNegotiation(t *testing.T) {
 			build: func() *http.Request {
 				return httptest.NewRequest(http.MethodGet, path+"?lang=ru", nil)
 			},
-			want: domain.CurrencyUSD,
+			want: domain.DefaultCurrency,
 		},
 		{
 			name: "an unknown code falls back instead of 400ing",
 			build: func() *http.Request {
 				return httptest.NewRequest(http.MethodGet, path+"?currency=EUR", nil)
 			},
-			want: domain.CurrencyUSD,
+			want: domain.DefaultCurrency,
 		},
 		{
 			// The value never reaches SQL as text — ParseCurrency is the only
@@ -119,7 +119,7 @@ func TestCurrencyNegotiation(t *testing.T) {
 				return httptest.NewRequest(http.MethodGet,
 					path+"?currency=USD%27%3B%20DROP%20TABLE%20variant_prices%3B%20--", nil)
 			},
-			want: domain.CurrencyUSD,
+			want: domain.DefaultCurrency,
 		},
 		{
 			name: "a garbage cookie falls through to the language guess",

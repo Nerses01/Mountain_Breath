@@ -3448,6 +3448,9 @@
                   "        pm.expect(order.ship_to.city).to.eql(\"Yerevan\");",
                   "        pm.expect(order.payment_method).to.eql(\"bank_transfer\");",
                   "        pm.expect(order.payment_status).to.eql(\"unpaid\");",
+                  "        // Decision #110: how to pay rides on the customer's own reads while unpaid",
+                  "        pm.expect(order.payment_instructions.method).to.eql(\"bank_transfer\");",
+                  "        pm.expect(order.payment_instructions.reference).to.eql(\"MB-\" + order.id);",
                   "    });",
                   "}"
                 ]
@@ -4225,7 +4228,7 @@
             "description": "Every gap in ONE response, keyed by the JSON path the form posts (`address.postal_code`) so the React form attaches each message to its input — the same convention as `variants[0].sku` since Phase 6.",
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"address\": {\"first_name\": \"A\"},\n    \"payment_method\": \"card\"\n}",
+              "raw": "{\n    \"address\": {\"first_name\": \"A\"},\n    \"payment_method\": \"bank_transfer\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4246,6 +4249,53 @@
                   "    const fields = pm.response.json().error.fields;",
                   "    pm.expect(fields).to.have.property(\"address.last_name\");",
                   "    pm.expect(fields).to.have.property(\"address.street\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Card is refused while payments are frozen (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiV1}}/orders",
+              "host": [
+                "{{apiV1}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "description": "Decisions #107/#109: card acquiring is frozen, so `card` is a value orders may CARRY (historic ones do) but not one a new order may CHOOSE. The API refuses it like any unknown method — hiding the option in the page is not the rule, this is. Thaw puts `card` back into `domain.OfferedPaymentMethods` and this request starts answering 201.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"address\": {\n        \"first_name\": \"Anahit\", \"last_name\": \"Sargsyan\",\n        \"phone\": \"+374 91 000000\", \"street\": \"14 Abovyan St, apt 6\",\n        \"city\": \"Yerevan\", \"postal_code\": \"0009\", \"country\": \"AM\"\n    },\n    \"payment_method\": \"card\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test(\"card is not an offered method\", () => {",
+                  "    pm.expect(pm.response.json().error.fields[\"payment_method\"]).to.eql(\"invalid_payment_method\");",
                   "});"
                 ]
               }

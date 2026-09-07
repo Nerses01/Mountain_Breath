@@ -54,13 +54,18 @@ func fieldErrors(t *testing.T, body []byte) map[string]string {
 	return envelope.Error.Fields
 }
 
+// Every request in this file shops in DOLLARS explicitly (?currency=USD):
+// the fixtures' figures are dollar figures ($14.00, a $30 floor), and dram
+// has been the default market since decision #110.
 func TestCheckoutPreview(t *testing.T) {
 	t.Run("first order: base waived, no bar, no discounts", func(t *testing.T) {
 		fake := newFakeStore()
 		fake.cart = cartWithOneItem() // $14.00 / 6,700 ֏
 		cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleCustomer})
 
-		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/checkout/preview", "", cookie)
+		// The figures below are the dollar ones, so the request shops in
+		// dollars — explicitly, since decision #110 made dram the default.
+		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/checkout/preview?currency=USD", "", cookie)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d (%s)", rec.Code, rec.Body.String())
 		}
@@ -90,7 +95,7 @@ func TestCheckoutPreview(t *testing.T) {
 		fake.upsell = &domain.Upsell{Slug: "bee-pollen-granules", Name: "Bee Pollen Granules", PriceMinor: 1600}
 		cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleCustomer})
 
-		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/checkout/preview", "", cookie)
+		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/checkout/preview?currency=USD", "", cookie)
 		p := decodePreview(t, rec.Body.Bytes())
 
 		if p.MemberDiscountMinor != 112 { // 8% of $14.00
@@ -111,7 +116,7 @@ func TestCheckoutPreview(t *testing.T) {
 	t.Run("empty cart previews as zeros, not an error", func(t *testing.T) {
 		fake := newFakeStore()
 		cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleCustomer})
-		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/checkout/preview", "", cookie)
+		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/checkout/preview?currency=USD", "", cookie)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", rec.Code)
 		}
@@ -121,7 +126,7 @@ func TestCheckoutPreview(t *testing.T) {
 	})
 
 	t.Run("anonymous gets 401", func(t *testing.T) {
-		rec := doRequest(newTestServer(newFakeStore()), http.MethodPost, "/api/v1/checkout/preview", "", nil)
+		rec := doRequest(newTestServer(newFakeStore()), http.MethodPost, "/api/v1/checkout/preview?currency=USD", "", nil)
 		if rec.Code != http.StatusUnauthorized {
 			t.Errorf("status = %d, want 401", rec.Code)
 		}
@@ -140,7 +145,7 @@ func TestApplyPromo(t *testing.T) {
 
 		// Lowercase with whitespace on purpose: normalization is part of the
 		// contract, not a client courtesy.
-		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/cart/promo",
+		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/cart/promo?currency=USD",
 			`{"code": "  honey10 "}`, cookie)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d (%s)", rec.Code, rec.Body.String())
@@ -163,7 +168,7 @@ func TestApplyPromo(t *testing.T) {
 		fake.cart = cartWithOneItem()
 		cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleCustomer})
 
-		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/cart/promo",
+		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/cart/promo?currency=USD",
 			`{"code": "NOPE"}`, cookie)
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", rec.Code)
@@ -184,7 +189,9 @@ func TestApplyPromo(t *testing.T) {
 		fake.promos = map[string]domain.Promo{"HONEY10": code}
 		cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleCustomer})
 
-		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/cart/promo",
+		// The floor is a dollar rule, so the request shops in dollars —
+		// explicitly, since decision #110 made dram the default.
+		rec := doRequest(newTestServer(fake), http.MethodPost, "/api/v1/cart/promo?currency=USD",
 			`{"code": "HONEY10"}`, cookie)
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", rec.Code)
@@ -204,7 +211,7 @@ func TestApplyPromo(t *testing.T) {
 		fake.cartPromo = &honey10
 		cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleCustomer})
 
-		rec := doRequest(newTestServer(fake), http.MethodDelete, "/api/v1/cart/promo", "", cookie)
+		rec := doRequest(newTestServer(fake), http.MethodDelete, "/api/v1/cart/promo?currency=USD", "", cookie)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d (%s)", rec.Code, rec.Body.String())
 		}

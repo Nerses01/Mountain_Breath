@@ -73,11 +73,14 @@ function SwitchToAMD() {
 }
 
 describe('catalog requests carry the active currency', () => {
-  it('defaults to dollars with nothing stored', async () => {
+  it('defaults to drams with nothing stored', async () => {
+    // Decision #110: the shop sells to Armenia on transfer and cash, and
+    // cash is AMD-only, so a first visit lands in the market where every
+    // payment method works.
     renderWithCurrency(<Probe useHook={() => useProducts({ page: 1 })} />)
 
     await waitFor(() => expect(urls.length).toBeGreaterThan(0))
-    expect(urls[0]).toContain('currency=USD')
+    expect(urls[0]).toContain('currency=AMD')
   })
 
   it('reads a stored choice before the first request goes out', async () => {
@@ -111,6 +114,8 @@ describe('catalog requests carry the active currency', () => {
 
 describe('switching currency', () => {
   it('refetches instead of serving the cached other-market prices', async () => {
+    // Start in dollars so the switch below actually changes market.
+    localStorage.setItem('mb_currency', 'USD')
     renderWithCurrency(
       <>
         <SwitchToAMD />

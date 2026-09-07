@@ -157,6 +157,20 @@ recommendation, phases P0–P4). The lines below stay until each ships.
       recorded fact, as status transitions got (log 08-18)?
 - [ ] Refunds on the same path; `refunded` finally reachable by flow.
 - [ ] Checkout's decorative card fields become the provider redirect.
+- [x] **While frozen, checkout offers only bank transfer and cash on
+      delivery** — decision #109, 2026-09-07: `card` refused by the API
+      (`invalid_payment_method`), gone from the page with its stub fields,
+      still rendered on historic orders; thaw = one list entry and one
+      `PaymentCard` back.
+- [x] **Cash and bank transfer as complete flows** — decision #110,
+      2026-09-07: dram is the first-visit currency (cash is AMD-only, so
+      every offered method works on arrival); the order page and the
+      confirmation mail say how to pay (the amount to have ready; the
+      account and the purpose line `MB-<id>` from `MB_BANK_*`); a cash
+      order marked delivered settles to paid in the same transaction.
+- [ ] **Operator hands**: `MB_BANK_RECIPIENT`, `MB_BANK_NAME` and
+      `MB_BANK_IBAN` into `deploy/.env` on the laptop, then `up -d api` —
+      until then the shop promises the account details by email.
 
 **Paperwork (the family's, not code) → [PAPERWORK_ARMENIA.md](PAPERWORK_ARMENIA.md)**
 (IE registration, tax regime in 20 days, FSIB operator registration,

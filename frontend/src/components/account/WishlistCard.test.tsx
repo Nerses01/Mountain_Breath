@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { CurrencyProvider } from '../../lib/CurrencyProvider'
 import { WishlistCard } from './WishlistCard'
 import type { WishlistEntry } from '../../api/types'
 
@@ -57,11 +58,17 @@ afterEach(() => {
 })
 
 function renderCard(e: WishlistEntry, onAdd?: React.ComponentProps<typeof WishlistCard>['onAdd']) {
+  // The entry is a DOLLAR read (`currency: 'USD'`), so the card renders
+  // inside a dollar market — explicitly, since decision #110 made dram
+  // the default a bare component would otherwise fall back to.
+  localStorage.setItem('mb_currency', 'USD')
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <MemoryRouter>
       <QueryClientProvider client={qc}>
-        <WishlistCard entry={e} onAdd={onAdd} />
+        <CurrencyProvider>
+          <WishlistCard entry={e} onAdd={onAdd} />
+        </CurrencyProvider>
       </QueryClientProvider>
     </MemoryRouter>,
   )
