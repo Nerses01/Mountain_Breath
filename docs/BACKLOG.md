@@ -217,6 +217,10 @@ reason wrong before it gets built.
       `types.ts`; the Postman collection is the seed of truth (P11).
 - [ ] **Prerender/SSR for meta** — now unblocked; JS-managed tags reach
       only rendering crawlers (E10).
+- [ ] **Brand image, the other two surfaces**: `og:image` (a 1200×630
+      card; product pages could use the product photo) and an
+      `Organization` JSON-LD with `logo` on the home page — the icon set
+      (decision #108) covers tabs, home screens and result rows only.
 - [ ] **DB-backed pages/journal** — tripwire: the family needs to edit
       copy without a commit (#77); also repairs journal posts missing
       from the backend sitemap.

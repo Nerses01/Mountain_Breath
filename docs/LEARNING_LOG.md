@@ -17,6 +17,51 @@ Template for an entry:
 
 ---
 
+## 2026-09-07 — Detour: the site icon (decision #108)
+
+**Worked on:** the browser tab and Google's result rows still showed
+Vite's template bolt. Replaced it with the brand mark — honey square,
+Poppins ExtraBold "M" — as a generated icon set: `icon.svg`, a
+16/32/48 px `favicon.ico`, a full-bleed `apple-touch-icon.png`,
+192/512 PNGs behind a `manifest.webmanifest`, and `theme-color`. One
+source of truth (`frontend/scripts/icons.ts`), one generator that
+rasterises through Playwright's Chromium, and a Vitest contract that
+pins the committed files to the generator, to `index.html` and to the
+colour tokens. The two Vite template files are gone.
+**Learned:**
+- an icon file renders in an isolated context that loads nothing — no
+  webfont — so the letter has to be an outline. Measured the real
+  glyph by drawing it on a canvas at 1000 px and scanning pixel rows:
+  13 corners, a flat foot at the baseline, the notch at 64% of cap
+  height. The browser as a measuring instrument
+- `.ico` is a 6-byte header, 16-byte directory entries, then whole
+  PNGs (allowed since Vista); PNG keeps width/height at bytes 16 and
+  20, big-endian. `DataView` is the disciplined `reinterpret_cast`:
+  the endianness is an argument on every read, not a property of the
+  CPU the code happens to run on
+- Node 24 runs TypeScript directly by stripping types; the tsconfig's
+  `erasableSyntaxOnly` is the same contract seen from the other side
+- the browser rules that shaped `index.html`: ICO first with
+  `sizes="32x32"`, SVG second (Chrome/Firefox take the SVG, Safari
+  cannot and takes the ICO); iOS composites transparency over black,
+  so its icon is full bleed; nginx types by extension and this image's
+  table has no `.webmanifest`
+- favicons are cached harder than anything else a site serves: a
+  changed icon wants a new URL, and Google shows the new one only
+  after it re-crawls the home page — Search Console's "request
+  indexing" hurries it
+- two tooling traps: Node resolves a script's imports from the
+  script's own directory, not the cwd (a scratch script outside
+  `frontend/` cannot import Playwright); and under Vitest's jsdom
+  environment `import.meta.url` is an `http://` URL, so file paths in
+  tests hang off `process.cwd()`
+**Questions / to revisit:**
+- `og:image` and an `Organization` JSON-LD with `logo` — the two other
+  surfaces a brand image shows on (link previews, the knowledge
+  panel); backlog §5
+
+---
+
 ## 2026-09-07 — Backlog §3: the paperwork, and a freeze
 
 **Worked on:** no code. The legal half of P0 — what an Armenian seller
