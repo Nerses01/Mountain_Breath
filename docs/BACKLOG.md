@@ -132,8 +132,23 @@ placeholder. Photography gates most of it.
 
 ## 3. Real payments (was Era III F4)
 
+**❄ FROZEN 2026-09-07 (decision #107).** The shop runs on
+`bank_transfer` + `cash_on_delivery` with the admin's PATCH as the only
+write to `payment_status`. Card acquiring needs an individual
+entrepreneur (no Armenian provider contracts with a natural person —
+[PAPERWORK_ARMENIA.md](PAPERWORK_ARMENIA.md)), and whether to register
+one is the family's open decision. Thaw = that decision; P0 then resumes
+from the paperwork checklist, P1–P2 need no contract and could start
+earlier against the scripted bank.
+
+**Scoped 2026-09-04 → [PLAN_PAYMENTS.md](PLAN_PAYMENTS.md)** (comparison,
+recommendation, phases P0–P4). The lines below stay until each ships.
+
 - [ ] Research + pick: **Idram / Ameriabank vPOS** (the mock's ArCa
       hint) or Stripe if local rails disappoint; sandbox account.
+      *Research done 09-04: Stripe rejected (Armenia unsupported);
+      recommendation Ameriabank vPOS, Idram later as a second method —
+      the pick and the Ameria Business account are P0, the developer's.*
 - [ ] Integration as E6's stub anticipated: provider hosts card entry
       (no PANs touch the API), webhook flips `payment_status` through
       F2's write path (#91).
@@ -142,6 +157,23 @@ placeholder. Photography gates most of it.
       recorded fact, as status transitions got (log 08-18)?
 - [ ] Refunds on the same path; `refunded` finally reachable by flow.
 - [ ] Checkout's decorative card fields become the provider redirect.
+
+**Paperwork (the family's, not code) → [PAPERWORK_ARMENIA.md](PAPERWORK_ARMENIA.md)**
+(IE registration, tax regime in 20 days, FSIB operator registration,
+vPOS contract; costs, taxes, days). Code items it produces, all P2–P3:
+
+- [ ] **Fiscal e-receipt per paid order** through the SRC e-HDM web
+      service (card and cash orders need one; bank transfer does not);
+      receipt number stored on the order, sent with the confirmation.
+- [ ] **"Order with obligation to pay"** wording on the final checkout
+      button (consumer-law amendments in force since 2026-07-01), in
+      all three languages.
+- [ ] **Return/withdrawal policy + privacy notice pages** in Armenian
+      first; 14-day distance-sale withdrawal with the food exceptions
+      once verified; refunds only via the provider, never cash (vPOS
+      T&C §16).
+- [ ] **Order retention ≥ 3 years** with delivery proof fields (vPOS
+      T&C §10) — check the account-deletion anonymisation keeps them.
 
 **Done when:** a sandbox dram moves end to end and the order shows
 paid-by-card with no human flipping anything.

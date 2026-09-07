@@ -17,6 +17,46 @@ Template for an entry:
 
 ---
 
+## 2026-09-07 — Backlog §3: the paperwork, and a freeze
+
+**Worked on:** no code. The legal half of P0 — what an Armenian seller
+must do before a bank will sign an acquiring contract — researched
+from Armenian sources and written up as
+[PAPERWORK_ARMENIA.md](PAPERWORK_ARMENIA.md): individual entrepreneur
+vs LLC, the 12 steps with costs and days, the tax regimes (turnover tax
+at 7% for own production; the 0% micro regime probably closed to
+e-commerce since 2025), the recurring calendar, and the four code items
+the bank's terms and the July-2026 consumer law create. Then the
+question "can we skip all of it and sell as a natural person?" — yes
+for selling own honey, no for card payments — and the decision to
+**freeze §3**: the shop stays on bank transfer + cash until the family
+decides whether to register an IE (decision #107).
+**Learned:**
+- a payment integration's first dependency is a merchant contract, and
+  the contract's first dependency is a legal status — the code can be
+  finished against a scripted bank, but the sandbox itself needs the
+  business account, so P4 is the phase that really waits
+- honey from one's own hives is agricultural production: tax-exempt for
+  a natural person, 7% (not trade's 10%) under turnover tax for an IE,
+  and the distinction collapses the moment anything not self-produced
+  is sold — a product-catalog rule with a tax consequence
+- the storefront's two-facts model (`payment_method` chosen by the
+  customer, `payment_status` written only through one store method)
+  is what makes the freeze free: nothing is torn out, a provider is
+  added later behind the `PaymentProvider` seam
+- the checkout still defaults to `card`, a method nobody can collect
+  on while frozen — a state to settle on thaw or before (see the
+  freeze note in BACKLOG §3)
+**Questions / to revisit:**
+- IE or natural person — the family's; the accountant questions are
+  listed in PAPERWORK §6
+- does "own honey through own website" count as the micro regime's
+  e-commerce exclusion? (the 0% vs 7% question)
+- the July-2026 14-day withdrawal right's food exceptions — needed
+  before the return policy is written
+
+---
+
 ## 2026-09-04 — Backlog §1 closes for real: the operator half
 
 **Worked on:** the operator checklist — backups + first restore drill,
