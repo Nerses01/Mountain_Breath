@@ -278,6 +278,7 @@ export const hy = {
       bankIntro: 'Փոխանցեք {{amount}}՝',
       recipient: 'Ստացող',
       bank: 'Բանկ',
+      account: 'Հաշիվ',
       reference: 'Նպատակ',
       bankShips: 'Կառաքենք փոխանցումը ստանալուն պես։',
       bankLater: 'Վճարեք {{amount}} բանկային փոխանցումով — հաշվի տվյալները շուտով կուղարկենք էլ. փոստով։',

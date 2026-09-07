@@ -149,8 +149,8 @@ func TestPaymentAfterCheckout(t *testing.T) {
 	if (domain.BankDetails{}).Configured() {
 		t.Error("zero bank details count as configured")
 	}
-	if !(domain.BankDetails{IBAN: "AM00"}).Configured() {
-		t.Error("an IBAN is the one thing that makes bank details usable")
+	if !(domain.BankDetails{Account: "1570001234567890"}).Configured() {
+		t.Error("an account number is the one thing that makes bank details usable")
 	}
 }
 

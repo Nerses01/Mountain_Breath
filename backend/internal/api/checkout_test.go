@@ -34,7 +34,7 @@ func TestCheckout(t *testing.T) {
 		fake.cart = cartWithOneItem()
 		cookie := loginAs(fake, domain.User{ID: 1, Role: domain.RoleCustomer})
 		mailer := &fakeMailer{}
-		bank := domain.BankDetails{Recipient: "Mountain Breath", Bank: "Ameriabank", IBAN: "AM00 0000 0000 0000 0000"}
+		bank := domain.BankDetails{Recipient: "Mountain Breath", Bank: "Ameriabank", Account: "1570001234567890"}
 
 		srv := newTestServerOpts(fake, api.Options{Mailer: mailer, BankDetails: bank})
 		rec := doRequest(srv, http.MethodPost, "/api/v1/orders", validCheckoutBody, cookie)
@@ -56,7 +56,7 @@ func TestCheckout(t *testing.T) {
 				Method    string `json:"method"`
 				Reference string `json:"reference"`
 				Bank      struct {
-					IBAN string `json:"iban"`
+					Account string `json:"account"`
 				} `json:"bank"`
 			} `json:"payment_instructions"`
 		}
@@ -64,11 +64,11 @@ func TestCheckout(t *testing.T) {
 			t.Fatal(err)
 		}
 		pi := got.PaymentInstructions
-		if pi.Method != domain.PayBankTransfer || pi.Reference != "MB-1" || pi.Bank.IBAN != bank.IBAN {
+		if pi.Method != domain.PayBankTransfer || pi.Reference != "MB-1" || pi.Bank.Account != bank.Account {
 			t.Errorf("payment_instructions = %+v", pi)
 		}
 		if len(mailer.sent) != 1 || !strings.Contains(mailer.sent[0].Text, "MB-1") ||
-			!strings.Contains(mailer.sent[0].Text, bank.IBAN) {
+			!strings.Contains(mailer.sent[0].Text, bank.Account) {
 			t.Errorf("confirmation mail lacks the how-to-pay: %+v", mailer.sent)
 		}
 	})

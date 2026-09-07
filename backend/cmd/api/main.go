@@ -126,7 +126,7 @@ func run(logger *slog.Logger) error {
 				GoogleClientID:     cfg.GoogleClientID,
 				GoogleClientSecret: cfg.GoogleClientSecret,
 				BankDetails: domain.BankDetails{
-					Recipient: cfg.BankRecipient, Bank: cfg.BankName, IBAN: cfg.BankIBAN,
+					Recipient: cfg.BankRecipient, Bank: cfg.BankName, Account: cfg.BankAccount,
 				},
 			}, store.NewPoolCollector(pool)).Routes(),
 		// Never run an HTTP server without timeouts: a client that sends

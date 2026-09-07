@@ -128,7 +128,7 @@ type paymentInstructionsResponse struct {
 type bankDetailsResponse struct {
 	Recipient string `json:"recipient"`
 	Bank      string `json:"bank"`
-	IBAN      string `json:"iban"`
+	Account   string `json:"account"` // a local number here; an IBAN abroad
 }
 
 func (s *Server) paymentInstructions(o domain.Order) *paymentInstructionsResponse {
@@ -142,7 +142,7 @@ func (s *Server) paymentInstructions(o domain.Order) *paymentInstructionsRespons
 			Reference: domain.TransferReference(o.ID),
 		}
 		if s.bank.Configured() {
-			pi.Bank = &bankDetailsResponse{Recipient: s.bank.Recipient, Bank: s.bank.Bank, IBAN: s.bank.IBAN}
+			pi.Bank = &bankDetailsResponse{Recipient: s.bank.Recipient, Bank: s.bank.Bank, Account: s.bank.Account}
 		}
 		return pi
 	case domain.PayCashOnDelivery:

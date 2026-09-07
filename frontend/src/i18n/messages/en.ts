@@ -341,6 +341,7 @@ export const en = {
       bankIntro: 'Transfer {{amount}} to:',
       recipient: 'Recipient',
       bank: 'Bank',
+      account: 'Account',
       reference: 'Purpose',
       bankShips: 'We ship as soon as it clears.',
       bankLater: 'Pay {{amount}} by bank transfer — we will email you the account details shortly.',
