@@ -94,6 +94,8 @@ describe('catalog requests carry the active locale', () => {
     renderHookAt('/ru/products/honey', () => useProduct('honey'))
 
     await waitFor(() => expect(urls.length).toBeGreaterThan(0))
-    expect(urls[0]).toBe('/api/v1/products/honey?lang=ru&currency=USD')
+    // The currency is the default market (dram since decision #110): a
+    // Russian reader is not assumed to shop in dollars.
+    expect(urls[0]).toBe('/api/v1/products/honey?lang=ru&currency=AMD')
   })
 })

@@ -17,6 +17,196 @@ Template for an entry:
 
 ---
 
+## 2026-09-07 — Cash and bank transfer as complete flows; dram becomes the default (decision #110)
+
+**Worked on:** "implement cash" turned out to be three gaps, found by
+mapping what cash on delivery already was. (1) The first-visit currency
+was USD, and cash is AMD-only by the design's rule, so a new visitor saw
+the Cash option greyed out — "not implemented" to anyone looking. Both
+defaults flip to dram: `domain.DefaultCurrency` and the frontend's
+`DEFAULT_CURRENCY`, the rule untouched. (2) After checkout nothing said
+HOW to pay, for either method. The API now composes
+`payment_instructions` on the customer's own order reads while unpaid —
+amount and currency; for a transfer the purpose line `MB-<id>`
+(`domain.TransferReference`) and the family's account from `MB_BANK_*`
+(`domain.BankDetails`, zero value = "details follow by email") — and the
+confirmation mail's new paragraph is built from the same pieces, in three
+languages. A `PaymentInstructions` panel renders it on the order page.
+(3) A cash order marked delivered stayed "payment pending" until a second
+admin click. `domain.PaymentSettlesOnDelivery(cash)` now flips
+`payment_status` inside `applyOrderStatusTx`, which takes the locked row
+by pointer and updates it as it writes. Tests at every layer: domain
+rules, the handler (instructions present/absent per method and status,
+the mail's text), the mail builder, the store's delivery transaction
+(cash settles, a transfer never does), the panel. The Postman checkout
+script asserts the instructions.
+
+**The fallout of a default:** sixteen tests across both sides had
+encoded "dollars unless said otherwise" without saying so. Request-URL
+tests now expect dram; component tests whose fixtures are dollar reads
+render inside a dollar market (`CurrencyProvider` + a stored choice) and
+say why; handler tests whose figures are dollar figures ask for dollars
+in the URL. One new test pins the point: cash is offered in the default
+market.
+
+**Learned:**
+- *A greyed-out option reads as a missing feature* — the rule was right
+  (a courier collects dram), the DEFAULT was wrong: it put every new
+  visitor in the one market where the rule bites. Defaults are product
+  decisions dressed as constants.
+- *Compose once, render twice* — the page and the mail must tell one
+  story about money, so the instructions are composed server-side from
+  domain functions and both consumers read the same output. The same
+  reasoning as F2's data export reusing the screens' reads.
+- *Deployment data is env, not source* — the family's IBAN is like
+  `MB_MAIL_FROM`: real, not secret, and different per deployment. And an
+  unset value gets an honest fallback sentence, never blank fields.
+- *A settlement rule belongs in the transaction that makes it true* —
+  cash is paid the moment it is delivered, so the money fact and the
+  parcel fact commit together, guarded by the current status. The
+  pointer-taking `applyOrderStatusTx` returns what the database now
+  holds without a second read — Go's `*T` doing what a C++ reference
+  parameter would.
+- *"Default" is a contract with a name* — tests that spelled the
+  fallback as `USD` broke; tests that spelled it `domain.DefaultCurrency`
+  did not. Assert the contract, not its current value.
+- *A fixture carries its market* — a `currency: 'USD'` fixture rendered
+  in a dram context is a lie the test tells itself; wrapping the render
+  in the market the fixture came from makes the assumption visible.
+
+**Questions / to revisit:**
+- Only the bank's IBAN is configured; a foreign customer paying in USD
+  would need SWIFT/BIC. Add `MB_BANK_SWIFT` when the first one asks.
+- The status mails (confirmed/shipped) do not repeat the account for an
+  unpaid transfer; if the family finds customers losing the first mail,
+  the confirmed mail can carry the same paragraph.
+- Operator step: `MB_BANK_*` into `deploy/.env` on the laptop, then
+  `up -d api` (BACKLOG §3).
+
+---
+
+## 2026-09-07 — §3 frozen, so the checkout stops offering what it cannot take (decision #109)
+
+**Worked on:** the one line #107 left open — the checkout still
+preselected `card`. The domain now has two lists: `PaymentMethods`
+(every value an order may carry, the CHECK constraint spelled in Go) and
+`OfferedPaymentMethods` (what a new order may choose: transfer and cash);
+`ValidatePayment` checks the second, so a hand-made request with `card`
+is a 400 like any unknown method. The page drops the third payment card
+and the decorative card-number stubs, preselects bank transfer, and the
+six locale keys the stub owned go with it in all three languages. A
+handler test pins the refusal; the checkout fixtures and the Postman 400
+example move to bank transfer. Historic card orders render everywhere
+they did.
+
+**Learned:**
+- *Valid-to-store and valid-to-choose are different sets* — one list
+  would have forced a choice between rejecting historic rows and offering
+  a method nobody can collect on. Two lists, the DB constraint untouched:
+  the vocabulary keeps the word, the menu drops it. The C++ shape: the
+  enum keeps its enumerator; a whitelist decides what is selectable.
+- *Refuse in the API, not just the UI* — hiding a button is not a rule;
+  a request built by hand still reaches the handler. The domain check is
+  the rule, the page merely agrees with it.
+- *Thaw cost is a design property* — one list entry and one JSX block.
+  Freezing a feature should be as cheap to undo as it was to do.
+- *A canvas departure gets its sentence* — the mock draws three payment
+  cards; rule #16 wants the reason where the departure happens, and #107
+  is the reason.
+
+**Questions / to revisit:**
+- `order:method.card` and `PayCard` stay for history; the dead-i18n sweep
+  in §5 must not remove them.
+- Should the admin's order list filter by method now that two are live?
+  Nothing has asked for it yet.
+
+---
+
+## 2026-09-07 — Detour: the site icon (decision #108)
+
+**Worked on:** the browser tab and Google's result rows still showed
+Vite's template bolt. Replaced it with the brand mark — honey square,
+Poppins ExtraBold "M" — as a generated icon set: `icon.svg`, a
+16/32/48 px `favicon.ico`, a full-bleed `apple-touch-icon.png`,
+192/512 PNGs behind a `manifest.webmanifest`, and `theme-color`. One
+source of truth (`frontend/scripts/icons.ts`), one generator that
+rasterises through Playwright's Chromium, and a Vitest contract that
+pins the committed files to the generator, to `index.html` and to the
+colour tokens. The two Vite template files are gone.
+**Learned:**
+- an icon file renders in an isolated context that loads nothing — no
+  webfont — so the letter has to be an outline. Measured the real
+  glyph by drawing it on a canvas at 1000 px and scanning pixel rows:
+  13 corners, a flat foot at the baseline, the notch at 64% of cap
+  height. The browser as a measuring instrument
+- `.ico` is a 6-byte header, 16-byte directory entries, then whole
+  PNGs (allowed since Vista); PNG keeps width/height at bytes 16 and
+  20, big-endian. `DataView` is the disciplined `reinterpret_cast`:
+  the endianness is an argument on every read, not a property of the
+  CPU the code happens to run on
+- Node 24 runs TypeScript directly by stripping types; the tsconfig's
+  `erasableSyntaxOnly` is the same contract seen from the other side
+- the browser rules that shaped `index.html`: ICO first with
+  `sizes="32x32"`, SVG second (Chrome/Firefox take the SVG, Safari
+  cannot and takes the ICO); iOS composites transparency over black,
+  so its icon is full bleed; nginx types by extension and this image's
+  table has no `.webmanifest`
+- favicons are cached harder than anything else a site serves: a
+  changed icon wants a new URL, and Google shows the new one only
+  after it re-crawls the home page — Search Console's "request
+  indexing" hurries it
+- two tooling traps: Node resolves a script's imports from the
+  script's own directory, not the cwd (a scratch script outside
+  `frontend/` cannot import Playwright); and under Vitest's jsdom
+  environment `import.meta.url` is an `http://` URL, so file paths in
+  tests hang off `process.cwd()`
+**Questions / to revisit:**
+- `og:image` and an `Organization` JSON-LD with `logo` — the two other
+  surfaces a brand image shows on (link previews, the knowledge
+  panel); backlog §5
+
+---
+
+## 2026-09-07 — Backlog §3: the paperwork, and a freeze
+
+**Worked on:** no code. The legal half of P0 — what an Armenian seller
+must do before a bank will sign an acquiring contract — researched
+from Armenian sources and written up as
+[PAPERWORK_ARMENIA.md](PAPERWORK_ARMENIA.md): individual entrepreneur
+vs LLC, the 12 steps with costs and days, the tax regimes (turnover tax
+at 7% for own production; the 0% micro regime probably closed to
+e-commerce since 2025), the recurring calendar, and the four code items
+the bank's terms and the July-2026 consumer law create. Then the
+question "can we skip all of it and sell as a natural person?" — yes
+for selling own honey, no for card payments — and the decision to
+**freeze §3**: the shop stays on bank transfer + cash until the family
+decides whether to register an IE (decision #107).
+**Learned:**
+- a payment integration's first dependency is a merchant contract, and
+  the contract's first dependency is a legal status — the code can be
+  finished against a scripted bank, but the sandbox itself needs the
+  business account, so P4 is the phase that really waits
+- honey from one's own hives is agricultural production: tax-exempt for
+  a natural person, 7% (not trade's 10%) under turnover tax for an IE,
+  and the distinction collapses the moment anything not self-produced
+  is sold — a product-catalog rule with a tax consequence
+- the storefront's two-facts model (`payment_method` chosen by the
+  customer, `payment_status` written only through one store method)
+  is what makes the freeze free: nothing is torn out, a provider is
+  added later behind the `PaymentProvider` seam
+- the checkout still defaults to `card`, a method nobody can collect
+  on while frozen — a state to settle on thaw or before (see the
+  freeze note in BACKLOG §3)
+**Questions / to revisit:**
+- IE or natural person — the family's; the accountant questions are
+  listed in PAPERWORK §6
+- does "own honey through own website" count as the micro regime's
+  e-commerce exclusion? (the 0% vs 7% question)
+- the July-2026 14-day withdrawal right's food exceptions — needed
+  before the return policy is written
+
+---
+
 ## 2026-09-04 — Backlog §1 closes for real: the operator half
 
 **Worked on:** the operator checklist — backups + first restore drill,

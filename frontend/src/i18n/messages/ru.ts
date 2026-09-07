@@ -243,17 +243,10 @@ export const ru = {
     },
     payment: {
       title: 'Оплата',
-      card: 'Карта',
-      cardBlurb: 'Visa, Mastercard, ArCa',
       bank: 'Банковский перевод',
       bankBlurb: 'Отправим после зачисления',
       cash: 'Наличные',
       cashBlurb: 'При получении, только в драмах',
-      cardNumber: 'Номер карты',
-      expiry: 'Срок действия',
-      cvc: 'CVC',
-      cardStubNote:
-        'Оплата картой онлайн скоро появится; пока заказ записывается, и семья подтверждает оплату с вами напрямую.',
     },
     summary: {
       label: 'Ваш заказ',
@@ -285,6 +278,15 @@ export const ru = {
     promo: 'Код {{code}}',
     includesVat: 'Включая НДС',
     allOrders: '← Все ваши заказы',
+    howToPay: {
+      cash: 'Приготовьте {{amount}} наличными для курьера — по возможности без сдачи.',
+      bankIntro: 'Переведите {{amount}} на:',
+      recipient: 'Получатель',
+      bank: 'Банк',
+      reference: 'Назначение',
+      bankShips: 'Отправим, как только деньги поступят.',
+      bankLater: 'Оплатите {{amount}} банковским переводом — реквизиты вышлем на почту в ближайшее время.',
+    },
     method: {
       card: 'Карта',
       bank_transfer: 'Банковский перевод',

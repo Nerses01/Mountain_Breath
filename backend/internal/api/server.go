@@ -264,6 +264,10 @@ type Options struct {
 	GoogleAuthURL     string
 	GoogleTokenURL    string
 	GoogleUserinfoURL string
+	// Decision #110: the family's account, for the how-to-pay on the
+	// customer's order reads and in the confirmation mail. The zero value
+	// means "details follow by email".
+	BankDetails domain.BankDetails
 }
 
 // Server holds the dependencies of the HTTP layer. Handlers are methods on it,
@@ -276,6 +280,7 @@ type Server struct {
 	metrics    *metrics
 	mailer     mail.Mailer
 	publicURL  string
+	bank       domain.BankDetails
 	google     googleOAuth
 	limiter    *rateLimiter
 }
@@ -300,6 +305,7 @@ func NewServer(log *slog.Logger, store Store, devMode bool, uploadsDir string,
 		metrics:    newMetrics(extraCollectors...),
 		mailer:     mailer,
 		publicURL:  publicURL,
+		bank:       opts.BankDetails,
 		google: googleOAuth{
 			clientID:     opts.GoogleClientID,
 			clientSecret: opts.GoogleClientSecret,

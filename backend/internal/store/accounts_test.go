@@ -172,7 +172,7 @@ func TestWishlist_ListsCardsNewestFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	items, err := s.ListWishlist(ctx, userID, domain.View{})
+	items, err := s.ListWishlist(ctx, userID, domain.View{Currency: domain.CurrencyUSD}) // the seed prices are dollars; dram is the default market since #110
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -96,8 +96,13 @@ test('a new customer can buy a product end to end', async ({ page }) => {
   // A2 gave order numbers their canvas display format (#MB-<id>).
   await expect(page.getByRole('heading', { name: /Order #MB-\d+/ })).toBeVisible()
   await expect(page.getByText('14 Abovyan St, apt 6')).toBeVisible()
-  await expect(page.getByText('Bank transfer')).toBeVisible()
+  // exact: the how-to-pay sentence below also says "bank transfer" (#110),
+  // and a substring match would find two elements.
+  await expect(page.getByText('Bank transfer', { exact: true })).toBeVisible()
   await expect(page.getByText('Payment pending')).toBeVisible()
+  // Decision #110: the page says how to pay. CI has no MB_BANK_* configured,
+  // so it is the honest fallback sentence, not blank account fields.
+  await expect(page.getByText(/by bank transfer/)).toBeVisible()
   // The breakdown balances on screen: subtotal + shipping = total, and the
   // "Includes VAT" line is display-only, contained in the subtotal.
   await expect(page.getByText('Includes VAT')).toBeVisible()

@@ -195,6 +195,10 @@ func TestListProducts_Filters(t *testing.T) {
 			f := tc.filter
 			f.Page, f.PerPage = 1, 20
 			f.Sort = domain.SortPriceAsc // stable, independent of sales_count
+			// The seed prices and the bounds in the table are dollar minor
+			// units, so the list is read in dollars — explicitly, since
+			// decision #110 made dram the default market.
+			f.Currency = domain.CurrencyUSD
 
 			got, total, err := s.ListProducts(ctx, f)
 			if err != nil {
@@ -448,7 +452,7 @@ func TestCatalogFacets_CountsRespectTheOtherFilters(t *testing.T) {
 	}
 
 	t.Run("unfiltered", func(t *testing.T) {
-		f, err := s.CatalogFacets(ctx, domain.ProductFilter{})
+		f, err := s.CatalogFacets(ctx, domain.ProductFilter{Currency: domain.CurrencyUSD})
 		if err != nil {
 			t.Fatalf("CatalogFacets: %v", err)
 		}
@@ -481,7 +485,7 @@ func TestCatalogFacets_CountsRespectTheOtherFilters(t *testing.T) {
 	})
 
 	t.Run("a benefit filter narrows the categories but not the benefits", func(t *testing.T) {
-		f, err := s.CatalogFacets(ctx, domain.ProductFilter{BenefitSlugs: []string{"skin"}})
+		f, err := s.CatalogFacets(ctx, domain.ProductFilter{Currency: domain.CurrencyUSD, BenefitSlugs: []string{"skin"}})
 		if err != nil {
 			t.Fatalf("CatalogFacets: %v", err)
 		}
@@ -513,7 +517,7 @@ func TestCatalogFacets_CountsRespectTheOtherFilters(t *testing.T) {
 	})
 
 	t.Run("a category filter narrows the benefits but not the categories", func(t *testing.T) {
-		f, err := s.CatalogFacets(ctx, domain.ProductFilter{CategorySlug: "honey"})
+		f, err := s.CatalogFacets(ctx, domain.ProductFilter{Currency: domain.CurrencyUSD, CategorySlug: "honey"})
 		if err != nil {
 			t.Fatalf("CatalogFacets: %v", err)
 		}
@@ -609,7 +613,7 @@ func TestCatalogFacets_SkipInactiveProducts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f, err := s.CatalogFacets(ctx, domain.ProductFilter{})
+	f, err := s.CatalogFacets(ctx, domain.ProductFilter{Currency: domain.CurrencyUSD})
 	if err != nil {
 		t.Fatalf("CatalogFacets: %v", err)
 	}

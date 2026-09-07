@@ -1,20 +1,28 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
+import { CurrencyProvider } from '../../lib/CurrencyProvider'
 import { PriceRange } from './PriceRange'
+
+// The bounds below are dollar minor units ($9.00 … $105.00), so the range
+// renders inside a dollar market — said explicitly, since decision #110
+// made dram the default a bare component would otherwise fall back to.
+beforeEach(() => localStorage.setItem('mb_currency', 'USD'))
 
 function renderRange(
   overrides: Partial<React.ComponentProps<typeof PriceRange>> = {},
 ) {
   const onCommit = vi.fn()
   render(
-    <PriceRange
-      label="Price"
-      min={900}
-      max={10500}
-      value={{ min: 900, max: 10500 }}
-      onCommit={onCommit}
-      {...overrides}
-    />,
+    <CurrencyProvider>
+      <PriceRange
+        label="Price"
+        min={900}
+        max={10500}
+        value={{ min: 900, max: 10500 }}
+        onCommit={onCommit}
+        {...overrides}
+      />
+    </CurrencyProvider>,
   )
   return {
     onCommit,
@@ -79,26 +87,30 @@ describe('PriceRange', () => {
 
   it('follows the value when the URL changes underneath it', () => {
     const { rerender } = render(
-      <PriceRange
-        label="Price"
-        min={900}
-        max={10500}
-        value={{ min: 900, max: 10500 }}
-        onCommit={vi.fn()}
-      />,
+      <CurrencyProvider>
+        <PriceRange
+          label="Price"
+          min={900}
+          max={10500}
+          value={{ min: 900, max: 10500 }}
+          onCommit={vi.fn()}
+        />
+      </CurrencyProvider>,
     )
     expect(screen.getByText('$105.00')).toBeInTheDocument()
 
     // The back button, or a filter cleared elsewhere. Without the sync
     // effect the thumbs would keep showing the old selection.
     rerender(
-      <PriceRange
-        label="Price"
-        min={900}
-        max={10500}
-        value={{ min: 1400, max: 3200 }}
-        onCommit={vi.fn()}
-      />,
+      <CurrencyProvider>
+        <PriceRange
+          label="Price"
+          min={900}
+          max={10500}
+          value={{ min: 1400, max: 3200 }}
+          onCommit={vi.fn()}
+        />
+      </CurrencyProvider>,
     )
     expect(screen.getByText('$14.00')).toBeInTheDocument()
     expect(screen.getByText('$32.00')).toBeInTheDocument()

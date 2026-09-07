@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { ApiError } from '../api/client'
 import { useCancelOrder, useOrder, useReorder } from '../api/hooks'
 import { OrderTracker } from '../components/account/OrderTracker'
+import { PaymentInstructions } from '../components/account/PaymentInstructions'
 import { ReorderReport } from '../components/account/ReorderReport'
 import { Button } from '../components/ui'
 import { useLocale } from '../i18n/useLocale'
@@ -181,6 +182,9 @@ export function OrderDetailPage() {
             <p className="mt-1 text-xs text-ink-soft">
               {t(`order:paymentStatus.${o.payment_status}`)}
             </p>
+            {/* Decision #110: "how to pay", present only while unpaid —
+                the server composes it; the confirmation mail said the same. */}
+            <PaymentInstructions instructions={o.payment_instructions} />
           </section>
 
           {/* Reorder lives HERE, not on the history rows (Aug 2026):

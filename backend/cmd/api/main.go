@@ -15,6 +15,7 @@ import (
 
 	"github.com/Nerses01/Mountain_Breath/backend/internal/api"
 	"github.com/Nerses01/Mountain_Breath/backend/internal/config"
+	"github.com/Nerses01/Mountain_Breath/backend/internal/domain"
 	"github.com/Nerses01/Mountain_Breath/backend/internal/mail"
 	"github.com/Nerses01/Mountain_Breath/backend/internal/store"
 )
@@ -124,6 +125,9 @@ func run(logger *slog.Logger) error {
 				PublicURL:          cfg.PublicURL,
 				GoogleClientID:     cfg.GoogleClientID,
 				GoogleClientSecret: cfg.GoogleClientSecret,
+				BankDetails: domain.BankDetails{
+					Recipient: cfg.BankRecipient, Bank: cfg.BankName, IBAN: cfg.BankIBAN,
+				},
 			}, store.NewPoolCollector(pool)).Routes(),
 		// Never run an HTTP server without timeouts: a client that sends
 		// its request one byte per minute would otherwise hold a goroutine

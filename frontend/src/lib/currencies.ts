@@ -21,7 +21,15 @@ export const CURRENCIES = ['USD', 'AMD'] as const
 
 export type Currency = (typeof CURRENCIES)[number]
 
-export const DEFAULT_CURRENCY: Currency = 'USD'
+/**
+ * Dram since decision #110. The shop sells to Armenia on bank transfer and
+ * cash (#107), and cash is AMD-only, so a first visit must land in the
+ * market where every offered payment method works. A departure from the
+ * canvas, which draws "$14.00 / 6,700 ֏" dollars-first; the backend's
+ * domain.DefaultCurrency says the same, and the two must agree — the first
+ * request after a reload is priced by whichever side answers first.
+ */
+export const DEFAULT_CURRENCY: Currency = 'AMD'
 
 interface CurrencyMeta {
   symbol: string

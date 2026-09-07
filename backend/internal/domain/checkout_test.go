@@ -106,8 +106,16 @@ func TestValidateAddress(t *testing.T) {
 }
 
 func TestValidatePayment(t *testing.T) {
-	if f := domain.ValidatePayment(domain.PayCard, domain.CurrencyUSD); len(f) != 0 {
-		t.Errorf("card in USD rejected: %v", f)
+	if f := domain.ValidatePayment(domain.PayBankTransfer, domain.CurrencyUSD); len(f) != 0 {
+		t.Errorf("bank transfer in USD rejected: %v", f)
+	}
+	// Decision #107: card is a value an order may CARRY (historic ones do)
+	// but not one a new order may CHOOSE — two lists, two answers.
+	if !domain.ValidPaymentMethod(domain.PayCard) {
+		t.Error("card no longer a known value — historic orders would stop rendering")
+	}
+	if f := domain.ValidatePayment(domain.PayCard, domain.CurrencyUSD); f["payment_method"] != domain.ValidationInvalidPaymentMethod {
+		t.Errorf("card offered while frozen: %v", f)
 	}
 	if f := domain.ValidatePayment(domain.PayCashOnDelivery, domain.CurrencyAMD); len(f) != 0 {
 		t.Errorf("cash in AMD rejected: %v", f)
@@ -122,6 +130,27 @@ func TestValidatePayment(t *testing.T) {
 	f = domain.ValidatePayment("crypto", domain.CurrencyUSD)
 	if f["payment_method"] != domain.ValidationInvalidPaymentMethod {
 		t.Errorf("unknown method: %v", f)
+	}
+}
+
+// Decision #110: what happens to the money after checkout, per method.
+func TestPaymentAfterCheckout(t *testing.T) {
+	if !domain.PaymentSettlesOnDelivery(domain.PayCashOnDelivery) {
+		t.Error("cash must settle on delivery — the courier's hand is the payment")
+	}
+	for _, m := range []string{domain.PayBankTransfer, domain.PayCard} {
+		if domain.PaymentSettlesOnDelivery(m) {
+			t.Errorf("%s settles on delivery — only the admin can see a transfer clear", m)
+		}
+	}
+	if got := domain.TransferReference(42); got != "MB-42" {
+		t.Errorf("reference = %q, want MB-42", got)
+	}
+	if (domain.BankDetails{}).Configured() {
+		t.Error("zero bank details count as configured")
+	}
+	if !(domain.BankDetails{IBAN: "AM00"}).Configured() {
+		t.Error("an IBAN is the one thing that makes bank details usable")
 	}
 }
 

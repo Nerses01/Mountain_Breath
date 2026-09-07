@@ -28,7 +28,12 @@ const (
 	CurrencyAMD Currency = "AMD"
 
 	// DefaultCurrency is what an unrecognised or absent request resolves to.
-	DefaultCurrency = CurrencyUSD
+	// Dram since decision #110: the shop sells to Armenia on transfer and
+	// cash (#107), and cash is AMD-only, so a first visit must land in the
+	// market where every offered payment method works. A departure from the
+	// canvas, which draws "$14.00 / 6,700 ֏" dollars-first; the frontend's
+	// DEFAULT_CURRENCY mirrors this constant and says the same.
+	DefaultCurrency = CurrencyAMD
 
 	// BaseCurrency is the one prices are authored in and FX rates are quoted
 	// against — `currencies.is_base` in SQL. It is special in a way the
