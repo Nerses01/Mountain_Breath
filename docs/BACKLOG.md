@@ -235,6 +235,10 @@ reason wrong before it gets built.
       card; product pages could use the product photo) and an
       `Organization` JSON-LD with `logo` on the home page — the icon set
       (decision #108) covers tabs, home screens and result rows only.
+      **Repo social preview** joins here (GitHub → Settings → Social
+      preview, 1280×640; UI-only, no API) — the same card serves both.
+      Re-shoot `docs/images/` for the README when §2's photography lands;
+      the shop and product captures show placeholder tiles (log 09-28).
 - [ ] **DB-backed pages/journal** — tripwire: the family needs to edit
       copy without a commit (#77); also repairs journal posts missing
       from the backend sitemap.

@@ -17,6 +17,82 @@ Template for an entry:
 
 ---
 
+## 2026-09-28 — The repository as a portfolio surface: README, About box, topics
+
+**Worked on:** the README still said Phase 9 was "waiting on hosting",
+26 days after the shop went live. Rewritten as the landing page a
+recruiter or reviewer meets first: brand icon, live badges, links to the
+three language roots and the live API, screenshots of the real site, the
+feature set by area, the engineering highlights a reviewer would open
+first, a Mermaid diagram of the production shape (edge → tunnel → nginx
+→ API → Postgres, with CD, mail, alerts and backups drawn where they
+attach), the test layers, the full documentation table, and the road
+from July to the launch. The GitHub **About** box — description, website
+link, topics — set with `gh repo edit`. Then, at the developer's
+direction, every mention of the learning project came out of the README
+and the About text: the repository's front page presents the shop; the
+learning framework stays in `docs/` (RULES.md, this log), one click away
+rather than on the door. Screenshots captured by a
+throwaway Playwright script against the live site (viewport 1440×900,
+`networkidle` + `document.fonts.ready`, product URL taken from the
+sitemap rather than guessed), committed under `docs/images/`.
+
+**Learned:**
+- *The About box is repository metadata, not a file* — description,
+  homepage and topics live on the GitHub side (`PATCH /repos/{o}/{r}`
+  and `PUT …/topics` under the hood), so no commit carries them; `gh
+  repo edit` is the scriptable way and `gh repo view --json` reads them
+  back. Topics are the discoverability index (`github.com/topics/<x>`),
+  lowercase-hyphenated, twenty at most.
+- *A README is rendered through a whitelist* — GitHub keeps a safe HTML
+  subset (`<p align>`, `<table>`, `<img width>`, `<details>`, `<sub>`)
+  and strips styles and scripts, so layout is done with that subset;
+  Mermaid fences render natively, so the architecture diagram is text
+  in the diff rather than a PNG that rots.
+- *Badges can state facts instead of claims* — shields.io's `website`
+  endpoint probes the URL when the page renders and the
+  `github/actions/workflow/status` one reads the Actions API, so "live"
+  and "CI passing" are measured on view, not typed once. Static badges
+  (Go 1.26, React 19) are the ones that will drift; the stack table
+  beside them is where they get corrected.
+- *Relative image paths resolve to raw blobs* — `docs/images/x.png` in
+  the README works on GitHub without a raw URL. The cost is that binary
+  assets are permanent history: every re-shoot adds its megabytes
+  forever, so keep the set small (three files, ~620 KB) and re-shoot only
+  when the site genuinely changes.
+- *The screenshot script is the e2e toolchain reused* — Playwright's
+  Chromium was already installed for the purchase journey; a real
+  browser at a fixed viewport is the only honest way to capture what a
+  visitor sees, and reading the product URL from `sitemap.xml` uses the
+  site's own contract instead of guessing a route.
+- *Honesty is the asset* — the shop tiles are designed placeholders
+  until the photography lands, and the caption says so. A README that a
+  reader can catch contradicting the repo one click away is worth less
+  than one that does not.
+- *A front page has one job* — the first draft framed the repository as
+  a learning project, because that is how the work is organised
+  internally; the developer's call was that the page should present the
+  product, and the process should stay in the docs that hold it. The
+  same split as a shipped library's README versus its CONTRIBUTING
+  file: what it is first, and separately, how it is made.
+
+**Questions / to revisit:**
+- Re-shoot `docs/images/` when BACKLOG §2's photography ships; the
+  product and shop captures show placeholder tiles by design.
+- An Armenian home capture was taken and dropped before committing: the
+  Armenian and Russian translations are due a refactor (§2's native
+  review), and a screenshot freezes today's wording into history. Add a
+  `/hy` capture back once that copy is final.
+- GitHub's **social preview** (the card Slack and Twitter unfurl) is
+  UI-only — no API, no `gh` flag — and belongs with the `og:image` item
+  in BACKLOG §5; the home capture is a usable stand-in until the brand
+  card exists.
+- The static version badges will lag upgrades; the CI badge and the
+  website badge never will. Consider dropping the version numbers from
+  the badges if they prove annoying to keep true.
+
+---
+
 ## 2026-09-07 — Cash and bank transfer as complete flows; dram becomes the default (decision #110)
 
 **Worked on:** "implement cash" turned out to be three gaps, found by
